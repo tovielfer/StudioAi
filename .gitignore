@@ -5,5 +5,5 @@ dist/
 .env.local
 *.log
 .DS_Store
-uploads/
+apps/api/uploads/
 coverage/
