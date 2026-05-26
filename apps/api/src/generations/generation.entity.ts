@@ -1,0 +1,65 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
+import { User } from '../users/user.entity';
+import {
+  GenerationType,
+  GenerationStatus,
+  ImageQuality,
+  ImageSize,
+  AiProvider,
+} from '../common/constants';
+
+@Entity('generations')
+export class Generation {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  userId: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'userId' })
+  user: User;
+
+  @Column({ type: 'varchar', default: GenerationType.IMAGE })
+  type: GenerationType;
+
+  @Column({ type: 'text' })
+  prompt: string;
+
+  @Column({ type: 'varchar' })
+  model: string;
+
+  @Column({ type: 'varchar', default: GenerationStatus.PENDING })
+  status: GenerationStatus;
+
+  @Column({ type: 'varchar', nullable: true })
+  resultUrl: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  referenceImageUrl: string | null;
+
+  @Column({ type: 'varchar', default: ImageQuality.STANDARD })
+  quality: ImageQuality;
+
+  @Column({ type: 'varchar', default: ImageSize.SQUARE })
+  size: ImageSize;
+
+  @Column({ type: 'varchar', default: AiProvider.MOCK })
+  provider: AiProvider;
+
+  @Column({ type: 'int', default: 0 })
+  creditCost: number;
+
+  @Column({ type: 'text', nullable: true })
+  errorMessage: string | null;
+
+  @CreateDateColumn()
+  createdAt: Date;
+}
