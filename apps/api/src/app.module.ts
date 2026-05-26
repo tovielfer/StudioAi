@@ -10,6 +10,7 @@ import { CreditsModule } from './credits/credits.module';
 import { StorageModule } from './storage/storage.module';
 import { AiModule } from './ai/ai.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { HealthController } from './health.controller';
 import { User } from './users/user.entity';
 import { Generation } from './generations/generation.entity';
 import { CreditTransaction } from './credits/credit-transaction.entity';
@@ -36,7 +37,7 @@ export class AppModule {
           entities: [User, Generation, CreditTransaction],
           migrations: [join(__dirname, 'database/migrations/*.{ts,js}')],
           migrationsRun: true,
-          synchronize: true,
+          synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
         }),
       }),
       AuthModule,
@@ -63,6 +64,6 @@ export class AppModule {
       );
     }
 
-    return { module: AppModule, imports };
+    return { module: AppModule, imports, controllers: [HealthController] };
   }
 }

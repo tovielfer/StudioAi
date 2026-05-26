@@ -1,14 +1,21 @@
 services:
+
+  # ── Infrastructure ─────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: aistudio
-      POSTGRES_PASSWORD: aistudio
-      POSTGRES_DB: aistudio
+      POSTGRES_USER: ${POSTGRES_USER:-aistudio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aistudio}
+      POSTGRES_DB: ${POSTGRES_DB:-aistudio}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aistudio}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -16,7 +23,68 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── API ────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      PORT: ${PORT:-3001}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aistudio}:${POSTGRES_PASSWORD:-aistudio}@postgres:5432/${POSTGRES_DB:-aistudio}
+      REDIS_URL: redis://redis:6379
+      DB_SYNCHRONIZE: ${DB_SYNCHRONIZE:-false}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      LOCAL_STORAGE_PATH: ${LOCAL_STORAGE_PATH:-./uploads}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:?PUBLIC_API_URL is required}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
+      FAL_KEY: ${FAL_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      STABILITY_API_KEY: ${STABILITY_API_KEY:-}
+      ADMIN_SECRET: ${ADMIN_SECRET:?ADMIN_SECRET is required}
+      FRONTEND_URL: ${FRONTEND_URL:?FRONTEND_URL is required}
+    ports:
+      - "${PORT:-3001}:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - api_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Web ────────────────────────────────────────────────────
+  web:
+    build:
+      context: ./apps/web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   postgres_data:
   redis_data:
+  api_uploads:

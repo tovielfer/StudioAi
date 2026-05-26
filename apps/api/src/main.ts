@@ -9,8 +9,15 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule.register());
   const logger = new Logger('Bootstrap');
 
+  const isProduction = process.env.NODE_ENV === 'production';
+  const frontendUrl = process.env.FRONTEND_URL;
+
+  if (isProduction && !frontendUrl) {
+    throw new Error('FRONTEND_URL env variable is required in production');
+  }
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: frontendUrl || 'http://localhost:3000',
     credentials: true,
   });
 
