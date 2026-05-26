@@ -14,7 +14,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package.json ./
-RUN npm install --omit=dev --ignore-scripts
+RUN npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist
 
