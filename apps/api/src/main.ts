@@ -30,8 +30,8 @@ async function bootstrap() {
   );
 
   const port = process.env.PORT || 3001;
-  await app.listen(port);
-  logger.log(`API running on http://localhost:${port}`);
+  await app.listen(port, '0.0.0.0');
+    logger.log(`API running on http://localhost:${port}`);
   if (isSyncQueue()) {
     logger.warn('QUEUE_MODE=sync — running without Redis (local dev)');
   }
