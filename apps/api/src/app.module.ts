@@ -1,4 +1,4 @@
-import { Module, DynamicModule } from '@nestjs/common';
+import { Module, DynamicModule, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
@@ -10,18 +10,24 @@ import { CreditsModule } from './credits/credits.module';
 import { StorageModule } from './storage/storage.module';
 import { AiModule } from './ai/ai.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { AdminModule } from './admin/admin.module';
 import { HealthController } from './health.controller';
+import { LoggerMiddleware } from './common/logger.middleware';
 import { User } from './users/user.entity';
 import { Generation } from './generations/generation.entity';
 import { CreditTransaction } from './credits/credit-transaction.entity';
 import { isSyncQueue } from './config/env.loader';
 
 @Module({})
-export class AppModule {
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(LoggerMiddleware).forRoutes('*');
+  }
+
   static register(): DynamicModule {
     const sync = isSyncQueue();
 
-    const imports: DynamicModule['imports'] = [
+    const coreImports: DynamicModule['imports'] = [
       ConfigModule.forRoot({
         isGlobal: true,
         envFilePath: [
@@ -41,6 +47,22 @@ export class AppModule {
           logging: true,
         }),
       }),
+    ];
+
+    const queueImports: DynamicModule['imports'] = sync
+      ? []
+      : [
+          BullModule.forRootAsync({
+            inject: [ConfigService],
+            useFactory: (config: ConfigService) => ({
+              connection: {
+                url: config.get('REDIS_URL', 'redis://localhost:6379'),
+              },
+            }),
+          }),
+        ];
+
+    const featureImports: DynamicModule['imports'] = [
       AuthModule,
       UsersModule,
       GenerationsModule.register(sync),
@@ -48,23 +70,13 @@ export class AppModule {
       StorageModule,
       AiModule,
       UploadsModule,
+      AdminModule,
     ];
 
-    if (!sync) {
-      imports.splice(
-        2,
-        0,
-        BullModule.forRootAsync({
-          inject: [ConfigService],
-          useFactory: (config: ConfigService) => ({
-            connection: {
-              url: config.get('REDIS_URL', 'redis://localhost:6379'),
-            },
-          }),
-        }),
-      );
-    }
-
-    return { module: AppModule, imports, controllers: [HealthController] };
+    return {
+      module: AppModule,
+      imports: [...coreImports, ...queueImports, ...featureImports],
+      controllers: [HealthController],
+    };
   }
 }

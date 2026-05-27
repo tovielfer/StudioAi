@@ -13,6 +13,9 @@ export function Navbar() {
         { href: '/dashboard', label: 'לוח בקרה' },
         { href: '/create', label: 'יצירה' },
         { href: '/history', label: 'היסטוריה' },
+        ...(user.role === 'admin'
+          ? [{ href: '/admin', label: 'ניהול' }]
+          : []),
       ]
     : [];
 

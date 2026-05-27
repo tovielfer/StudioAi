@@ -267,7 +267,7 @@ export class AiService {
           const form = new FormData();
           form.append('prompt', params.prompt);
           form.append('output_format', 'png');
-          form.append('aspect_ratio', params.size.replace(':', ':'));
+          form.append('aspect_ratio', params.size);
           form.append('width', String(width));
           form.append('height', String(height));
           if (params.referenceImage) {

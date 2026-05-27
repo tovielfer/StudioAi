@@ -8,6 +8,11 @@ import {
 import { Generation } from '../generations/generation.entity';
 import { CreditTransaction } from '../credits/credit-transaction.entity';
 
+export enum UserRole {
+  USER = 'user',
+  ADMIN = 'admin',
+}
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -21,6 +26,9 @@ export class User {
 
   @Column({ default: 25 })
   credits: number;
+
+  @Column({ type: 'varchar', default: UserRole.USER })
+  role: UserRole;
 
   @CreateDateColumn()
   createdAt: Date;

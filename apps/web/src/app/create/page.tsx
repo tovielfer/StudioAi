@@ -175,7 +175,7 @@ function CreateContent() {
               >
                 {selectedModel.qualities.map((q) => (
                   <option key={q.id} value={q.id}>
-                    {q.label} ({q.credits} קרדיטים)
+                    {q.label}
                   </option>
                 ))}
               </select>

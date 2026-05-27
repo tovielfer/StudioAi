@@ -32,25 +32,4 @@ export enum AiProvider {
   MOCK = 'mock',
 }
 
-export const CREDIT_COSTS = {
-  IMAGE_STANDARD: 5,
-  IMAGE_HD: 10,
-  REFERENCE_BONUS: 5,
-  VIDEO: 50,
-} as const;
-
-export function calculateCreditCost(
-  quality: ImageQuality,
-  hasReference: boolean,
-  type: GenerationType = GenerationType.IMAGE,
-): number {
-  if (type === GenerationType.VIDEO) return CREDIT_COSTS.VIDEO;
-
-  let cost =
-    quality === ImageQuality.HD
-      ? CREDIT_COSTS.IMAGE_HD
-      : CREDIT_COSTS.IMAGE_STANDARD;
-
-  if (hasReference) cost += CREDIT_COSTS.REFERENCE_BONUS;
-  return cost;
-}
+export { getGenerationCost } from '../ai/ai-cost.table';

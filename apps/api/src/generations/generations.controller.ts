@@ -17,7 +17,8 @@ import { CreateGenerationDto } from './dto/create-generation.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RateLimitGuard } from '../common/rate-limit.guard';
 import { StorageService } from '../storage/storage.service';
-import { GenerationType } from '../common/constants';
+import { GenerationType, getGenerationCost } from '../common/constants';
+import { ImageQuality, ImageSize, AiProvider } from '../common/constants';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -27,6 +28,26 @@ export class GenerationsController {
     private readonly generationsService: GenerationsService,
     private readonly storageService: StorageService,
   ) {}
+
+  @Get('cost')
+  @UseGuards(JwtAuthGuard)
+  getCost(
+    @Query('provider') provider: string,
+    @Query('model') model: string,
+    @Query('size') size: string,
+    @Query('quality') quality: string,
+    @Query('hasReference') hasReference?: string,
+    @Query('type') type?: GenerationType,
+  ) {
+    return getGenerationCost({
+      provider: provider ?? AiProvider.MOCK,
+      model: model ?? 'gpt-image-1',
+      size: size ?? ImageSize.SQUARE,
+      quality: quality ?? ImageQuality.STANDARD,
+      hasReference: hasReference === 'true',
+      type: type ?? GenerationType.IMAGE,
+    });
+  }
 
   @Post('create')
   @UseGuards(JwtAuthGuard, RateLimitGuard)

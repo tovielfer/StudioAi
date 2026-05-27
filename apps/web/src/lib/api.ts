@@ -4,6 +4,8 @@ export interface User {
   id: string;
   email: string;
   credits: number;
+  role: 'user' | 'admin';
+  createdAt?: string;
 }
 
 export interface AuthResponse {
@@ -26,6 +28,18 @@ export interface Generation {
   creditCost: number;
   errorMessage: string | null;
   createdAt: string;
+}
+
+export interface AdminStats {
+  usersTotal: number;
+  generationsTotal: number;
+  creditsIssued: number;
+  creditsSpent: number;
+  generationsByStatus: Record<string, number>;
+}
+
+export interface AdminGeneration extends Generation {
+  userEmail: string | null;
 }
 
 class ApiClient {
@@ -119,12 +133,74 @@ class ApiClient {
       body: form,
     });
   }
+
+  getGenerationCostPreview(params: {
+    provider: string;
+    model: string;
+    size: string;
+    quality: string;
+    hasReference?: boolean;
+    type?: string;
+  }) {
+    const query = new URLSearchParams({
+      provider: params.provider,
+      model: params.model,
+      size: params.size,
+      quality: params.quality,
+      hasReference: String(params.hasReference ?? false),
+    });
+    if (params.type) query.set('type', params.type);
+    return this.request<{ credits: number; usd: number }>(
+      `/generations/cost?${query.toString()}`,
+    );
+  }
+
+  getAdminStats() {
+    return this.request<AdminStats>('/admin/stats');
+  }
+
+  getAdminUsers(params?: { search?: string; limit?: number; offset?: number }) {
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+    const qs = query.toString();
+    return this.request<{ items: User[]; total: number }>(
+      `/admin/users${qs ? `?${qs}` : ''}`,
+    );
+  }
+
+  getAdminGenerations(params?: {
+    status?: string;
+    userId?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.userId) query.set('userId', params.userId);
+    if (params?.search) query.set('search', params.search);
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+    const qs = query.toString();
+    return this.request<{ items: AdminGeneration[]; total: number }>(
+      `/admin/generations${qs ? `?${qs}` : ''}`,
+    );
+  }
+
+  addAdminCredits(userId: string, amount: number, reason?: string) {
+    return this.request<{ credits: number }>(`/admin/users/${userId}/credits`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, reason }),
+    });
+  }
 }
 
 export const api = new ApiClient();
 
 export interface SizeOption   { id: string; label: string }
-export interface QualityOption { id: string; label: string; credits: number }
+export interface QualityOption { id: string; label: string }
 export interface ModelOption {
   id: string;
   name: string;
@@ -141,9 +217,9 @@ const DEFAULT_SIZES: SizeOption[] = [
 ];
 
 const DEFAULT_QUALITIES: QualityOption[] = [
-  { id: 'fast',     label: 'מהיר', credits: 5 },
-  { id: 'standard', label: 'רגיל', credits: 5 },
-  { id: 'hd',       label: 'HD',   credits: 10 },
+  { id: 'fast',     label: 'מהיר' },
+  { id: 'standard', label: 'רגיל' },
+  { id: 'hd',       label: 'HD'   },
 ];
 
 export const MODELS: ModelOption[] = [
@@ -170,7 +246,7 @@ export const MODELS: ModelOption[] = [
   },
   {
     id: 'gpt-image-1',
-    name: 'OpenAI Image',
+    name: 'OpenAI Image 1',
     provider: 'openai',
     sizes: [
       { id: '1:1',  label: '1024×1024 (ריבוע)' },
@@ -178,9 +254,24 @@ export const MODELS: ModelOption[] = [
       { id: '9:16', label: '1024×1536 (לאורך)' },
     ],
     qualities: [
-      { id: 'fast',     label: 'Low – מהיר',          credits: 5  },
-      { id: 'standard', label: 'Medium – רגיל',        credits: 5  },
-      { id: 'hd',       label: 'High – איכות גבוהה',  credits: 10 },
+      { id: 'fast',     label: 'Low – מהיר'         },
+      { id: 'standard', label: 'Medium – רגיל'       },
+      { id: 'hd',       label: 'High – איכות גבוהה' },
+    ],
+  },
+  {
+    id: 'gpt-image-2',
+    name: 'OpenAI Image 2',
+    provider: 'openai',
+    sizes: [
+      { id: '1:1',  label: '1024×1024 (ריבוע)' },
+      { id: '16:9', label: '1536×1024 (לרוחב)' },
+      { id: '9:16', label: '1024×1536 (לאורך)' },
+    ],
+    qualities: [
+      { id: 'fast',     label: 'Low – מהיר'         },
+      { id: 'standard', label: 'Medium – רגיל'       },
+      { id: 'hd',       label: 'High – איכות גבוהה' },
     ],
   },
   {
@@ -192,6 +283,7 @@ export const MODELS: ModelOption[] = [
   },
 ];
 
+/** @deprecated Use api.getGenerationCostPreview() for accurate backend pricing. */
 export function estimateCost(
   quality: string,
   hasReference: boolean,

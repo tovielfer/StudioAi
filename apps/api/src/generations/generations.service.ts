@@ -20,7 +20,7 @@ import {
   ImageQuality,
   ImageSize,
   AiProvider,
-  calculateCreditCost,
+  getGenerationCost,
 } from '../common/constants';
 import { moderatePrompt } from '../common/moderation';
 
@@ -47,8 +47,17 @@ export class GenerationsService {
 
     const type = dto.type ?? GenerationType.IMAGE;
     const quality = dto.quality ?? ImageQuality.STANDARD;
+    const size = dto.size ?? ImageSize.SQUARE;
+    const provider = dto.provider ?? AiProvider.MOCK;
     const hasReference = !!dto.referenceImageUrl;
-    const creditCost = calculateCreditCost(quality, hasReference, type);
+    const { credits: creditCost } = getGenerationCost({
+      provider,
+      model: dto.model,
+      size,
+      quality,
+      hasReference,
+      type,
+    });
 
     const generation = this.genRepo.create({
       userId,
@@ -56,8 +65,8 @@ export class GenerationsService {
       model: dto.model,
       type,
       quality,
-      size: dto.size ?? ImageSize.SQUARE,
-      provider: dto.provider ?? AiProvider.MOCK,
+      size,
+      provider,
       referenceImageUrl: dto.referenceImageUrl ?? null,
       status: GenerationStatus.PENDING,
       creditCost,
@@ -66,7 +75,7 @@ export class GenerationsService {
     await this.creditsService.deductCredits(
       userId,
       creditCost,
-      `generation:${type}`,
+      `generation:${type}:${provider}:${dto.model}`,
     );
 
     const saved = await this.genRepo.save(generation);

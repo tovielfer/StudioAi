@@ -114,7 +114,4 @@ export class StorageService {
     return this.uploadBuffer(buffer, ext, contentType);
   }
 
-  getLocalStoragePath() {
-    return this.localPath;
-  }
 }

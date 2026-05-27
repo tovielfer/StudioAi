@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
+import { UserRole } from '../users/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -37,11 +38,25 @@ export class AuthService {
     return this.buildAuthResponse(user);
   }
 
-  private buildAuthResponse(user: { id: string; email: string; credits: number }) {
-    const token = this.jwtService.sign({ sub: user.id, email: user.email });
+  private buildAuthResponse(user: {
+    id: string;
+    email: string;
+    credits: number;
+    role: UserRole;
+  }) {
+    const token = this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    });
     return {
       token,
-      user: { id: user.id, email: user.email, credits: user.credits },
+      user: {
+        id: user.id,
+        email: user.email,
+        credits: user.credits,
+        role: user.role,
+      },
     };
   }
 }
