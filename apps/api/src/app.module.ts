@@ -38,6 +38,7 @@ export class AppModule {
           migrations: [join(__dirname, 'database/migrations/*.{ts,js}')],
           migrationsRun: true,
           synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
+          logging: true,
         }),
       }),
       AuthModule,

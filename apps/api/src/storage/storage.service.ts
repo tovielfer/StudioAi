@@ -27,7 +27,8 @@ export class StorageService {
 
     const accountId = config.get('R2_ACCOUNT_ID');
     if (this.storageType === 'r2' && accountId) {
-      this.s3 = new S3Client({
+      const logger = this.logger;
+      const s3 = new S3Client({
         region: 'auto',
         endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
         credentials: {
@@ -35,6 +36,30 @@ export class StorageService {
           secretAccessKey: config.get('R2_SECRET_ACCESS_KEY', ''),
         },
       });
+
+      s3.middlewareStack.add(
+        (next) => async (args) => {
+          const result = await next(args).catch(async (err) => {
+            const raw = (err as { $response?: { body?: unknown } })?.$response?.body;
+            if (raw) {
+              try {
+                const chunks: Buffer[] = [];
+                for await (const chunk of raw as AsyncIterable<Buffer>) {
+                  chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+                }
+                logger.error(`R2 raw error body: ${Buffer.concat(chunks).toString('utf-8')}`);
+              } catch {
+                logger.error(`R2 raw error body could not be read`);
+              }
+            }
+            throw err;
+          });
+          return result;
+        },
+        { step: 'deserialize', name: 'r2ErrorLogger', priority: 'low' },
+      );
+
+      this.s3 = s3;
     } else {
       this.s3 = null;
     }
@@ -48,14 +73,27 @@ export class StorageService {
     const key = `generations/${uuidv4()}.${ext}`;
 
     if (this.storageType === 'r2' && this.s3) {
-      await this.s3.send(
-        new PutObjectCommand({
-          Bucket: this.bucket,
-          Key: key,
-          Body: buffer,
-          ContentType: contentType,
-        }),
-      );
+      try {
+        await this.s3.send(
+          new PutObjectCommand({
+            Bucket: this.bucket,
+            Key: key,
+            Body: buffer,
+            ContentType: contentType,
+          }),
+        );
+      } catch (err) {
+        const code =
+          (err as Record<string, unknown>)?.Code ??
+          (err as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode ??
+          'unknown';
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.error(
+          `R2 upload failed (bucket=${this.bucket} key=${key} code=${code}): ${msg}`,
+          err instanceof Error ? err.stack : undefined,
+        );
+        throw new Error(`R2 upload failed [${code}]: ${msg}`);
+      }
       return `${this.publicUrl}/${key}`;
     }
 

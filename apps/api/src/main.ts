@@ -7,6 +7,8 @@ import { isSyncQueue } from './config/env.loader';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule.register());
+  console.log('PORT FROM ENV:', process.env.PORT); // 👈 כאן
+
   const logger = new Logger('Bootstrap');
 
   const isProduction = process.env.NODE_ENV === 'production';
@@ -29,9 +31,11 @@ async function bootstrap() {
     }),
   );
 
+  app.enableShutdownHooks();
+
   const port = process.env.PORT || 3001;
   await app.listen(port, '0.0.0.0');
-    logger.log(`API running on http://localhost:${port}`);
+  logger.log(`API running on http://localhost:${port}`);
   if (isSyncQueue()) {
     logger.warn('QUEUE_MODE=sync — running without Redis (local dev)');
   }

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "nest build",
+    "predev": "npx kill-port 3001 || exit 0",
     "dev": "nest start --watch",
     "start": "node dist/main",
     "start:prod": "node dist/main",
@@ -12,6 +13,7 @@
     "migration:generate": "nest build && typeorm migration:generate -d dist/database/data-source.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.787.0",
     "@nestjs/bullmq": "^11.0.2",
     "@nestjs/common": "^11.0.12",
     "@nestjs/config": "^4.0.2",
@@ -20,7 +22,6 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.12",
     "@nestjs/typeorm": "^11.0.0",
-    "@aws-sdk/client-s3": "^3.787.0",
     "bcrypt": "^5.1.1",
     "bullmq": "^5.44.4",
     "class-transformer": "^0.5.1",
@@ -42,6 +43,7 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^22.14.0",
     "@types/passport-jwt": "^4.0.1",
+    "kill-port": "^2.0.1",
     "typescript": "^5.8.3"
   }
 }

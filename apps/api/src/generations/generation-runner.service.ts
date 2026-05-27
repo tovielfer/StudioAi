@@ -71,7 +71,11 @@ export class GenerationRunnerService {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Generation ${generationId} failed: ${message}`);
+      const name = error instanceof Error ? error.name : 'Error';
+      this.logger.error(
+        `Generation ${generationId} failed [${name}]: ${message}`,
+        error instanceof Error ? error.stack : String(error),
+      );
 
       if (isLastAttempt) {
         await this.genRepo.update(generationId, {
