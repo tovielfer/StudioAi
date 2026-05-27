@@ -6,7 +6,6 @@ import { useAuth } from '@/lib/auth-context';
 import {
   api,
   MODELS,
-  estimateCost,
   Generation,
 } from '@/lib/api';
 import { translateError } from '@/lib/he';
@@ -30,9 +29,12 @@ function CreateContent() {
   const [generating, setGenerating] = useState(false);
   const [currentGen, setCurrentGen] = useState<Generation | null>(null);
   const [error, setError] = useState('');
+  const [cost, setCost] = useState<number | null>(null);
+  const [costLoading, setCostLoading] = useState(false);
+  const [costError, setCostError] = useState('');
 
   const selectedModel = MODELS.find((m) => m.id === model)!;
-  const cost = estimateCost(quality, !!referenceFile);
+  const hasReference = !!referenceFile;
 
   const handleModelChange = (newModel: string) => {
     setModel(newModel);
@@ -68,9 +70,45 @@ function CreateContent() {
     }
   }, [refreshCredits]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    setCostLoading(true);
+    setCostError('');
+
+    api.getGenerationCostPreview({
+      provider: selectedModel.provider,
+      model: selectedModel.id,
+      size,
+      quality,
+      hasReference,
+    })
+      .then((preview) => {
+        if (!cancelled) setCost(preview.credits);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCost(null);
+          setCostError('לא ניתן לחשב את העלות כרגע');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCostLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedModel.provider, selectedModel.id, size, quality, hasReference]);
+
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       setError(translateError('Please enter a prompt'));
+      return;
+    }
+
+    if (cost === null) {
+      setError('לא ניתן ליצור לפני חישוב העלות');
       return;
     }
 
@@ -203,13 +241,20 @@ function CreateContent() {
 
           <div className="flex items-center justify-between pt-2">
             <div className="text-sm text-gray-400">
-              עלות: <span className="text-brand-400 font-medium">{cost} קרדיטים</span>
+              עלות:{' '}
+              <span className="text-brand-400 font-medium">
+                {costLoading
+                  ? 'מחשב...'
+                  : cost !== null
+                    ? `${cost} קרדיטים`
+                    : costError || 'לא זמין'}
+              </span>
               {' · '}
               יתרה: {user?.credits ?? 0}
             </div>
             <button
               onClick={handleGenerate}
-              disabled={generating || (user?.credits ?? 0) < cost}
+              disabled={generating || cost === null || (user?.credits ?? 0) < cost}
               className="btn-primary"
             >
               {generating ? 'יוצר...' : 'יצירה'}
