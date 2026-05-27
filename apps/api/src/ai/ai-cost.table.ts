@@ -15,6 +15,12 @@ const IMAGE_COST_TABLE: Record<
       '9:16': { fast: 0.016, standard: 0.06,  hd: 0.25  },
       '4:3':  { fast: 0.016, standard: 0.06,  hd: 0.25  },
     },
+    'gpt-image-2': {
+      '1:1':  { fast: 0.015, standard: 0.05,  hd: 0.22  },
+      '16:9': { fast: 0.015, standard: 0.05,  hd: 0.22  },
+      '9:16': { fast: 0.015, standard: 0.05,  hd: 0.22  },
+      '4:3':  { fast: 0.015, standard: 0.05,  hd: 0.22  },
+    },
   },
 
   replicate: {
