@@ -123,25 +123,73 @@ class ApiClient {
 
 export const api = new ApiClient();
 
-export const MODELS = [
-  { id: 'flux-schnell', name: 'Flux Schnell', provider: 'mock' },
-  { id: 'flux-dev', name: 'Flux Dev', provider: 'replicate' },
-  { id: 'sd3', name: 'Stable Diffusion 3', provider: 'stability' },
-  { id: 'gpt-image-1', name: 'OpenAI Image', provider: 'openai' },
-    { id: 'fal-flux', name: 'Fal Flux', provider: 'fal' },
-];
+export interface SizeOption   { id: string; label: string }
+export interface QualityOption { id: string; label: string; credits: number }
+export interface ModelOption {
+  id: string;
+  name: string;
+  provider: string;
+  sizes: SizeOption[];
+  qualities: QualityOption[];
+}
 
-export const SIZES = [
-  { id: '1:1', label: '1:1 ריבוע' },
+const DEFAULT_SIZES: SizeOption[] = [
+  { id: '1:1',  label: '1:1 ריבוע' },
   { id: '16:9', label: '16:9 לרוחב' },
   { id: '9:16', label: '9:16 לאורך' },
-  { id: '4:3', label: '4:3 סטנדרטי' },
+  { id: '4:3',  label: '4:3 סטנדרטי' },
 ];
 
-export const QUALITIES = [
-  { id: 'fast', label: 'מהיר', credits: 5 },
+const DEFAULT_QUALITIES: QualityOption[] = [
+  { id: 'fast',     label: 'מהיר', credits: 5 },
   { id: 'standard', label: 'רגיל', credits: 5 },
-  { id: 'hd', label: 'HD', credits: 10 },
+  { id: 'hd',       label: 'HD',   credits: 10 },
+];
+
+export const MODELS: ModelOption[] = [
+  {
+    id: 'flux-schnell',
+    name: 'Flux Schnell',
+    provider: 'mock',
+    sizes: DEFAULT_SIZES,
+    qualities: DEFAULT_QUALITIES,
+  },
+  {
+    id: 'flux-dev',
+    name: 'Flux Dev',
+    provider: 'replicate',
+    sizes: DEFAULT_SIZES,
+    qualities: DEFAULT_QUALITIES,
+  },
+  {
+    id: 'sd3',
+    name: 'Stable Diffusion 3',
+    provider: 'stability',
+    sizes: DEFAULT_SIZES,
+    qualities: DEFAULT_QUALITIES,
+  },
+  {
+    id: 'gpt-image-1',
+    name: 'OpenAI Image',
+    provider: 'openai',
+    sizes: [
+      { id: '1:1',  label: '1024×1024 (ריבוע)' },
+      { id: '16:9', label: '1536×1024 (לרוחב)' },
+      { id: '9:16', label: '1024×1536 (לאורך)' },
+    ],
+    qualities: [
+      { id: 'fast',     label: 'Low – מהיר',          credits: 5  },
+      { id: 'standard', label: 'Medium – רגיל',        credits: 5  },
+      { id: 'hd',       label: 'High – איכות גבוהה',  credits: 10 },
+    ],
+  },
+  {
+    id: 'fal-flux',
+    name: 'Fal Flux',
+    provider: 'fal',
+    sizes: DEFAULT_SIZES,
+    qualities: DEFAULT_QUALITIES,
+  },
 ];
 
 export function estimateCost(

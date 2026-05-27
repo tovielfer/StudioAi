@@ -65,9 +65,16 @@ export class GenerationRunnerService {
         resultUrl,
         provider: result.provider as AiProvider,
         errorMessage: null,
+        tokensUsed: result.usage ?? null,
       });
 
-      this.logger.log(`Generation ${generationId} completed`);
+      if (result.usage) {
+        this.logger.log(
+          `Generation ${generationId} completed — tokens: input=${result.usage.input_tokens}, output=${result.usage.output_tokens}, total=${result.usage.total_tokens}`,
+        );
+      } else {
+        this.logger.log(`Generation ${generationId} completed`);
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown error';

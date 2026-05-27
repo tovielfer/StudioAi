@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GenerateImageParams, GenerateImageResult } from './ai.types';
+import { GenerateImageParams, GenerateImageResult, ImageUsage } from './ai.types';
 import { AiProvider } from '../common/constants';
 
 @Injectable()
@@ -185,12 +185,22 @@ export class AiService {
     return map[size] ?? '1024x1024';
   }
 
+  private openAIQualityFromImageQuality(quality?: string): string {
+    const map: Record<string, string> = {
+      fast: 'low',
+      standard: 'medium',
+      hd: 'high',
+    };
+    return map[quality ?? ''] ?? 'medium';
+  }
+
   private async generateOpenAI(
     params: GenerateImageParams,
   ): Promise<GenerateImageResult> {
     const key = this.config.get('OPENAI_API_KEY');
     const model = this.resolveOpenAIModel(params.model);
     const size = this.openAISizeFromAspectRatio(params.size);
+    const quality = this.openAIQualityFromImageQuality(params.quality);
 
     const response = await fetch(
       'https://api.openai.com/v1/images/generations',
@@ -204,6 +214,7 @@ export class AiService {
           model,
           prompt: params.prompt,
           size,
+          quality,
           n: 1,
         }),
       },
@@ -216,16 +227,22 @@ export class AiService {
 
     const data = (await response.json()) as {
       data?: { url?: string; b64_json?: string }[];
+      usage?: ImageUsage;
     };
+
+    this.logger.log(
+      `OpenAI usage — input: ${data.usage?.input_tokens ?? 'N/A'}, output: ${data.usage?.output_tokens ?? 'N/A'}, total: ${data.usage?.total_tokens ?? 'N/A'}`,
+    );
 
     const item = data.data?.[0];
     if (item?.url) {
-      return { imageUrl: item.url, provider: AiProvider.OPENAI };
+      return { imageUrl: item.url, provider: AiProvider.OPENAI, usage: data.usage };
     }
     if (item?.b64_json) {
       return {
         imageUrl: `data:image/png;base64,${item.b64_json}`,
         provider: AiProvider.OPENAI,
+        usage: data.usage,
       };
     }
 

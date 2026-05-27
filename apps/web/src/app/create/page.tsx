@@ -6,8 +6,6 @@ import { useAuth } from '@/lib/auth-context';
 import {
   api,
   MODELS,
-  SIZES,
-  QUALITIES,
   estimateCost,
   Generation,
 } from '@/lib/api';
@@ -35,6 +33,17 @@ function CreateContent() {
 
   const selectedModel = MODELS.find((m) => m.id === model)!;
   const cost = estimateCost(quality, !!referenceFile);
+
+  const handleModelChange = (newModel: string) => {
+    setModel(newModel);
+    const newModelDef = MODELS.find((m) => m.id === newModel);
+    if (newModelDef && !newModelDef.sizes.find((s) => s.id === size)) {
+      setSize(newModelDef.sizes[0].id);
+    }
+    if (newModelDef && !newModelDef.qualities.find((q) => q.id === quality)) {
+      setQuality(newModelDef.qualities[0].id);
+    }
+  };
 
   const handleReferenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -131,7 +140,7 @@ function CreateContent() {
             <label className="block text-sm text-gray-400 mb-1.5">מודל</label>
             <select
               value={model}
-              onChange={(e) => setModel(e.target.value)}
+              onChange={(e) => handleModelChange(e.target.value)}
               className="input-field"
             >
               {MODELS.map((m) => (
@@ -150,7 +159,7 @@ function CreateContent() {
                 onChange={(e) => setSize(e.target.value)}
                 className="input-field"
               >
-                {SIZES.map((s) => (
+                {selectedModel.sizes.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.label}
                   </option>
@@ -164,7 +173,7 @@ function CreateContent() {
                 onChange={(e) => setQuality(e.target.value)}
                 className="input-field"
               >
-                {QUALITIES.map((q) => (
+                {selectedModel.qualities.map((q) => (
                   <option key={q.id} value={q.id}>
                     {q.label} ({q.credits} קרדיטים)
                   </option>

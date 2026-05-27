@@ -60,6 +60,14 @@ export class Generation {
   @Column({ type: 'text', nullable: true })
   errorMessage: string | null;
 
+  @Column({ type: 'jsonb', nullable: true })
+  tokensUsed: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    input_tokens_details?: { text_tokens?: number; image_tokens?: number };
+  } | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

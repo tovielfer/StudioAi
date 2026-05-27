@@ -35,8 +35,7 @@ async function bootstrap() {
 
   console.log('PORT:', process.env.PORT);
   // const port = process.env.PORT || 3001;
-  const port = Number(process.env.PORT);
-
+  const port = process.env.PORT || 3001;
   if (!port) {
     throw new Error('PORT is not defined');
   }
