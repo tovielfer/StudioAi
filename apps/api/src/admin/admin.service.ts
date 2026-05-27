@@ -106,6 +106,7 @@ export class AdminService {
       .addSelect('g.size', 'size')
       .addSelect('g.provider', 'provider')
       .addSelect('g.creditCost', 'creditCost')
+      .addSelect('g.tokensUsed', 'tokensUsed')
       .addSelect('g.errorMessage', 'errorMessage')
       .addSelect('g.createdAt', 'createdAt')
       .orderBy('g.createdAt', 'DESC')

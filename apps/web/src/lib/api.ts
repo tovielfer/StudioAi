@@ -13,6 +13,16 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface TokensUsed {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  input_tokens_details?: {
+    text_tokens?: number;
+    image_tokens?: number;
+  };
+}
+
 export interface Generation {
   id: string;
   userId: string;
@@ -26,6 +36,7 @@ export interface Generation {
   size: string;
   provider: string;
   creditCost: number;
+  tokensUsed: TokensUsed | null;
   errorMessage: string | null;
   createdAt: string;
 }
