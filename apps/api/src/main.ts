@@ -34,9 +34,15 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   console.log('PORT:', process.env.PORT);
-  const port = process.env.PORT || 3001;
+  // const port = process.env.PORT || 3001;
+  const port = Number(process.env.PORT);
 
+  if (!port) {
+    throw new Error('PORT is not defined');
+  }
+  
   await app.listen(port, '0.0.0.0');
+  // await app.listen(port, '0.0.0.0');
   logger.log(`API running on http://localhost:${port}`);
   if (isSyncQueue()) {
     logger.warn('QUEUE_MODE=sync — running without Redis (local dev)');
