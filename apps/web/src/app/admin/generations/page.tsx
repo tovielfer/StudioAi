@@ -100,7 +100,7 @@ function AdminGenerationsContent() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1120px] text-sm">
+              <table className="w-full min-w-[1240px] text-sm">
                 <thead className="text-gray-500 border-b border-gray-200">
                   <tr>
                     <th className="text-right py-3 pe-4">משתמש</th>
@@ -111,6 +111,7 @@ function AdminGenerationsContent() {
                     <th className="text-right py-3 pe-4">tokensUsed</th>
                     <th className="text-right py-3 pe-4">גודל</th>
                     <th className="text-right py-3 pe-4">איכות</th>
+                    <th className="text-right py-3 pe-4">תמונת מקור</th>
                     <th className="text-right py-3 pe-4">תוצאה</th>
                     <th className="text-right py-3">נוצר</th>
                   </tr>
@@ -144,14 +145,40 @@ function AdminGenerationsContent() {
                         <div className="font-semibold text-gray-950">
                           {formatTokens(generation.tokensUsed?.total_tokens)}
                         </div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          input {formatTokens(generation.tokensUsed?.input_tokens)} · output{' '}
-                          {formatTokens(generation.tokensUsed?.output_tokens)}
+                        <div className="mt-1 space-y-0.5 text-xs text-gray-500">
+                          <div>
+                            input {formatTokens(generation.tokensUsed?.input_tokens)} · output{' '}
+                            {formatTokens(generation.tokensUsed?.output_tokens)}
+                          </div>
+                          <div>
+                            text{' '}
+                            {formatTokens(generation.tokensUsed?.input_tokens_details?.text_tokens)} · image{' '}
+                            {formatTokens(generation.tokensUsed?.input_tokens_details?.image_tokens)}
+                          </div>
                         </div>
                       </td>
                       <td className="py-3 pe-4 text-gray-600">{generation.size}</td>
                       <td className="py-3 pe-4 text-gray-600">
                         {generation.quality}
+                      </td>
+                      <td className="py-3 pe-4">
+                        {generation.referenceImageUrl ? (
+                          <a
+                            href={generation.referenceImageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 text-brand-700 hover:underline"
+                          >
+                            <img
+                              src={generation.referenceImageUrl}
+                              alt="תמונת מקור"
+                              className="h-10 w-10 rounded-md border border-gray-200 object-cover"
+                            />
+                            פתיחה
+                          </a>
+                        ) : (
+                          <span className="text-gray-400">אין</span>
+                        )}
                       </td>
                       <td className="py-3 pe-4">
                         {generation.resultUrl ? (

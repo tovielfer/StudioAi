@@ -222,7 +222,7 @@ function CreateContent() {
 
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">
-              תמונת השראה (אופציונלי, +5 קרדיטים)
+              תמונת השראה (אופציונלי)
             </label>
             <input
               type="file"

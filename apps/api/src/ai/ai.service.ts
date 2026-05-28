@@ -194,6 +194,97 @@ export class AiService {
     return map[quality ?? ''] ?? 'medium';
   }
 
+  private extensionFromContentType(contentType: string): string {
+    if (contentType.includes('jpeg')) return 'jpg';
+    if (contentType.includes('webp')) return 'webp';
+    if (contentType.includes('png')) return 'png';
+    return 'png';
+  }
+
+  private filenameFromReferenceUrl(referenceImage: string, contentType: string): string {
+    try {
+      const filename = new URL(referenceImage).pathname.split('/').pop();
+      if (filename?.includes('.')) return filename;
+    } catch {
+      // Fall back to a generated filename when the stored reference is not a URL.
+    }
+
+    return `reference.${this.extensionFromContentType(contentType)}`;
+  }
+
+  private async fetchReferenceImage(referenceImage: string): Promise<{
+    blob: Blob;
+    filename: string;
+  }> {
+    const response = await fetch(referenceImage);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch reference image: ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get('content-type') || 'image/png';
+    const blob = new Blob([await response.arrayBuffer()], { type: contentType });
+    const filename = this.filenameFromReferenceUrl(referenceImage, contentType);
+
+    return { blob, filename };
+  }
+
+  private async editOpenAIImage(
+    params: GenerateImageParams,
+    model: string,
+    size: string,
+    quality: string,
+  ): Promise<GenerateImageResult> {
+    if (!params.referenceImage) {
+      throw new Error('Reference image is required for OpenAI image edits');
+    }
+
+    const { blob, filename } = await this.fetchReferenceImage(params.referenceImage);
+    const form = new FormData();
+    form.append('model', model);
+    form.append('prompt', params.prompt);
+    form.append('size', size);
+    form.append('quality', quality);
+    form.append('n', '1');
+    form.append('image', blob, filename);
+
+    const key = this.config.get('OPENAI_API_KEY');
+    const response = await fetch('https://api.openai.com/v1/images/edits', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+      },
+      body: form,
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`OpenAI error: ${err}`);
+    }
+
+    const data = (await response.json()) as {
+      data?: { url?: string; b64_json?: string }[];
+      usage?: ImageUsage;
+    };
+
+    this.logger.log(
+      `OpenAI edit usage — input: ${data.usage?.input_tokens ?? 'N/A'}, output: ${data.usage?.output_tokens ?? 'N/A'}, total: ${data.usage?.total_tokens ?? 'N/A'}`,
+    );
+
+    const item = data.data?.[0];
+    if (item?.url) {
+      return { imageUrl: item.url, provider: AiProvider.OPENAI, usage: data.usage };
+    }
+    if (item?.b64_json) {
+      return {
+        imageUrl: `data:image/png;base64,${item.b64_json}`,
+        provider: AiProvider.OPENAI,
+        usage: data.usage,
+      };
+    }
+
+    throw new Error('OpenAI returned no image');
+  }
+
   private async generateOpenAI(
     params: GenerateImageParams,
   ): Promise<GenerateImageResult> {
@@ -201,6 +292,10 @@ export class AiService {
     const model = this.resolveOpenAIModel(params.model);
     const size = this.openAISizeFromAspectRatio(params.size);
     const quality = this.openAIQualityFromImageQuality(params.quality);
+
+    if (params.referenceImage) {
+      return this.editOpenAIImage(params, model, size, quality);
+    }
 
     const response = await fetch(
       'https://api.openai.com/v1/images/generations',
