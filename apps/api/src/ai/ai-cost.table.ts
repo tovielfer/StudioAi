@@ -75,12 +75,12 @@ const IMAGE_COST_TABLE: Record<
       '9:16': { fast: 0.134, standard: 0.134, hd: 0.134 },
       '4:3':  { fast: 0.134, standard: 0.134, hd: 0.134 },
     },
-    'gemini-3.1-flash-image-preview': {
-      '1:1':  { fast: 0.0672, standard: 0.0672, hd: 0.0672 },
-      '16:9': { fast: 0.0672, standard: 0.0672, hd: 0.0672 },
-      '9:16': { fast: 0.0672, standard: 0.0672, hd: 0.0672 },
-      '4:3':  { fast: 0.0672, standard: 0.0672, hd: 0.0672 },
-    },
+    // 'gemini-3.1-flash-image-preview': {
+    //   '1:1':  { fast: 0.0672, standard: 0.0672, hd: 0.0672 },
+    //   '16:9': { fast: 0.0672, standard: 0.0672, hd: 0.0672 },
+    //   '9:16': { fast: 0.0672, standard: 0.0672, hd: 0.0672 },
+    //   '4:3':  { fast: 0.0672, standard: 0.0672, hd: 0.0672 },
+    // },
     'gemini-2.5-flash-image': {
       '1:1':  { fast: 0.039, standard: 0.039, hd: 0.039 },
       '16:9': { fast: 0.039, standard: 0.039, hd: 0.039 },
