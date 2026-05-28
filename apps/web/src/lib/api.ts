@@ -238,27 +238,27 @@ const DEFAULT_QUALITIES: QualityOption[] = [
 ];
 
 export const MODELS: ModelOption[] = [
-  {
-    id: 'flux-schnell',
-    name: 'Flux Schnell',
-    provider: 'mock',
-    sizes: DEFAULT_SIZES,
-    qualities: DEFAULT_QUALITIES,
-  },
-  {
-    id: 'flux-dev',
-    name: 'Flux Dev',
-    provider: 'replicate',
-    sizes: DEFAULT_SIZES,
-    qualities: DEFAULT_QUALITIES,
-  },
-  {
-    id: 'sd3',
-    name: 'Stable Diffusion 3',
-    provider: 'stability',
-    sizes: DEFAULT_SIZES,
-    qualities: DEFAULT_QUALITIES,
-  },
+  // {
+  //   id: 'flux-schnell',
+  //   name: 'Flux Schnell',
+  //   provider: 'mock',
+  //   sizes: DEFAULT_SIZES,
+  //   qualities: DEFAULT_QUALITIES,
+  // },
+  // {
+  //   id: 'flux-dev',
+  //   name: 'Flux Dev',
+  //   provider: 'replicate',
+  //   sizes: DEFAULT_SIZES,
+  //   qualities: DEFAULT_QUALITIES,
+  // },
+  // {
+  //   id: 'sd3',
+  //   name: 'Stable Diffusion 3',
+  //   provider: 'stability',
+  //   sizes: DEFAULT_SIZES,
+  //   qualities: DEFAULT_QUALITIES,
+  // },
   {
     id: 'gpt-image-1',
     name: 'OpenAI Image 1',
@@ -289,13 +289,13 @@ export const MODELS: ModelOption[] = [
       { id: 'hd',       label: 'High – איכות גבוהה' },
     ],
   },
-  {
-    id: 'fal-flux',
-    name: 'Fal Flux',
-    provider: 'fal',
-    sizes: DEFAULT_SIZES,
-    qualities: DEFAULT_QUALITIES,
-  },
+  // {
+  //   id: 'fal-flux',
+  //   name: 'Fal Flux',
+  //   provider: 'fal',
+  //   sizes: DEFAULT_SIZES,
+  //   qualities: DEFAULT_QUALITIES,
+  // },
   {
     id: 'gemini-3-pro-image-preview',
     name: 'Nano Banana Pro',
