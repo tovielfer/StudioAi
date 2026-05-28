@@ -393,14 +393,55 @@ export class AiService {
     };
   }
 
+  private extractGoogleImage(response: {
+    candidates?: Array<{
+      content?: { parts?: Array<{ inlineData?: { mimeType?: string; data?: string }; text?: string }> };
+      finishReason?: string;
+      safetyRatings?: unknown;
+    }>;
+    promptFeedback?: { blockReason?: string; safetyRatings?: unknown };
+  }): string {
+    const candidate = response.candidates?.[0];
+    const parts = candidate?.content?.parts ?? [];
+
+    for (const part of parts) {
+      if (part.inlineData?.data) {
+        const mimeType = part.inlineData.mimeType || 'image/png';
+        return `data:${mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+
+    const textParts = parts
+      .map((p) => p.text)
+      .filter((t): t is string => typeof t === 'string' && t.length > 0);
+    const blockReason = response.promptFeedback?.blockReason;
+    const finishReason = candidate?.finishReason;
+
+    this.logger.error(
+      `Google Gemini returned no image. blockReason=${blockReason ?? 'none'}, finishReason=${finishReason ?? 'none'}, text=${textParts.join(' | ') || 'none'}`,
+    );
+
+    if (blockReason) {
+      throw new Error(`Google Gemini blocked the request: ${blockReason}`);
+    }
+    if (finishReason && finishReason !== 'STOP') {
+      throw new Error(
+        `Google Gemini finished without image (reason: ${finishReason})${textParts.length ? `: ${textParts.join(' ')}` : ''}`,
+      );
+    }
+    if (textParts.length) {
+      throw new Error(`Google Gemini returned text instead of image: ${textParts.join(' ')}`);
+    }
+    throw new Error('Google Gemini returned no image');
+  }
+
   private async generateGoogle(
     params: GenerateImageParams,
   ): Promise<GenerateImageResult> {
     const key = this.config.get('GOOGLE_API_KEY');
     const ai = new GoogleGenAI({ apiKey: key });
-    const model = params.model || 'gemini-3.1-flash-image-preview';
-
-    let imageUrl = '';
+    const model = params.model || 'gemini-2.5-flash-image';
+    const config = { responseModalities: ['IMAGE'] as string[] };
 
     if (params.referenceImage) {
       const { blob } = await this.fetchReferenceImage(params.referenceImage);
@@ -408,38 +449,31 @@ export class AiService {
       const imageBase64 = Buffer.from(arrayBuffer).toString('base64');
       const mimeType = blob.type || 'image/png';
 
-      const chat = ai.chats.create({ model });
-      const response = await chat.sendMessage({
-        message: [
-          { inlineData: { mimeType, data: imageBase64 } },
-          params.prompt,
-        ],
-      });
-
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          imageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
-          break;
-        }
-      }
-    } else {
       const response = await ai.models.generateContent({
         model,
-        contents: params.prompt,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType, data: imageBase64 } },
+              { text: params.prompt },
+            ],
+          },
+        ],
+        config,
       });
 
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          imageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
-          break;
-        }
-      }
+      const imageUrl = this.extractGoogleImage(response);
+      return { imageUrl, provider: AiProvider.GOOGLE };
     }
 
-    if (!imageUrl) {
-      throw new Error('Google Gemini returned no image');
-    }
+    const response = await ai.models.generateContent({
+      model,
+      contents: params.prompt,
+      config,
+    });
 
+    const imageUrl = this.extractGoogleImage(response);
     return { imageUrl, provider: AiProvider.GOOGLE };
   }
 }
