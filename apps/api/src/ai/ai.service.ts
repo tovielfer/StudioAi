@@ -441,7 +441,6 @@ export class AiService {
     const key = this.config.get('GOOGLE_API_KEY');
     const ai = new GoogleGenAI({ apiKey: key });
     const model = params.model || 'gemini-2.5-flash-image';
-    const config = { responseModalities: ['IMAGE'] as string[] };
 
     if (params.referenceImage) {
       const { blob } = await this.fetchReferenceImage(params.referenceImage);
@@ -460,7 +459,6 @@ export class AiService {
             ],
           },
         ],
-        config,
       });
 
       const imageUrl = this.extractGoogleImage(response);
@@ -470,7 +468,6 @@ export class AiService {
     const response = await ai.models.generateContent({
       model,
       contents: params.prompt,
-      config,
     });
 
     const imageUrl = this.extractGoogleImage(response);
