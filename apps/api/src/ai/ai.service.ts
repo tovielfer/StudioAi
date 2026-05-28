@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { GoogleGenAI } from '@google/genai';
 import { GenerateImageParams, GenerateImageResult, ImageUsage } from './ai.types';
 import { AiProvider } from '../common/constants';
 
@@ -15,6 +16,7 @@ export class AiService {
       fal: AiProvider.FAL,
       openai: AiProvider.OPENAI,
       stability: AiProvider.STABILITY,
+      google: AiProvider.GOOGLE,
       mock: AiProvider.MOCK,
     };
 
@@ -37,6 +39,8 @@ export class AiService {
         return !!this.config.get('OPENAI_API_KEY');
       case AiProvider.STABILITY:
         return !!this.config.get('STABILITY_API_KEY');
+      case AiProvider.GOOGLE:
+        return !!this.config.get('GOOGLE_API_KEY');
       default:
         return true;
     }
@@ -54,6 +58,8 @@ export class AiService {
         return this.generateOpenAI(params);
       case AiProvider.STABILITY:
         return this.generateStability(params);
+      case AiProvider.GOOGLE:
+        return this.generateGoogle(params);
       default:
         return this.generateMock(params);
     }
@@ -385,5 +391,55 @@ export class AiService {
       imageUrl: `data:image/png;base64,${data.image}`,
       provider: AiProvider.STABILITY,
     };
+  }
+
+  private async generateGoogle(
+    params: GenerateImageParams,
+  ): Promise<GenerateImageResult> {
+    const key = this.config.get('GOOGLE_API_KEY');
+    const ai = new GoogleGenAI({ apiKey: key });
+    const model = params.model || 'gemini-3.1-flash-image-preview';
+
+    let imageUrl = '';
+
+    if (params.referenceImage) {
+      const { blob } = await this.fetchReferenceImage(params.referenceImage);
+      const arrayBuffer = await blob.arrayBuffer();
+      const imageBase64 = Buffer.from(arrayBuffer).toString('base64');
+      const mimeType = blob.type || 'image/png';
+
+      const chat = ai.chats.create({ model });
+      const response = await chat.sendMessage({
+        message: [
+          { inlineData: { mimeType, data: imageBase64 } },
+          params.prompt,
+        ],
+      });
+
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+          imageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+          break;
+        }
+      }
+    } else {
+      const response = await ai.models.generateContent({
+        model,
+        contents: params.prompt,
+      });
+
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+          imageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+          break;
+        }
+      }
+    }
+
+    if (!imageUrl) {
+      throw new Error('Google Gemini returned no image');
+    }
+
+    return { imageUrl, provider: AiProvider.GOOGLE };
   }
 }

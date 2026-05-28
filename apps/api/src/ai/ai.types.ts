@@ -7,11 +7,28 @@ export interface GenerateImageParams {
   provider: string;
 }
 
+export interface GenerateTextParams {
+  prompt: string;
+  model?: string;
+  provider?: string;
+  systemInstruction?: string;
+}
+
+export interface GenerateTextResult {
+  text: string;
+  provider: string;
+  usage?: ImageUsage;
+}
+
 export interface ImageUsage {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
   input_tokens_details?: {
+    text_tokens?: number;
+    image_tokens?: number;
+  };
+  output_tokens_details?: {
     text_tokens?: number;
     image_tokens?: number;
   };

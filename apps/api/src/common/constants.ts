@@ -29,6 +29,7 @@ export enum AiProvider {
   FAL = 'fal',
   OPENAI = 'openai',
   STABILITY = 'stability',
+  GOOGLE = 'google',
   MOCK = 'mock',
 }
 

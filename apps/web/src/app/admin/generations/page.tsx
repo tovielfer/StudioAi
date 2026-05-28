@@ -151,9 +151,14 @@ function AdminGenerationsContent() {
                             {formatTokens(generation.tokensUsed?.output_tokens)}
                           </div>
                           <div>
-                            text{' '}
+                            input text{' '}
                             {formatTokens(generation.tokensUsed?.input_tokens_details?.text_tokens)} · image{' '}
                             {formatTokens(generation.tokensUsed?.input_tokens_details?.image_tokens)}
+                          </div>
+                          <div>
+                            output text{' '}
+                            {formatTokens(generation.tokensUsed?.output_tokens_details?.text_tokens)} · image{' '}
+                            {formatTokens(generation.tokensUsed?.output_tokens_details?.image_tokens)}
                           </div>
                         </div>
                       </td>
