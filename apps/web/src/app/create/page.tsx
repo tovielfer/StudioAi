@@ -52,16 +52,30 @@ function CreateContent() {
     const selected = Array.from(e.target.files ?? []);
     if (!selected.length) return;
 
-    const oversized = selected.find((f) => f.size > 5 * 1024 * 1024);
-    if (oversized) {
-      setError(translateError('Reference image must be under 5MB'));
+    const MAX_SIZE = 20 * 1024 * 1024;
+    const valid = selected.filter((f) => f.size <= MAX_SIZE);
+    const skipped = selected.filter((f) => f.size > MAX_SIZE);
+
+    if (skipped.length > 0) {
+      setError(
+        skipped.length === 1
+          ? `"${skipped[0].name}" גדולה מ-20MB ולא נוספה`
+          : `${skipped.length} תמונות גדולות מ-20MB ולא נוספו`,
+      );
+    } else {
+      setError('');
+    }
+
+    if (valid.length === 0) {
+      e.target.value = '';
       return;
     }
 
     const remaining = MAX_REFERENCES - referenceFiles.length;
-    const toAdd = selected.slice(0, remaining);
+    const toAdd = valid.slice(0, remaining);
     if (toAdd.length === 0) {
       setError(`ניתן להעלות עד ${MAX_REFERENCES} תמונות השראה`);
+      e.target.value = '';
       return;
     }
 
@@ -70,7 +84,6 @@ function CreateContent() {
       ...prev,
       ...toAdd.map((f) => URL.createObjectURL(f)),
     ]);
-    setError('');
     e.target.value = '';
   };
 
@@ -272,13 +285,16 @@ function CreateContent() {
               </div>
             )}
             {referenceFiles.length < MAX_REFERENCES && (
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleReferenceChange}
-                className="input-field file:me-4 file:py-1 file:px-3 file:rounded file:border-0 file:bg-brand-600 file:text-white file:text-sm"
-              />
+              <>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleReferenceChange}
+                  className="input-field file:me-4 file:py-1 file:px-3 file:rounded file:border-0 file:bg-brand-600 file:text-white file:text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">כל תמונה חייבת להיות עד 20MB</p>
+              </>
             )}
           </div>
 

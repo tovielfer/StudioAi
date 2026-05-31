@@ -20,7 +20,7 @@ import { StorageService } from '../storage/storage.service';
 import { GenerationType, getGenerationCost } from '../common/constants';
 import { ImageQuality, ImageSize, AiProvider } from '../common/constants';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
 @Controller('generations')
 export class GenerationsController {
