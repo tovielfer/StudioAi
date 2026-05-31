@@ -56,6 +56,11 @@ export class AdminController {
     });
   }
 
+  @Get('cost-stats')
+  getCostStats() {
+    return this.adminService.getCostStats();
+  }
+
   @Post('users/:id/credits')
   addCredits(
     @Param('id', ParseUUIDPipe) id: string,

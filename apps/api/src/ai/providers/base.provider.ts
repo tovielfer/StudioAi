@@ -25,16 +25,32 @@ export abstract class BaseImageProvider {
     if (!response.ok) {
       throw new Error(`Failed to fetch reference image: ${response.statusText}`);
     }
-    const contentType = response.headers.get('content-type') || 'image/png';
+    const raw = response.headers.get('content-type') ?? '';
+    // R2 (and some CDNs) may return application/octet-stream — fall back to URL extension
+    const contentType = raw.startsWith('image/')
+      ? raw.split(';')[0].trim()
+      : this.contentTypeFromUrl(url);
     const blob = new Blob([await response.arrayBuffer()], { type: contentType });
     const filename = this.filenameFromUrl(url, contentType);
     return { blob, filename };
   }
 
+  private contentTypeFromUrl(url: string): string {
+    const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
+    const map: Record<string, string> = {
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      png: 'image/png',
+      webp: 'image/webp',
+      gif: 'image/gif',
+    };
+    return map[ext ?? ''] ?? 'image/png';
+  }
+
   private filenameFromUrl(url: string, contentType: string): string {
     try {
       const filename = new URL(url).pathname.split('/').pop();
-      if (filename?.includes('.')) return filename;
+      if (filename?.includes('.')) return filename.toLowerCase();
     } catch {
       // fall through
     }

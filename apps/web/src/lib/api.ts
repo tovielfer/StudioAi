@@ -57,6 +57,21 @@ export interface AdminGeneration extends Generation {
   userEmail: string | null;
 }
 
+export interface AdminCostStat {
+  provider: string;
+  model: string;
+  size: string;
+  quality: string;
+  count: number;
+  totalCredits: number;
+  avgCredits: number;
+  refCount: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalInputImageTokens: number;
+  totalOutputImageTokens: number;
+}
+
 class ApiClient {
   private getToken(): string | null {
     if (typeof window === 'undefined') return null;
@@ -209,6 +224,10 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ amount, reason }),
     });
+  }
+
+  getAdminCostStats() {
+    return this.request<AdminCostStat[]>('/admin/cost-stats');
   }
 }
 

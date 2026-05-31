@@ -130,6 +130,60 @@ export class AdminService {
     );
   }
 
+  async getCostStats() {
+    const rows = await this.generationsRepo
+      .createQueryBuilder('g')
+      .select('g.provider', 'provider')
+      .addSelect('g.model', 'model')
+      .addSelect('g.size', 'size')
+      .addSelect('g.quality', 'quality')
+      .addSelect('COUNT(*)::int', 'count')
+      .addSelect(`SUM(g."creditCost")::int`, 'totalCredits')
+      .addSelect(`ROUND(AVG(g."creditCost")::numeric, 1)`, 'avgCredits')
+      .addSelect(
+        `SUM(CASE WHEN g."referenceImageUrls" IS NOT NULL AND jsonb_array_length(g."referenceImageUrls") > 0 THEN 1 ELSE 0 END)::int`,
+        'refCount',
+      )
+      .addSelect(
+        `COALESCE(SUM((g."tokensUsed"->>'input_tokens')::int), 0)::int`,
+        'totalInputTokens',
+      )
+      .addSelect(
+        `COALESCE(SUM((g."tokensUsed"->>'output_tokens')::int), 0)::int`,
+        'totalOutputTokens',
+      )
+      .addSelect(
+        `COALESCE(SUM((g."tokensUsed"->'input_tokens_details'->>'image_tokens')::int), 0)::int`,
+        'totalInputImageTokens',
+      )
+      .addSelect(
+        `COALESCE(SUM((g."tokensUsed"->'output_tokens_details'->>'image_tokens')::int), 0)::int`,
+        'totalOutputImageTokens',
+      )
+      .where('g.status = :status', { status: GenerationStatus.DONE })
+      .groupBy('g.provider')
+      .addGroupBy('g.model')
+      .addGroupBy('g.size')
+      .addGroupBy('g.quality')
+      .orderBy(`SUM(g."creditCost")`, 'DESC')
+      .getRawMany<Record<string, string>>();
+
+    return rows.map((r) => ({
+      provider: r['provider'],
+      model: r['model'],
+      size: r['size'],
+      quality: r['quality'],
+      count: Number(r['count']),
+      totalCredits: Number(r['totalCredits']),
+      avgCredits: Number(r['avgCredits']),
+      refCount: Number(r['refCount']),
+      totalInputTokens: Number(r['totalInputTokens']),
+      totalOutputTokens: Number(r['totalOutputTokens']),
+      totalInputImageTokens: Number(r['totalInputImageTokens']),
+      totalOutputImageTokens: Number(r['totalOutputImageTokens']),
+    }));
+  }
+
   private async getCreditTotals() {
     const row = await this.creditTransactionsRepo
       .createQueryBuilder('tx')
