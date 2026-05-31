@@ -1,14 +1,30 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenAI } from '@google/genai';
-import { GenerateImageParams, GenerateImageResult, ImageUsage } from './ai.types';
+import { GenerateImageParams, GenerateImageResult } from './ai.types';
 import { AiProvider } from '../common/constants';
+import { BaseImageProvider } from './providers/base.provider';
+import { MockProvider } from './providers/mock.provider';
+import { OpenAIProvider } from './providers/openai.provider';
+import { GoogleProvider } from './providers/google.provider';
+import { ReplicateProvider } from './providers/replicate.provider';
+import { FalProvider } from './providers/fal.provider';
+import { StabilityProvider } from './providers/stability.provider';
 
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
+  private readonly providers: Map<AiProvider, BaseImageProvider>;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService) {
+    this.providers = new Map([
+      [AiProvider.MOCK, new MockProvider(config)],
+      [AiProvider.OPENAI, new OpenAIProvider(config)],
+      [AiProvider.GOOGLE, new GoogleProvider(config)],
+      [AiProvider.REPLICATE, new ReplicateProvider(config)],
+      [AiProvider.FAL, new FalProvider(config)],
+      [AiProvider.STABILITY, new StabilityProvider(config)],
+    ]);
+  }
 
   resolveProvider(requested: string): AiProvider {
     const map: Record<string, AiProvider> = {
@@ -21,472 +37,27 @@ export class AiService {
     };
 
     const provider = map[requested] ?? AiProvider.MOCK;
-    if (this.isProviderConfigured(provider)) return provider;
+    if (this.isConfigured(provider)) return provider;
 
-    this.logger.warn(
-      `Provider ${provider} not configured, falling back to mock`,
-    );
+    this.logger.warn(`Provider ${provider} not configured, falling back to mock`);
     return AiProvider.MOCK;
-  }
-
-  private isProviderConfigured(provider: AiProvider): boolean {
-    switch (provider) {
-      case AiProvider.REPLICATE:
-        return !!this.config.get('REPLICATE_API_TOKEN');
-      case AiProvider.FAL:
-        return !!this.config.get('FAL_KEY');
-      case AiProvider.OPENAI:
-        return !!this.config.get('OPENAI_API_KEY');
-      case AiProvider.STABILITY:
-        return !!this.config.get('STABILITY_API_KEY');
-      case AiProvider.GOOGLE:
-        return !!this.config.get('GOOGLE_API_KEY');
-      default:
-        return true;
-    }
   }
 
   async generateImage(params: GenerateImageParams): Promise<GenerateImageResult> {
     const provider = this.resolveProvider(params.provider);
-
-    switch (provider) {
-      case AiProvider.REPLICATE:
-        return this.generateReplicate(params);
-      case AiProvider.FAL:
-        return this.generateFal(params);
-      case AiProvider.OPENAI:
-        return this.generateOpenAI(params);
-      case AiProvider.STABILITY:
-        return this.generateStability(params);
-      case AiProvider.GOOGLE:
-        return this.generateGoogle(params);
-      default:
-        return this.generateMock(params);
-    }
+    const handler = this.providers.get(provider) ?? this.providers.get(AiProvider.MOCK)!;
+    return handler.generate(params);
   }
 
-  private sizeToDimensions(size: string): { width: number; height: number } {
-    const map: Record<string, { width: number; height: number }> = {
-      '1:1': { width: 1024, height: 1024 },
-      '16:9': { width: 1344, height: 768 },
-      '9:16': { width: 768, height: 1344 },
-      '4:3': { width: 1152, height: 896 },
+  private isConfigured(provider: AiProvider): boolean {
+    const keys: Partial<Record<AiProvider, string>> = {
+      [AiProvider.REPLICATE]: 'REPLICATE_API_TOKEN',
+      [AiProvider.FAL]: 'FAL_KEY',
+      [AiProvider.OPENAI]: 'OPENAI_API_KEY',
+      [AiProvider.STABILITY]: 'STABILITY_API_KEY',
+      [AiProvider.GOOGLE]: 'GOOGLE_API_KEY',
     };
-    return map[size] ?? map['1:1'];
-  }
-
-  private async generateMock(
-    params: GenerateImageParams,
-  ): Promise<GenerateImageResult> {
-    const { width, height } = this.sizeToDimensions(params.size);
-    const encodedPrompt = encodeURIComponent(params.prompt.slice(0, 80));
-    const imageUrl = `https://placehold.co/${width}x${height}/1a1a2e/eee?text=${encodedPrompt}`;
-    await new Promise((r) => setTimeout(r, 1500));
-    return { imageUrl, provider: AiProvider.MOCK };
-  }
-
-  private async generateReplicate(
-    params: GenerateImageParams,
-  ): Promise<GenerateImageResult> {
-    const token = this.config.get('REPLICATE_API_TOKEN');
-    const model =
-      params.model || 'black-forest-labs/flux-schnell';
-
-    const { width, height } = this.sizeToDimensions(params.size);
-
-    const response = await fetch('https://api.replicate.com/v1/predictions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        Prefer: 'wait',
-      },
-      body: JSON.stringify({
-        version: model.includes('/') ? undefined : model,
-        model: model.includes('/') ? model : undefined,
-        input: {
-          prompt: params.prompt,
-          width,
-          height,
-          ...(this.resolveReferenceImages(params)[0]
-            ? { image: this.resolveReferenceImages(params)[0] }
-            : {}),
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Replicate error: ${err}`);
-    }
-
-    const data = (await response.json()) as {
-      output?: string | string[];
-    };
-
-    const output = Array.isArray(data.output) ? data.output[0] : data.output;
-    if (!output) throw new Error('Replicate returned no output');
-
-    return { imageUrl: output, provider: AiProvider.REPLICATE };
-  }
-
-  private resolveFalEndpoint(model?: string): string {
-    const defaults: Record<string, string> = {
-      'fal-flux': 'https://fal.run/fal-ai/flux/schnell',
-      'flux-schnell': 'https://fal.run/fal-ai/flux/schnell',
-    };
-    if (model?.startsWith('http')) return model;
-    return defaults[model ?? ''] ?? 'https://fal.run/fal-ai/flux/schnell';
-  }
-
-  private async generateFal(
-    params: GenerateImageParams,
-  ): Promise<GenerateImageResult> {
-    const key = this.config.get('FAL_KEY');
-    const endpoint = this.resolveFalEndpoint(params.model);
-
-    const { width, height } = this.sizeToDimensions(params.size);
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        Authorization: `Key ${key}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        prompt: params.prompt,
-        image_size: { width, height },
-        ...(this.resolveReferenceImages(params)[0]
-          ? { image_url: this.resolveReferenceImages(params)[0] }
-          : {}),
-      }),
-    });
-
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Fal.ai error: ${err}`);
-    }
-
-    const data = (await response.json()) as {
-      images?: { url: string }[];
-    };
-
-    const imageUrl = data.images?.[0]?.url;
-    if (!imageUrl) throw new Error('Fal.ai returned no image');
-
-    return { imageUrl, provider: AiProvider.FAL };
-  }
-
-  private resolveOpenAIModel(model?: string): string {
-    return model ?? 'gpt-image-1';
-  }
-
-  private openAISizeFromAspectRatio(size: string): string {
-    const map: Record<string, string> = {
-      '1:1': '1024x1024',
-      '16:9': '1536x1024',
-      '9:16': '1024x1536',
-      '4:3': '1536x1024',
-    };
-    return map[size] ?? '1024x1024';
-  }
-
-  private openAIQualityFromImageQuality(quality?: string): string {
-    const map: Record<string, string> = {
-      fast: 'low',
-      standard: 'medium',
-      hd: 'high',
-    };
-    return map[quality ?? ''] ?? 'medium';
-  }
-
-  private extensionFromContentType(contentType: string): string {
-    if (contentType.includes('jpeg')) return 'jpg';
-    if (contentType.includes('webp')) return 'webp';
-    if (contentType.includes('png')) return 'png';
-    return 'png';
-  }
-
-  private filenameFromReferenceUrl(referenceImage: string, contentType: string): string {
-    try {
-      const filename = new URL(referenceImage).pathname.split('/').pop();
-      if (filename?.includes('.')) return filename;
-    } catch {
-      // Fall back to a generated filename when the stored reference is not a URL.
-    }
-
-    return `reference.${this.extensionFromContentType(contentType)}`;
-  }
-
-  private async fetchReferenceImage(referenceImage: string): Promise<{
-    blob: Blob;
-    filename: string;
-  }> {
-    const response = await fetch(referenceImage);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch reference image: ${response.statusText}`);
-    }
-
-    const contentType = response.headers.get('content-type') || 'image/png';
-    const blob = new Blob([await response.arrayBuffer()], { type: contentType });
-    const filename = this.filenameFromReferenceUrl(referenceImage, contentType);
-
-    return { blob, filename };
-  }
-
-  private async editOpenAIImage(
-    params: GenerateImageParams,
-    model: string,
-    size: string,
-    quality: string,
-  ): Promise<GenerateImageResult> {
-    const allRefs = this.resolveReferenceImages(params);
-    if (allRefs.length === 0) {
-      throw new Error('Reference image is required for OpenAI image edits');
-    }
-
-    const form = new FormData();
-    form.append('model', model);
-    form.append('prompt', params.prompt);
-    form.append('size', size);
-    form.append('quality', quality);
-    form.append('n', '1');
-
-    for (const refUrl of allRefs) {
-      const { blob, filename } = await this.fetchReferenceImage(refUrl);
-      form.append('image[]', blob, filename);
-    }
-
-    const key = this.config.get('OPENAI_API_KEY');
-    const response = await fetch('https://api.openai.com/v1/images/edits', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-      },
-      body: form,
-    });
-
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`OpenAI error: ${err}`);
-    }
-
-    const data = (await response.json()) as {
-      data?: { url?: string; b64_json?: string }[];
-      usage?: ImageUsage;
-    };
-
-    this.logger.log(
-      `OpenAI edit usage — input: ${data.usage?.input_tokens ?? 'N/A'}, output: ${data.usage?.output_tokens ?? 'N/A'}, total: ${data.usage?.total_tokens ?? 'N/A'}`,
-    );
-
-    const item = data.data?.[0];
-    if (item?.url) {
-      return { imageUrl: item.url, provider: AiProvider.OPENAI, usage: data.usage };
-    }
-    if (item?.b64_json) {
-      return {
-        imageUrl: `data:image/png;base64,${item.b64_json}`,
-        provider: AiProvider.OPENAI,
-        usage: data.usage,
-      };
-    }
-
-    throw new Error('OpenAI returned no image');
-  }
-
-  private resolveReferenceImages(params: GenerateImageParams): string[] {
-    if (params.referenceImages?.length) return params.referenceImages;
-    if (params.referenceImage) return [params.referenceImage];
-    return [];
-  }
-
-  private async generateOpenAI(
-    params: GenerateImageParams,
-  ): Promise<GenerateImageResult> {
-    const key = this.config.get('OPENAI_API_KEY');
-    const model = this.resolveOpenAIModel(params.model);
-    const size = this.openAISizeFromAspectRatio(params.size);
-    const quality = this.openAIQualityFromImageQuality(params.quality);
-
-    if (this.resolveReferenceImages(params).length > 0) {
-      return this.editOpenAIImage(params, model, size, quality);
-    }
-
-    const response = await fetch(
-      'https://api.openai.com/v1/images/generations',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${key}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          prompt: params.prompt,
-          size,
-          quality,
-          n: 1,
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`OpenAI error: ${err}`);
-    }
-
-    const data = (await response.json()) as {
-      data?: { url?: string; b64_json?: string }[];
-      usage?: ImageUsage;
-    };
-
-    this.logger.log(
-      `OpenAI usage — input: ${data.usage?.input_tokens ?? 'N/A'}, output: ${data.usage?.output_tokens ?? 'N/A'}, total: ${data.usage?.total_tokens ?? 'N/A'}`,
-    );
-
-    const item = data.data?.[0];
-    if (item?.url) {
-      return { imageUrl: item.url, provider: AiProvider.OPENAI, usage: data.usage };
-    }
-    if (item?.b64_json) {
-      return {
-        imageUrl: `data:image/png;base64,${item.b64_json}`,
-        provider: AiProvider.OPENAI,
-        usage: data.usage,
-      };
-    }
-
-    throw new Error('OpenAI returned no image');
-  }
-
-  private async generateStability(
-    params: GenerateImageParams,
-  ): Promise<GenerateImageResult> {
-    const key = this.config.get('STABILITY_API_KEY');
-    const { width, height } = this.sizeToDimensions(params.size);
-
-    const response = await fetch(
-      'https://api.stability.ai/v2beta/stable-image/generate/sd3',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${key}`,
-          Accept: 'application/json',
-        },
-        body: (() => {
-          const form = new FormData();
-          form.append('prompt', params.prompt);
-          form.append('output_format', 'png');
-          form.append('aspect_ratio', params.size);
-          form.append('width', String(width));
-          form.append('height', String(height));
-          const firstRef = this.resolveReferenceImages(params)[0];
-          if (firstRef) {
-            form.append('image', firstRef);
-          }
-          return form;
-        })(),
-      },
-    );
-
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Stability AI error: ${err}`);
-    }
-
-    const data = (await response.json()) as { image?: string };
-    if (!data.image) throw new Error('Stability AI returned no image');
-
-    return {
-      imageUrl: `data:image/png;base64,${data.image}`,
-      provider: AiProvider.STABILITY,
-    };
-  }
-
-  private extractGoogleImage(response: {
-    candidates?: Array<{
-      content?: { parts?: Array<{ inlineData?: { mimeType?: string; data?: string }; text?: string }> };
-      finishReason?: string;
-      safetyRatings?: unknown;
-    }>;
-    promptFeedback?: { blockReason?: string; safetyRatings?: unknown };
-  }): string {
-    const candidate = response.candidates?.[0];
-    const parts = candidate?.content?.parts ?? [];
-
-    for (const part of parts) {
-      if (part.inlineData?.data) {
-        const mimeType = part.inlineData.mimeType || 'image/png';
-        return `data:${mimeType};base64,${part.inlineData.data}`;
-      }
-    }
-
-    const textParts = parts
-      .map((p) => p.text)
-      .filter((t): t is string => typeof t === 'string' && t.length > 0);
-    const blockReason = response.promptFeedback?.blockReason;
-    const finishReason = candidate?.finishReason;
-
-    this.logger.error(
-      `Google Gemini returned no image. blockReason=${blockReason ?? 'none'}, finishReason=${finishReason ?? 'none'}, text=${textParts.join(' | ') || 'none'}`,
-    );
-
-    if (blockReason) {
-      throw new Error(`Google Gemini blocked the request: ${blockReason}`);
-    }
-    if (finishReason && finishReason !== 'STOP') {
-      throw new Error(
-        `Google Gemini finished without image (reason: ${finishReason})${textParts.length ? `: ${textParts.join(' ')}` : ''}`,
-      );
-    }
-    if (textParts.length) {
-      throw new Error(`Google Gemini returned text instead of image: ${textParts.join(' ')}`);
-    }
-    throw new Error('Google Gemini returned no image');
-  }
-
-  private async generateGoogle(
-    params: GenerateImageParams,
-  ): Promise<GenerateImageResult> {
-    const key = this.config.get('GOOGLE_API_KEY');
-    const ai = new GoogleGenAI({ apiKey: key });
-    const model = params.model || 'gemini-2.5-flash-image';
-    const allRefs = this.resolveReferenceImages(params);
-
-    if (allRefs.length > 0) {
-      const imageParts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
-      for (const refUrl of allRefs) {
-        const { blob } = await this.fetchReferenceImage(refUrl);
-        const arrayBuffer = await blob.arrayBuffer();
-        const imageBase64 = Buffer.from(arrayBuffer).toString('base64');
-        const mimeType = blob.type || 'image/png';
-        imageParts.push({ inlineData: { mimeType, data: imageBase64 } });
-      }
-
-      const response = await ai.models.generateContent({
-        model,
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              ...imageParts,
-              { text: params.prompt },
-            ],
-          },
-        ],
-      });
-
-      const imageUrl = this.extractGoogleImage(response);
-      return { imageUrl, provider: AiProvider.GOOGLE };
-    }
-
-    const response = await ai.models.generateContent({
-      model,
-      contents: params.prompt,
-    });
-
-    const imageUrl = this.extractGoogleImage(response);
-    return { imageUrl, provider: AiProvider.GOOGLE };
+    const key = keys[provider];
+    return key ? !!this.config.get(key) : true;
   }
 }
