@@ -20,19 +20,45 @@ export abstract class BaseImageProvider {
     return params.referenceImages?.length ? params.referenceImages : [];
   }
 
+  private static readonly REFERENCE_IMAGE_TIMEOUT_MS = 10_000;
+  private static readonly REFERENCE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
   protected async fetchReferenceImage(url: string): Promise<{ blob: Blob; filename: string }> {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch reference image: ${response.statusText}`);
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error('Invalid reference image URL');
     }
-    const raw = response.headers.get('content-type') ?? '';
-    // R2 (and some CDNs) may return application/octet-stream — fall back to URL extension
-    const contentType = raw.startsWith('image/')
-      ? raw.split(';')[0].trim()
-      : this.contentTypeFromUrl(url);
-    const blob = new Blob([await response.arrayBuffer()], { type: contentType });
-    const filename = this.filenameFromUrl(url, contentType);
-    return { blob, filename };
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      throw new Error(`Unsupported reference image protocol: ${parsed.protocol}`);
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      BaseImageProvider.REFERENCE_IMAGE_TIMEOUT_MS,
+    );
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch reference image: ${response.statusText}`);
+      }
+      const buffer = await response.arrayBuffer();
+      if (buffer.byteLength > BaseImageProvider.REFERENCE_IMAGE_MAX_BYTES) {
+        throw new Error('Reference image exceeds maximum allowed size');
+      }
+      const raw = response.headers.get('content-type') ?? '';
+      // R2 (and some CDNs) may return application/octet-stream — fall back to URL extension
+      const contentType = raw.startsWith('image/')
+        ? raw.split(';')[0].trim()
+        : this.contentTypeFromUrl(url);
+      const blob = new Blob([buffer], { type: contentType });
+      const filename = this.filenameFromUrl(url, contentType);
+      return { blob, filename };
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private contentTypeFromUrl(url: string): string {

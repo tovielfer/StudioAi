@@ -385,13 +385,13 @@ export const MODELS: ModelOption[] = [
     sizes: DEFAULT_SIZES,
     qualities: DEFAULT_QUALITIES,
   },
-  {
-    id: 'gemini-3.1-flash-image',
-    name: 'Nano Banana 2',
-    provider: 'google',
-    sizes: DEFAULT_SIZES,
-    qualities: DEFAULT_QUALITIES,
-  },
+  // {
+  //   id: 'gemini-3.1-flash-image',
+  //   name: 'Nano Banana 2',
+  //   provider: 'google',
+  //   sizes: DEFAULT_SIZES,
+  //   qualities: DEFAULT_QUALITIES,
+  // },
   {
     id: 'gemini-2.5-flash-image',
     name: 'Nano Banana',

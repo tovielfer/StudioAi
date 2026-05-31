@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { GoogleGenAI } from '@google/genai';
 import { AiProvider } from '../../common/constants';
-import { GenerateImageParams, GenerateImageResult } from '../ai.types';
+import { GenerateImageParams, GenerateImageResult, ImageUsage } from '../ai.types';
 import { BaseImageProvider } from './base.provider';
 
 export class GoogleProvider extends BaseImageProvider {
@@ -9,29 +9,52 @@ export class GoogleProvider extends BaseImageProvider {
 
   async generate(params: GenerateImageParams): Promise<GenerateImageResult> {
     const key = this.config.get('GOOGLE_API_KEY');
+    if (!key) {
+      throw new Error('GOOGLE_API_KEY is not configured');
+    }
     const ai = new GoogleGenAI({ apiKey: key });
     const model = params.model || 'gemini-2.5-flash-image';
     const refs = this.resolveReferenceImages(params);
 
-    if (refs.length > 0) {
-      const imageParts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
-
-      for (const refUrl of refs) {
-        const { blob } = await this.fetchReferenceImage(refUrl);
-        const imageBase64 = Buffer.from(await blob.arrayBuffer()).toString('base64');
-        imageParts.push({ inlineData: { mimeType: blob.type || 'image/png', data: imageBase64 } });
-      }
-
-      const response = await ai.models.generateContent({
-        model,
-        contents: [{ role: 'user', parts: [...imageParts, { text: params.prompt }] }],
-      });
-
-      return { imageUrl: this.extractImage(response), provider: AiProvider.GOOGLE };
+    const imageParts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
+    for (const refUrl of refs) {
+      const { blob } = await this.fetchReferenceImage(refUrl);
+      const imageBase64 = Buffer.from(await blob.arrayBuffer()).toString('base64');
+      imageParts.push({ inlineData: { mimeType: blob.type || 'image/png', data: imageBase64 } });
     }
 
-    const response = await ai.models.generateContent({ model, contents: params.prompt });
-    return { imageUrl: this.extractImage(response), provider: AiProvider.GOOGLE };
+    const contents =
+      imageParts.length > 0
+        ? [{ role: 'user', parts: [...imageParts, { text: params.prompt }] }]
+        : params.prompt;
+
+    const response = await ai.models.generateContent({
+      model,
+      contents,
+      config: { responseModalities: ['TEXT', 'IMAGE'] },
+    });
+
+    const usage = this.extractUsage(response);
+    this.logger.log(
+      `Google generate (refs: ${imageParts.length}) — input: ${usage?.input_tokens ?? 'N/A'}, output: ${usage?.output_tokens ?? 'N/A'}`,
+    );
+    return { imageUrl: this.extractImage(response), provider: AiProvider.GOOGLE, usage };
+  }
+
+  private extractUsage(response: {
+    usageMetadata?: {
+      promptTokenCount?: number;
+      candidatesTokenCount?: number;
+      totalTokenCount?: number;
+    };
+  }): ImageUsage | undefined {
+    const meta = response.usageMetadata;
+    if (!meta) return undefined;
+    return {
+      input_tokens: meta.promptTokenCount ?? 0,
+      output_tokens: meta.candidatesTokenCount ?? 0,
+      total_tokens: meta.totalTokenCount ?? 0,
+    };
   }
 
   private extractImage(response: {
@@ -40,6 +63,7 @@ export class GoogleProvider extends BaseImageProvider {
       finishReason?: string;
     }>;
     promptFeedback?: { blockReason?: string };
+    usageMetadata?: unknown;
   }): string {
     const candidate = response.candidates?.[0];
     const parts = candidate?.content?.parts ?? [];
