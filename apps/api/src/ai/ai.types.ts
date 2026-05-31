@@ -4,6 +4,7 @@ export interface GenerateImageParams {
   size: string;
   quality: string;
   referenceImage?: string | null;
+  referenceImages?: string[] | null;
   provider: string;
 }
 

@@ -2,6 +2,7 @@ import {
   IsString,
   IsOptional,
   IsEnum,
+  IsArray,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -40,4 +41,9 @@ export class CreateGenerationDto {
   @IsOptional()
   @IsString()
   referenceImageUrl?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  referenceImageUrls?: string[];
 }

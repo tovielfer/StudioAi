@@ -108,8 +108,8 @@ export class AiService {
           prompt: params.prompt,
           width,
           height,
-          ...(params.referenceImage
-            ? { image: params.referenceImage }
+          ...(this.resolveReferenceImages(params)[0]
+            ? { image: this.resolveReferenceImages(params)[0] }
             : {}),
         },
       }),
@@ -156,8 +156,8 @@ export class AiService {
       body: JSON.stringify({
         prompt: params.prompt,
         image_size: { width, height },
-        ...(params.referenceImage
-          ? { image_url: params.referenceImage }
+        ...(this.resolveReferenceImages(params)[0]
+          ? { image_url: this.resolveReferenceImages(params)[0] }
           : {}),
       }),
     });
@@ -240,18 +240,22 @@ export class AiService {
     size: string,
     quality: string,
   ): Promise<GenerateImageResult> {
-    if (!params.referenceImage) {
+    const allRefs = this.resolveReferenceImages(params);
+    if (allRefs.length === 0) {
       throw new Error('Reference image is required for OpenAI image edits');
     }
 
-    const { blob, filename } = await this.fetchReferenceImage(params.referenceImage);
     const form = new FormData();
     form.append('model', model);
     form.append('prompt', params.prompt);
     form.append('size', size);
     form.append('quality', quality);
     form.append('n', '1');
-    form.append('image', blob, filename);
+
+    for (const refUrl of allRefs) {
+      const { blob, filename } = await this.fetchReferenceImage(refUrl);
+      form.append('image[]', blob, filename);
+    }
 
     const key = this.config.get('OPENAI_API_KEY');
     const response = await fetch('https://api.openai.com/v1/images/edits', {
@@ -291,6 +295,12 @@ export class AiService {
     throw new Error('OpenAI returned no image');
   }
 
+  private resolveReferenceImages(params: GenerateImageParams): string[] {
+    if (params.referenceImages?.length) return params.referenceImages;
+    if (params.referenceImage) return [params.referenceImage];
+    return [];
+  }
+
   private async generateOpenAI(
     params: GenerateImageParams,
   ): Promise<GenerateImageResult> {
@@ -299,7 +309,7 @@ export class AiService {
     const size = this.openAISizeFromAspectRatio(params.size);
     const quality = this.openAIQualityFromImageQuality(params.quality);
 
-    if (params.referenceImage) {
+    if (this.resolveReferenceImages(params).length > 0) {
       return this.editOpenAIImage(params, model, size, quality);
     }
 
@@ -371,8 +381,9 @@ export class AiService {
           form.append('aspect_ratio', params.size);
           form.append('width', String(width));
           form.append('height', String(height));
-          if (params.referenceImage) {
-            form.append('image', params.referenceImage);
+          const firstRef = this.resolveReferenceImages(params)[0];
+          if (firstRef) {
+            form.append('image', firstRef);
           }
           return form;
         })(),
@@ -441,12 +452,17 @@ export class AiService {
     const key = this.config.get('GOOGLE_API_KEY');
     const ai = new GoogleGenAI({ apiKey: key });
     const model = params.model || 'gemini-2.5-flash-image';
+    const allRefs = this.resolveReferenceImages(params);
 
-    if (params.referenceImage) {
-      const { blob } = await this.fetchReferenceImage(params.referenceImage);
-      const arrayBuffer = await blob.arrayBuffer();
-      const imageBase64 = Buffer.from(arrayBuffer).toString('base64');
-      const mimeType = blob.type || 'image/png';
+    if (allRefs.length > 0) {
+      const imageParts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
+      for (const refUrl of allRefs) {
+        const { blob } = await this.fetchReferenceImage(refUrl);
+        const arrayBuffer = await blob.arrayBuffer();
+        const imageBase64 = Buffer.from(arrayBuffer).toString('base64');
+        const mimeType = blob.type || 'image/png';
+        imageParts.push({ inlineData: { mimeType, data: imageBase64 } });
+      }
 
       const response = await ai.models.generateContent({
         model,
@@ -454,7 +470,7 @@ export class AiService {
           {
             role: 'user',
             parts: [
-              { inlineData: { mimeType, data: imageBase64 } },
+              ...imageParts,
               { text: params.prompt },
             ],
           },

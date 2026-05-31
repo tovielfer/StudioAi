@@ -24,8 +24,8 @@ function CreateContent() {
   const [model, setModel] = useState(MODELS[0].id);
   const [size, setSize] = useState('1:1');
   const [quality, setQuality] = useState('standard');
-  const [referenceFile, setReferenceFile] = useState<File | null>(null);
-  const [referencePreview, setReferencePreview] = useState<string | null>(null);
+  const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
+  const [referencePreviews, setReferencePreviews] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
   const [currentGen, setCurrentGen] = useState<Generation | null>(null);
   const [error, setError] = useState('');
@@ -34,7 +34,8 @@ function CreateContent() {
   const [costError, setCostError] = useState('');
 
   const selectedModel = MODELS.find((m) => m.id === model)!;
-  const hasReference = !!referenceFile;
+  const hasReference = referenceFiles.length > 0;
+  const MAX_REFERENCES = 5;
 
   const handleModelChange = (newModel: string) => {
     setModel(newModel);
@@ -48,15 +49,37 @@ function CreateContent() {
   };
 
   const handleReferenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
+    const selected = Array.from(e.target.files ?? []);
+    if (!selected.length) return;
+
+    const oversized = selected.find((f) => f.size > 5 * 1024 * 1024);
+    if (oversized) {
       setError(translateError('Reference image must be under 5MB'));
       return;
     }
-    setReferenceFile(file);
-    setReferencePreview(URL.createObjectURL(file));
+
+    const remaining = MAX_REFERENCES - referenceFiles.length;
+    const toAdd = selected.slice(0, remaining);
+    if (toAdd.length === 0) {
+      setError(`ניתן להעלות עד ${MAX_REFERENCES} תמונות השראה`);
+      return;
+    }
+
+    setReferenceFiles((prev) => [...prev, ...toAdd]);
+    setReferencePreviews((prev) => [
+      ...prev,
+      ...toAdd.map((f) => URL.createObjectURL(f)),
+    ]);
     setError('');
+    e.target.value = '';
+  };
+
+  const removeReference = (index: number) => {
+    setReferencePreviews((prev) => {
+      URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
+    setReferenceFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const pollGeneration = useCallback(async (id: string) => {
@@ -117,10 +140,12 @@ function CreateContent() {
     setCurrentGen(null);
 
     try {
-      let referenceImageUrl: string | undefined;
-      if (referenceFile) {
-        const upload = await api.uploadReference(referenceFile);
-        referenceImageUrl = upload.url;
+      let referenceImageUrls: string[] | undefined;
+      if (referenceFiles.length > 0) {
+        const uploads = await Promise.all(
+          referenceFiles.map((f) => api.uploadReference(f)),
+        );
+        referenceImageUrls = uploads.map((u) => u.url);
       }
 
       const gen = await api.createGeneration({
@@ -129,7 +154,7 @@ function CreateContent() {
         size,
         quality,
         provider: selectedModel.provider,
-        referenceImageUrl,
+        referenceImageUrls,
       });
 
       setCurrentGen(gen);
@@ -147,9 +172,10 @@ function CreateContent() {
 
   useEffect(() => {
     return () => {
-      if (referencePreview) URL.revokeObjectURL(referencePreview);
+      referencePreviews.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [referencePreview]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
@@ -222,19 +248,36 @@ function CreateContent() {
 
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">
-              תמונת השראה (אופציונלי)
+              תמונות השראה (אופציונלי, עד {MAX_REFERENCES})
             </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleReferenceChange}
-              className="input-field file:me-4 file:py-1 file:px-3 file:rounded file:border-0 file:bg-brand-600 file:text-white file:text-sm"
-            />
-            {referencePreview && (
-              <img
-                src={referencePreview}
-                alt="תמונת השראה"
-                className="mt-3 w-24 h-24 object-cover rounded-lg border border-surface-border"
+            {referencePreviews.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {referencePreviews.map((src, i) => (
+                  <div key={i} className="relative group">
+                    <img
+                      src={src}
+                      alt={`תמונת השראה ${i + 1}`}
+                      className="w-20 h-20 object-cover rounded-lg border border-surface-border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeReference(i)}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs flex items-center justify-center leading-none transition-colors"
+                      aria-label="הסר תמונה"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {referenceFiles.length < MAX_REFERENCES && (
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleReferenceChange}
+                className="input-field file:me-4 file:py-1 file:px-3 file:rounded file:border-0 file:bg-brand-600 file:text-white file:text-sm"
               />
             )}
           </div>

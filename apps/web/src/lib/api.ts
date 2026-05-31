@@ -36,6 +36,7 @@ export interface Generation {
   status: 'pending' | 'processing' | 'done' | 'failed';
   resultUrl: string | null;
   referenceImageUrl: string | null;
+  referenceImageUrls: string[] | null;
   quality: string;
   size: string;
   provider: string;
@@ -115,6 +116,7 @@ class ApiClient {
     size?: string;
     provider?: string;
     referenceImageUrl?: string;
+    referenceImageUrls?: string[];
   }) {
     return this.request<Generation>('/generations/create', {
       method: 'POST',

@@ -41,6 +41,7 @@ export class GenerationRunnerService {
         size: generation.size,
         quality: generation.quality,
         referenceImage: generation.referenceImageUrl,
+        referenceImages: generation.referenceImageUrls ?? undefined,
         provider: generation.provider,
       });
 

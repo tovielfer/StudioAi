@@ -45,6 +45,9 @@ export class Generation {
   @Column({ type: 'varchar', nullable: true })
   referenceImageUrl: string | null;
 
+  @Column({ type: 'jsonb', nullable: true })
+  referenceImageUrls: string[] | null;
+
   @Column({ type: 'varchar', default: ImageQuality.STANDARD })
   quality: ImageQuality;
 
