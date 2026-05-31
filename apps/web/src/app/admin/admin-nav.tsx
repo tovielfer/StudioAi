@@ -20,6 +20,11 @@ const ADMIN_LINKS = [
     description: 'מעקב ועלות טוקנים',
   },
   {
+    href: '/admin/feedback',
+    label: 'פניות',
+    description: 'הערות ובקשות משתמשים',
+  },
+  {
     href: '/admin/cost-analysis',
     label: 'ניתוח עלויות',
     description: 'היסטוריה אמיתית + מחשבון',
@@ -30,7 +35,7 @@ export function AdminNav() {
   const pathname = usePathname();
 
   return (
-    <div className="grid md:grid-cols-4 gap-3">
+    <div className="grid md:grid-cols-5 gap-3">
       {ADMIN_LINKS.map((link) => {
         const isActive = pathname === link.href;
 

@@ -11,11 +11,13 @@ import { StorageModule } from './storage/storage.module';
 import { AiModule } from './ai/ai.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { AdminModule } from './admin/admin.module';
+import { FeedbackModule } from './feedback/feedback.module';
 import { HealthController } from './health.controller';
 import { LoggerMiddleware } from './common/logger.middleware';
 import { User } from './users/user.entity';
 import { Generation } from './generations/generation.entity';
 import { CreditTransaction } from './credits/credit-transaction.entity';
+import { FeedbackSubmission } from './feedback/feedback-submission.entity';
 import { isSyncQueue } from './config/env.loader';
 
 @Module({})
@@ -40,11 +42,11 @@ export class AppModule implements NestModule {
         useFactory: (config: ConfigService) => ({
           type: 'postgres',
           url: config.get<string>('DATABASE_URL'),
-          entities: [User, Generation, CreditTransaction],
+          entities: [User, Generation, CreditTransaction, FeedbackSubmission],
           migrations: [join(__dirname, 'database/migrations/*.{ts,js}')],
           migrationsRun: true,
           synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
-          logging: true,
+          logging: false,
         }),
       }),
     ];
@@ -71,6 +73,7 @@ export class AppModule implements NestModule {
       AiModule,
       UploadsModule,
       AdminModule,
+      FeedbackModule,
     ];
 
     return {

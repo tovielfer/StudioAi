@@ -13,6 +13,7 @@ export function Navbar() {
         { href: '/dashboard', label: 'לוח בקרה' },
         { href: '/create', label: 'יצירה' },
         { href: '/history', label: 'היסטוריה' },
+        { href: '/feedback', label: 'פניות' },
         ...(user.role === 'admin'
           ? [{ href: '/admin', label: 'ניהול' }]
           : []),

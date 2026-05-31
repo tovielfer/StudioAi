@@ -1,164 +1,248 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/lib/auth-context';
-import {
-  api,
-  MODELS,
-  Generation,
-} from '@/lib/api';
+import { api, MODELS, Generation } from '@/lib/api';
 import { translateError } from '@/lib/he';
+
+import { CreateForm, ReferenceImage, MAX_REFERENCES } from './_components/CreateForm';
+import { CurrentGenPreview } from './_components/CurrentGenPreview';
+import { RecentCreations } from './_components/RecentCreations';
 
 export default function CreatePage() {
   return (
     <AuthGuard>
-      <CreateContent />
+      <Suspense fallback={null}>
+        <CreateContent />
+      </Suspense>
     </AuthGuard>
   );
 }
 
 function CreateContent() {
   const { user, refreshCredits } = useAuth();
+  const searchParams = useSearchParams();
+  const initializedFromParams = useRef(false);
+  const objectUrlsRef = useRef<string[]>([]);
+
   const [prompt, setPrompt] = useState('');
   const [model, setModel] = useState(MODELS[0].id);
   const [size, setSize] = useState('1:1');
   const [quality, setQuality] = useState('standard');
-  const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
-  const [referencePreviews, setReferencePreviews] = useState<string[]>([]);
+  const [references, setReferences] = useState<ReferenceImage[]>([]);
   const [generating, setGenerating] = useState(false);
   const [currentGen, setCurrentGen] = useState<Generation | null>(null);
   const [error, setError] = useState('');
   const [cost, setCost] = useState<number | null>(null);
   const [costLoading, setCostLoading] = useState(false);
   const [costError, setCostError] = useState('');
+  const [recentGenerations, setRecentGenerations] = useState<Generation[]>([]);
+  const [recentLoading, setRecentLoading] = useState(true);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const selectedModel = MODELS.find((m) => m.id === model)!;
-  const hasReference = referenceFiles.length > 0;
-  const MAX_REFERENCES = 5;
+  const hasReference = references.length > 0;
 
-  const handleModelChange = (newModel: string) => {
-    setModel(newModel);
-    const newModelDef = MODELS.find((m) => m.id === newModel);
-    if (newModelDef && !newModelDef.sizes.find((s) => s.id === size)) {
-      setSize(newModelDef.sizes[0].id);
-    }
-    if (newModelDef && !newModelDef.qualities.find((q) => q.id === quality)) {
-      setQuality(newModelDef.qualities[0].id);
-    }
+  // ── Reference helpers ──────────────────────────────────────────────────────
+
+  const addReferenceUrl = useCallback(
+    (url: string) => {
+      if (references.some((r) => r.sourceUrl === url)) return;
+      if (references.length >= MAX_REFERENCES) {
+        setError(`ניתן להעלות עד ${MAX_REFERENCES} תמונות השראה`);
+        return;
+      }
+      setReferences((prev) => [
+        ...prev,
+        { id: `url-${Date.now()}-${url}`, previewUrl: url, sourceUrl: url },
+      ]);
+    },
+    [references],
+  );
+
+  const addReferenceFiles = useCallback(
+    (files: File[]) => {
+      const MAX_SIZE = 20 * 1024 * 1024;
+      const valid = files.filter((f) => f.size <= MAX_SIZE);
+      const skipped = files.filter((f) => f.size > MAX_SIZE);
+
+      if (skipped.length > 0) {
+        setError(
+          skipped.length === 1
+            ? `"${skipped[0].name}" גדולה מ-20MB ולא נוספה`
+            : `${skipped.length} תמונות גדולות מ-20MB ולא נוספו`,
+        );
+      } else {
+        setError('');
+      }
+
+      if (valid.length === 0) return;
+
+      const remaining = MAX_REFERENCES - references.length;
+      const toAdd = valid.slice(0, remaining);
+      if (toAdd.length === 0) {
+        setError(`ניתן להעלות עד ${MAX_REFERENCES} תמונות השראה`);
+        return;
+      }
+
+      const newRefs = toAdd.map((file) => {
+        const previewUrl = URL.createObjectURL(file);
+        objectUrlsRef.current.push(previewUrl);
+        return {
+          id: `file-${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
+          previewUrl,
+          file,
+          objectUrl: true as const,
+        };
+      });
+      setReferences((prev) => [...prev, ...newRefs]);
+    },
+    [references],
+  );
+
+  const removeReference = (index: number) => {
+    setReferences((prev) => {
+      const removed = prev[index];
+      if (removed?.objectUrl) {
+        URL.revokeObjectURL(removed.previewUrl);
+        objectUrlsRef.current = objectUrlsRef.current.filter(
+          (u) => u !== removed.previewUrl,
+        );
+      }
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleReferenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = Array.from(e.target.files ?? []);
-    if (!selected.length) return;
-
-    const MAX_SIZE = 20 * 1024 * 1024;
-    const valid = selected.filter((f) => f.size <= MAX_SIZE);
-    const skipped = selected.filter((f) => f.size > MAX_SIZE);
-
-    if (skipped.length > 0) {
-      setError(
-        skipped.length === 1
-          ? `"${skipped[0].name}" גדולה מ-20MB ולא נוספה`
-          : `${skipped.length} תמונות גדולות מ-20MB ולא נוספו`,
-      );
-    } else {
-      setError('');
-    }
-
-    if (valid.length === 0) {
-      e.target.value = '';
-      return;
-    }
-
-    const remaining = MAX_REFERENCES - referenceFiles.length;
-    const toAdd = valid.slice(0, remaining);
-    if (toAdd.length === 0) {
-      setError(`ניתן להעלות עד ${MAX_REFERENCES} תמונות השראה`);
-      e.target.value = '';
-      return;
-    }
-
-    setReferenceFiles((prev) => [...prev, ...toAdd]);
-    setReferencePreviews((prev) => [
-      ...prev,
-      ...toAdd.map((f) => URL.createObjectURL(f)),
-    ]);
+    const files = Array.from(e.target.files ?? []);
+    if (files.length) addReferenceFiles(files);
     e.target.value = '';
   };
 
-  const removeReference = (index: number) => {
-    setReferencePreviews((prev) => {
-      URL.revokeObjectURL(prev[index]);
-      return prev.filter((_, i) => i !== index);
-    });
-    setReferenceFiles((prev) => prev.filter((_, i) => i !== index));
+  const handleReferenceDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      const imageFiles = Array.from(e.dataTransfer.files).filter((f) =>
+        f.type.startsWith('image/'),
+      );
+      if (imageFiles.length > 0) { addReferenceFiles(imageFiles); return; }
+    }
+    const url =
+      e.dataTransfer.getData('text/uri-list') ||
+      e.dataTransfer.getData('text/plain');
+    if (url) addReferenceUrl(url);
   };
 
-  const pollGeneration = useCallback(async (id: string) => {
-    const gen = await api.getGeneration(id);
-    setCurrentGen(gen);
-    if (gen.status === 'pending' || gen.status === 'processing') {
-      setTimeout(() => pollGeneration(id), 2000);
-    } else {
-      setGenerating(false);
-      refreshCredits();
+  // ── Recent generations ─────────────────────────────────────────────────────
+
+  const loadRecent = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await api.getUserGenerations(user.id, { type: 'image', limit: 50 });
+      setRecentGenerations(res.items.filter((g) => g.status !== 'failed'));
+    } catch {
+      // keep existing list on error
+    } finally {
+      setRecentLoading(false);
     }
-  }, [refreshCredits]);
+  }, [user]);
+
+  useEffect(() => {
+    setRecentLoading(true);
+    loadRecent();
+  }, [loadRecent]);
+
+  // ── URL params (edit-from-history flow) ───────────────────────────────────
+
+  useEffect(() => {
+    if (initializedFromParams.current) return;
+    initializedFromParams.current = true;
+    searchParams
+      .getAll('reference')
+      .filter(Boolean)
+      .slice(0, MAX_REFERENCES)
+      .forEach(addReferenceUrl);
+    const promptParam = searchParams.get('prompt');
+    if (promptParam) setPrompt(promptParam);
+  }, [addReferenceUrl, searchParams]);
+
+  // ── Model change ───────────────────────────────────────────────────────────
+
+  const handleModelChange = (newModel: string) => {
+    setModel(newModel);
+    const def = MODELS.find((m) => m.id === newModel);
+    if (def && !def.sizes.find((s) => s.id === size)) setSize(def.sizes[0].id);
+    if (def && !def.qualities.find((q) => q.id === quality)) setQuality(def.qualities[0].id);
+  };
+
+  // ── Cost preview ───────────────────────────────────────────────────────────
 
   useEffect(() => {
     let cancelled = false;
-
     setCostLoading(true);
     setCostError('');
-
-    api.getGenerationCostPreview({
-      provider: selectedModel.provider,
-      model: selectedModel.id,
-      size,
-      quality,
-      hasReference,
-    })
-      .then((preview) => {
-        if (!cancelled) setCost(preview.credits);
+    api
+      .getGenerationCostPreview({
+        provider: selectedModel.provider,
+        model: selectedModel.id,
+        size,
+        quality,
+        hasReference,
       })
+      .then((p) => { if (!cancelled) setCost(p.credits); })
       .catch(() => {
-        if (!cancelled) {
-          setCost(null);
-          setCostError('לא ניתן לחשב את העלות כרגע');
-        }
+        if (!cancelled) { setCost(null); setCostError('לא ניתן לחשב את העלות כרגע'); }
       })
-      .finally(() => {
-        if (!cancelled) setCostLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => { if (!cancelled) setCostLoading(false); });
+    return () => { cancelled = true; };
   }, [selectedModel.provider, selectedModel.id, size, quality, hasReference]);
 
-  const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      setError(translateError('Please enter a prompt'));
-      return;
-    }
+  // ── Polling ────────────────────────────────────────────────────────────────
 
-    if (cost === null) {
-      setError('לא ניתן ליצור לפני חישוב העלות');
-      return;
-    }
+  const pollGeneration = useCallback(
+    async (id: string) => {
+      const gen = await api.getGeneration(id);
+      setCurrentGen(gen);
+      setRecentGenerations((prev) => {
+        if (gen.status === 'failed') return prev.filter((g) => g.id !== id);
+        const idx = prev.findIndex((g) => g.id === id);
+        if (idx === -1) return [gen, ...prev];
+        const next = [...prev];
+        next[idx] = gen;
+        return next;
+      });
+      if (gen.status === 'pending' || gen.status === 'processing') {
+        setTimeout(() => pollGeneration(id), 2000);
+      } else {
+        setGenerating(false);
+        refreshCredits();
+        if (gen.status === 'done') loadRecent();
+      }
+    },
+    [refreshCredits, loadRecent],
+  );
+
+  // ── Generate ───────────────────────────────────────────────────────────────
+
+  const handleGenerate = async () => {
+    if (!prompt.trim()) { setError(translateError('Please enter a prompt')); return; }
+    if (cost === null) { setError('לא ניתן ליצור לפני חישוב העלות'); return; }
 
     setError('');
     setGenerating(true);
     setCurrentGen(null);
 
     try {
-      let referenceImageUrls: string[] | undefined;
-      if (referenceFiles.length > 0) {
-        const uploads = await Promise.all(
-          referenceFiles.map((f) => api.uploadReference(f)),
-        );
-        referenceImageUrls = uploads.map((u) => u.url);
+      const existingUrls = references.map((r) => r.sourceUrl).filter((u): u is string => Boolean(u));
+      const files = references.map((r) => r.file).filter((f): f is File => Boolean(f));
+      let referenceImageUrls = existingUrls.length > 0 ? existingUrls : undefined;
+
+      if (files.length > 0) {
+        const uploads = await Promise.all(files.map((f) => api.uploadReference(f)));
+        referenceImageUrls = [...(referenceImageUrls ?? []), ...uploads.map((u) => u.url)];
       }
 
       const gen = await api.createGeneration({
@@ -171,185 +255,75 @@ function CreateContent() {
       });
 
       setCurrentGen(gen);
+      setRecentGenerations((prev) => [gen, ...prev.filter((g) => g.id !== gen.id)]);
       refreshCredits();
       pollGeneration(gen.id);
     } catch (err) {
-      setError(
-        translateError(
-          err instanceof Error ? err.message : 'Generation failed',
-        ),
-      );
+      setError(translateError(err instanceof Error ? err.message : 'Generation failed'));
       setGenerating(false);
     }
   };
 
+  // ── Cleanup object URLs ────────────────────────────────────────────────────
+
   useEffect(() => {
     return () => {
-      referencePreviews.forEach((url) => URL.revokeObjectURL(url));
+      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      objectUrlsRef.current = [];
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10">
+    <div className="max-w-7xl mx-auto px-4 py-10">
       <h1 className="text-3xl font-bold mb-8">יצירת תמונה</h1>
 
-      <div className="grid lg:grid-cols-2 gap-8">
-        <div className="space-y-5">
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg px-4 py-3">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">תיאור (Prompt)</label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              className="input-field min-h-[120px] resize-y"
-              placeholder="תאר את התמונה שברצונך ליצור..."
-              maxLength={2000}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">מודל</label>
-            <select
-              value={model}
-              onChange={(e) => handleModelChange(e.target.value)}
-              className="input-field"
-            >
-              {MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} ({m.provider})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">גודל</label>
-              <select
-                value={size}
-                onChange={(e) => setSize(e.target.value)}
-                className="input-field"
-              >
-                {selectedModel.sizes.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">איכות</label>
-              <select
-                value={quality}
-                onChange={(e) => setQuality(e.target.value)}
-                className="input-field"
-              >
-                {selectedModel.qualities.map((q) => (
-                  <option key={q.id} value={q.id}>
-                    {q.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">
-              תמונות השראה (אופציונלי, עד {MAX_REFERENCES})
-            </label>
-            {referencePreviews.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3">
-                {referencePreviews.map((src, i) => (
-                  <div key={i} className="relative group">
-                    <img
-                      src={src}
-                      alt={`תמונת השראה ${i + 1}`}
-                      className="w-20 h-20 object-cover rounded-lg border border-surface-border"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeReference(i)}
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs flex items-center justify-center leading-none transition-colors"
-                      aria-label="הסר תמונה"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {referenceFiles.length < MAX_REFERENCES && (
-              <>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleReferenceChange}
-                  className="input-field file:me-4 file:py-1 file:px-3 file:rounded file:border-0 file:bg-brand-600 file:text-white file:text-sm"
-                />
-                <p className="text-xs text-gray-500 mt-1">כל תמונה חייבת להיות עד 20MB</p>
-              </>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            <div className="text-sm text-gray-400">
-              עלות:{' '}
-              <span className="text-brand-400 font-medium">
-                {costLoading
-                  ? 'מחשב...'
-                  : cost !== null
-                    ? `${cost} קרדיטים`
-                    : costError || 'לא זמין'}
-              </span>
-              {' · '}
-              יתרה: {user?.credits ?? 0}
-            </div>
-            <button
-              onClick={handleGenerate}
-              disabled={generating || cost === null || (user?.credits ?? 0) < cost}
-              className="btn-primary"
-            >
-              {generating ? 'יוצר...' : 'יצירה'}
-            </button>
-          </div>
+      <div className="grid lg:grid-cols-3 gap-6 items-start">
+        {/* Left 1/3 — form, sticky */}
+        <div className="lg:col-span-1 lg:sticky lg:top-4">
+          <CreateForm
+            prompt={prompt}
+            setPrompt={setPrompt}
+            model={model}
+            handleModelChange={handleModelChange}
+            models={MODELS}
+            size={size}
+            setSize={setSize}
+            quality={quality}
+            setQuality={setQuality}
+            selectedModel={selectedModel}
+            references={references}
+            removeReference={removeReference}
+            isDragOver={isDragOver}
+            setIsDragOver={setIsDragOver}
+            handleReferenceDrop={handleReferenceDrop}
+            handleReferenceChange={handleReferenceChange}
+            cost={cost}
+            costLoading={costLoading}
+            costError={costError}
+            user={user}
+            generating={generating}
+            onGenerate={handleGenerate}
+            error={error}
+          />
         </div>
 
-        <div className="card flex flex-col">
-          <h2 className="text-lg font-semibold mb-4">תצוגה מקדימה</h2>
-          <div className="flex-1 aspect-square bg-surface rounded-lg overflow-hidden flex items-center justify-center">
-            {currentGen?.resultUrl && currentGen.status === 'done' ? (
-              <img
-                src={currentGen.resultUrl}
-                alt={currentGen.prompt}
-                className="w-full h-full object-contain"
-              />
-            ) : generating ? (
-              <div className="text-center">
-                <div className="w-10 h-10 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-gray-400 text-sm">
-                  {currentGen?.status === 'processing'
-                    ? 'ה-AI יוצר את התמונה שלך...'
-                    : 'ממתין בתור לעיבוד...'}
-                </p>
-              </div>
-            ) : currentGen?.status === 'failed' ? (
-              <div className="text-center text-red-400 px-4">
-                <p className="font-medium">היצירה נכשלה</p>
-                <p className="text-sm mt-1">{currentGen.errorMessage}</p>
-              </div>
-            ) : (
-              <p className="text-gray-600 text-sm">
-                התמונה שתיווצר תופיע כאן
-              </p>
-            )}
-          </div>
+        {/* Right 2/3 — preview of current generation + grid */}
+        <div className="lg:col-span-2 space-y-4">
+          {currentGen && (
+            <CurrentGenPreview
+              gen={currentGen}
+              onUseReference={addReferenceUrl}
+              onDismiss={() => setCurrentGen(null)}
+            />
+          )}
+          <RecentCreations
+            generations={recentGenerations}
+            loading={recentLoading}
+            activeGenId={currentGen?.id ?? null}
+            onUseReference={addReferenceUrl}
+          />
         </div>
       </div>
     </div>

@@ -22,6 +22,10 @@ body {
     @apply bg-surface-card hover:bg-surface-border border border-surface-border text-white font-medium px-5 py-2.5 rounded-lg transition-colors;
   }
 
+  .icon-button {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-lg border border-surface-border bg-surface-card text-gray-200 transition-colors hover:bg-surface-border hover:text-white;
+  }
+
   .input-field {
     @apply w-full bg-surface-card border border-surface-border rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent;
   }

@@ -72,6 +72,28 @@ export interface AdminCostStat {
   totalOutputImageTokens: number;
 }
 
+export type FeedbackType =
+  | 'request'
+  | 'note'
+  | 'improvement'
+  | 'shortcut'
+  | 'other';
+
+export type FeedbackStatus = 'open' | 'in_progress' | 'answered' | 'closed';
+
+export interface FeedbackSubmission {
+  id: string;
+  userId: string;
+  userEmail?: string | null;
+  type: FeedbackType;
+  title: string;
+  message: string;
+  status: FeedbackStatus;
+  adminReply: string | null;
+  answeredAt: string | null;
+  createdAt: string;
+}
+
 class ApiClient {
   private getToken(): string | null {
     if (typeof window === 'undefined') return null;
@@ -228,6 +250,47 @@ class ApiClient {
 
   getAdminCostStats() {
     return this.request<AdminCostStat[]>('/admin/cost-stats');
+  }
+
+  createFeedback(data: {
+    type: FeedbackType;
+    title: string;
+    message: string;
+  }) {
+    return this.request<FeedbackSubmission>('/feedback', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  getMyFeedback(params?: { limit?: number; offset?: number }) {
+    const query = new URLSearchParams();
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+    const qs = query.toString();
+    return this.request<{ items: FeedbackSubmission[]; total: number }>(
+      `/feedback${qs ? `?${qs}` : ''}`,
+    );
+  }
+
+  getAdminFeedback(params?: { limit?: number; offset?: number }) {
+    const query = new URLSearchParams();
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+    const qs = query.toString();
+    return this.request<{ items: FeedbackSubmission[]; total: number }>(
+      `/feedback/admin${qs ? `?${qs}` : ''}`,
+    );
+  }
+
+  updateAdminFeedback(
+    id: string,
+    data: { status?: FeedbackStatus; adminReply?: string },
+  ) {
+    return this.request<FeedbackSubmission>(`/feedback/admin/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   }
 }
 
