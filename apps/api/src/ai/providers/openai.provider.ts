@@ -32,9 +32,10 @@ export class OpenAIProvider extends BaseImageProvider {
     form.append('quality', quality);
     form.append('n', '1');
 
+    const imageKey = refs.length > 1 ? 'image[]' : 'image';
     for (const refUrl of refs) {
       const { blob, filename } = await this.fetchReferenceImage(refUrl);
-      form.append('image', blob, filename);
+      form.append(imageKey, blob, filename);
     }
 
     const key = this.config.get('OPENAI_API_KEY');

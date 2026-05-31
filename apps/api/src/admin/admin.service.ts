@@ -101,7 +101,7 @@ export class AdminService {
       .addSelect('g.model', 'model')
       .addSelect('g.status', 'status')
       .addSelect('g.resultUrl', 'resultUrl')
-      .addSelect('g.referenceImageUrl', 'referenceImageUrl')
+      .addSelect('g.referenceImageUrls', 'referenceImageUrls')
       .addSelect('g.quality', 'quality')
       .addSelect('g.size', 'size')
       .addSelect('g.provider', 'provider')

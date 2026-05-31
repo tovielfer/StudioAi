@@ -17,9 +17,7 @@ export abstract class BaseImageProvider {
   }
 
   protected resolveReferenceImages(params: GenerateImageParams): string[] {
-    if (params.referenceImages?.length) return params.referenceImages;
-    if (params.referenceImage) return [params.referenceImage];
-    return [];
+    return params.referenceImages?.length ? params.referenceImages : [];
   }
 
   protected async fetchReferenceImage(url: string): Promise<{ blob: Blob; filename: string }> {

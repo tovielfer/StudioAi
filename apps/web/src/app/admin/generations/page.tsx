@@ -167,15 +167,15 @@ function AdminGenerationsContent() {
                         {generation.quality}
                       </td>
                       <td className="py-3 pe-4">
-                        {generation.referenceImageUrl ? (
+                        {generation.referenceImageUrls?.[0] ? (
                           <a
-                            href={generation.referenceImageUrl}
+                            href={generation.referenceImageUrls[0]}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-2 text-brand-700 hover:underline"
                           >
                             <img
-                              src={generation.referenceImageUrl}
+                              src={generation.referenceImageUrls[0]}
                               alt="תמונת מקור"
                               className="h-10 w-10 rounded-md border border-gray-200 object-cover"
                             />

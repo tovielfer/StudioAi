@@ -42,9 +42,6 @@ export class Generation {
   @Column({ type: 'varchar', nullable: true })
   resultUrl: string | null;
 
-  @Column({ type: 'varchar', nullable: true })
-  referenceImageUrl: string | null;
-
   @Column({ type: 'jsonb', nullable: true })
   referenceImageUrls: string[] | null;
 

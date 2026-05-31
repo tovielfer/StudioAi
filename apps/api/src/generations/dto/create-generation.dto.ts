@@ -39,10 +39,6 @@ export class CreateGenerationDto {
   type?: GenerationType;
 
   @IsOptional()
-  @IsString()
-  referenceImageUrl?: string;
-
-  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   referenceImageUrls?: string[];

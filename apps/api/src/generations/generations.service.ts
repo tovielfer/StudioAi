@@ -49,11 +49,7 @@ export class GenerationsService {
     const quality = dto.quality ?? ImageQuality.STANDARD;
     const size = dto.size ?? ImageSize.SQUARE;
     const provider = dto.provider ?? AiProvider.MOCK;
-    const allReferenceUrls = dto.referenceImageUrls?.length
-      ? dto.referenceImageUrls
-      : dto.referenceImageUrl
-        ? [dto.referenceImageUrl]
-        : [];
+    const allReferenceUrls = dto.referenceImageUrls ?? [];
     const hasReference = allReferenceUrls.length > 0;
     const { credits: creditCost } = getGenerationCost({
       provider,
@@ -72,7 +68,6 @@ export class GenerationsService {
       quality,
       size,
       provider,
-      referenceImageUrl: allReferenceUrls[0] ?? null,
       referenceImageUrls: allReferenceUrls.length > 0 ? allReferenceUrls : null,
       status: GenerationStatus.PENDING,
       creditCost,
