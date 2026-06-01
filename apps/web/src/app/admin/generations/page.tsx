@@ -5,8 +5,12 @@ import { AdminGuard } from '@/components/AdminGuard';
 import { AdminGeneration, api } from '@/lib/api';
 import { STATUS_LABELS } from '@/lib/he';
 import { AdminShell } from '../admin-shell';
+import { AdminGenerationCard } from './_components/AdminGenerationCard';
+import { AdminGenerationModal } from './_components/AdminGenerationModal';
 
 const PAGE_SIZE = 25;
+
+type ViewMode = 'table' | 'cards';
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString('he-IL', {
@@ -34,6 +38,8 @@ function AdminGenerationsContent() {
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [view, setView] = useState<ViewMode>('table');
+  const [selected, setSelected] = useState<AdminGeneration | null>(null);
 
   const loadGenerations = useCallback(async () => {
     const res = await api.getAdminGenerations({
@@ -74,6 +80,30 @@ function AdminGenerationsContent() {
               </p>
             </div>
             <div className="flex flex-col md:flex-row gap-3">
+              <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setView('table')}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                    view === 'table'
+                      ? 'bg-white text-brand-700 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  טבלה
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView('cards')}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                    view === 'cards'
+                      ? 'bg-white text-brand-700 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  כרטיסים
+                </button>
+              </div>
               <input
                 value={generationSearch}
                 onChange={(e) => setGenerationSearch(e.target.value)}
@@ -98,6 +128,22 @@ function AdminGenerationsContent() {
             <div className="flex justify-center py-16">
               <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
             </div>
+          ) : view === 'cards' ? (
+            generations.length === 0 ? (
+              <div className="py-12 text-center text-gray-500">
+                לא נמצאו יצירות לפי הסינון הנוכחי
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {generations.map((generation) => (
+                  <AdminGenerationCard
+                    key={generation.id}
+                    gen={generation}
+                    onSelect={setSelected}
+                  />
+                ))}
+              </div>
+            )
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1240px] text-sm">
@@ -216,6 +262,10 @@ function AdminGenerationsContent() {
           )}
         </section>
       </div>
+
+      {selected && (
+        <AdminGenerationModal generation={selected} onClose={() => setSelected(null)} />
+      )}
     </AdminShell>
   );
 }
