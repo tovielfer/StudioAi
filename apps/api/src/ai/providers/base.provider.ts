@@ -6,14 +6,21 @@ export abstract class BaseImageProvider {
 
   abstract generate(params: GenerateImageParams): Promise<GenerateImageResult>;
 
-  protected sizeToDimensions(size: string): { width: number; height: number } {
-    const map: Record<string, { width: number; height: number }> = {
+  // Pixel dimensions for a given aspect ratio at 1K, scaled by the resolution tier.
+  protected dimensions(
+    ratio: string,
+    resolution?: string,
+  ): { width: number; height: number } {
+    const base: Record<string, { width: number; height: number }> = {
       '1:1': { width: 1024, height: 1024 },
       '16:9': { width: 1344, height: 768 },
       '9:16': { width: 768, height: 1344 },
       '4:3': { width: 1152, height: 896 },
     };
-    return map[size] ?? map['1:1'];
+    const factor: Record<string, number> = { '1K': 1, '2K': 2, '4K': 4 };
+    const { width, height } = base[ratio] ?? base['1:1'];
+    const scale = factor[resolution ?? '1K'] ?? 1;
+    return { width: width * scale, height: height * scale };
   }
 
   protected resolveReferenceImages(params: GenerateImageParams): string[] {

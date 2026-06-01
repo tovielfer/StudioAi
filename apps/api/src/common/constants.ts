@@ -24,6 +24,12 @@ export enum ImageSize {
   WIDE = '4:3',
 }
 
+export enum ImageResolution {
+  ONE_K = '1K',
+  TWO_K = '2K',
+  FOUR_K = '4K',
+}
+
 export enum AiProvider {
   REPLICATE = 'replicate',
   FAL = 'fal',

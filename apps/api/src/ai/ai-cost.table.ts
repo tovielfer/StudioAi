@@ -105,6 +105,24 @@ const IMAGE_COST_TABLE: Record<
   },
 };
 
+// Multipliers applied to the base (~1K) cost for models whose price scales with
+// output resolution. Composes with the per-quality base price. Models absent
+// here are unaffected by resolution. Values are approximate; the real provider
+// cost is reconciled from token usage at generation time.
+const RESOLUTION_MULTIPLIER: Record<
+  string,
+  Record<string, Record<string, number>>
+> = {
+  google: {
+    // Nano Banana Pro: 1K/2K priced the same (~$0.134), 4K ~$0.24.
+    'gemini-3-pro-image-preview': { '1K': 1, '2K': 1, '4K': 1.79 },
+  },
+  openai: {
+    // gpt-image-2 output tokens scale roughly with pixel count.
+    'gpt-image-2': { '1K': 1, '2K': 4, '4K': 8 },
+  },
+};
+
 // Markup applied on top of raw provider cost
 const MARGIN = 2.5;
 
@@ -122,6 +140,7 @@ function lookupUsdCost(
   model: string,
   size: string,
   quality: string,
+  resolution: string,
 ): number {
   const usd =
     IMAGE_COST_TABLE[provider]?.[model]?.[size]?.[quality] ??
@@ -134,7 +153,8 @@ function lookupUsdCost(
     return FALLBACK_USD;
   }
 
-  return usd;
+  const multiplier = RESOLUTION_MULTIPLIER[provider]?.[model]?.[resolution] ?? 1;
+  return usd * multiplier;
 }
 
 export interface GenerationCostParams {
@@ -142,6 +162,7 @@ export interface GenerationCostParams {
   model: string;
   size: string;
   quality: string;
+  resolution?: string;
   hasReference?: boolean;
   type?: GenerationType;
 }
@@ -167,6 +188,7 @@ export function getGenerationCost(
     params.model,
     params.size,
     params.quality,
+    params.resolution ?? '1K',
   );
 
   const referenceUsd = params.hasReference ? REFERENCE_IMAGE_USD : 0;

@@ -40,6 +40,7 @@ export class GenerationRunnerService {
         model: generation.model,
         size: generation.size,
         quality: generation.quality,
+        resolution: generation.resolution,
         referenceImages: generation.referenceImageUrls ?? undefined,
         provider: generation.provider,
       });

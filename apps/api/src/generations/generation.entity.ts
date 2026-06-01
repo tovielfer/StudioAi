@@ -12,6 +12,7 @@ import {
   GenerationStatus,
   ImageQuality,
   ImageSize,
+  ImageResolution,
   AiProvider,
 } from '../common/constants';
 
@@ -50,6 +51,9 @@ export class Generation {
 
   @Column({ type: 'varchar', default: ImageSize.SQUARE })
   size: ImageSize;
+
+  @Column({ type: 'varchar', default: ImageResolution.ONE_K })
+  resolution: ImageResolution;
 
   @Column({ type: 'varchar', default: AiProvider.MOCK })
   provider: AiProvider;

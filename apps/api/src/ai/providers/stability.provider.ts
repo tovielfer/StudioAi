@@ -5,7 +5,7 @@ import { BaseImageProvider } from './base.provider';
 export class StabilityProvider extends BaseImageProvider {
   async generate(params: GenerateImageParams): Promise<GenerateImageResult> {
     const key = this.config.get('STABILITY_API_KEY');
-    const { width, height } = this.sizeToDimensions(params.size);
+    const { width, height } = this.dimensions(params.size, params.resolution);
     const firstRef = this.resolveReferenceImages(params)[0];
 
     const form = new FormData();

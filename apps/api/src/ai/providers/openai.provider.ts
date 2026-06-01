@@ -45,7 +45,7 @@ export class OpenAIProvider extends BaseImageProvider {
 
   async generate(params: GenerateImageParams): Promise<GenerateImageResult> {
     const model = params.model ?? 'gpt-image-1';
-    const size = this.mapSize(params.size);
+    const size = this.mapSize(model, params.size, params.resolution);
     const quality = this.mapQuality(params.quality);
     const refs = this.resolveReferenceImages(params);
 
@@ -158,14 +158,39 @@ export class OpenAIProvider extends BaseImageProvider {
     throw new Error('OpenAI returned no image');
   }
 
-  private mapSize(size: string): string {
-    const map: Record<string, string> = {
+  // gpt-image-1 only accepts fixed ~1K sizes. gpt-image-2 accepts higher
+  // resolutions too, as long as: max edge <= 3840, both edges multiples of 16,
+  // long:short ratio <= 3:1, and total pixels between 655,360 and 8,294,400.
+  // The values below are hand-picked to satisfy all of those constraints.
+  private mapSize(model: string, ratio: string, resolution?: string): string {
+    const oneK: Record<string, string> = {
       '1:1': '1024x1024',
       '16:9': '1536x1024',
       '9:16': '1024x1536',
       '4:3': '1536x1024',
     };
-    return map[size] ?? '1024x1024';
+
+    if (model !== 'gpt-image-2') {
+      return oneK[ratio] ?? '1024x1024';
+    }
+
+    const byResolution: Record<string, Record<string, string>> = {
+      '1K': oneK,
+      '2K': {
+        '1:1': '2048x2048',
+        '16:9': '2048x1152',
+        '9:16': '1152x2048',
+        '4:3': '2048x1536',
+      },
+      '4K': {
+        '1:1': '2880x2880',
+        '16:9': '3840x2160',
+        '9:16': '2160x3840',
+        '4:3': '3264x2448',
+      },
+    };
+
+    return byResolution[resolution ?? '1K']?.[ratio] ?? oneK[ratio] ?? '1024x1024';
   }
 
   private mapQuality(quality?: string): string {

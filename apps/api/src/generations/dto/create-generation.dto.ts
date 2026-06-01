@@ -9,6 +9,7 @@ import {
 import {
   ImageQuality,
   ImageSize,
+  ImageResolution,
   AiProvider,
   GenerationType,
 } from '../../common/constants';
@@ -29,6 +30,10 @@ export class CreateGenerationDto {
   @IsOptional()
   @IsEnum(ImageSize)
   size?: ImageSize;
+
+  @IsOptional()
+  @IsEnum(ImageResolution)
+  resolution?: ImageResolution;
 
   @IsOptional()
   @IsEnum(AiProvider)

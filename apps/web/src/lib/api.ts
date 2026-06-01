@@ -38,6 +38,7 @@ export interface Generation {
   referenceImageUrls: string[] | null;
   quality: string;
   size: string;
+  resolution: string;
   provider: string;
   creditCost: number;
   actualCostUsd: number | null;
@@ -155,6 +156,7 @@ class ApiClient {
     model: string;
     quality?: string;
     size?: string;
+    resolution?: string;
     provider?: string;
     referenceImageUrls?: string[];
   }) {
@@ -196,6 +198,7 @@ class ApiClient {
     model: string;
     size: string;
     quality: string;
+    resolution?: string;
     hasReference?: boolean;
     type?: string;
   }) {
@@ -206,6 +209,7 @@ class ApiClient {
       quality: params.quality,
       hasReference: String(params.hasReference ?? false),
     });
+    if (params.resolution) query.set('resolution', params.resolution);
     if (params.type) query.set('type', params.type);
     return this.request<{ credits: number; usd: number }>(
       `/generations/cost?${query.toString()}`,
@@ -323,12 +327,16 @@ export const api = new ApiClient();
 
 export interface SizeOption   { id: string; label: string }
 export interface QualityOption { id: string; label: string }
+export interface ResolutionOption { id: string; label: string }
 export interface ModelOption {
   id: string;
   name: string;
   provider: string;
   sizes: SizeOption[];
   qualities: QualityOption[];
+  // Resolution tiers (1K/2K/4K). Empty when the model has a single fixed
+  // resolution; the UI only renders the selector when there is a choice.
+  resolutions: ResolutionOption[];
 }
 
 const DEFAULT_SIZES: SizeOption[] = [
@@ -342,6 +350,12 @@ const DEFAULT_QUALITIES: QualityOption[] = [
   { id: 'fast',     label: 'מהיר' },
   { id: 'standard', label: 'רגיל' },
   { id: 'hd',       label: 'HD'   },
+];
+
+const RESOLUTION_TIERS: ResolutionOption[] = [
+  { id: '1K', label: '1K – רגיל' },
+  { id: '2K', label: '2K – גבוה' },
+  { id: '4K', label: '4K – מקסימלי' },
 ];
 
 export const MODELS: ModelOption[] = [
@@ -380,21 +394,23 @@ export const MODELS: ModelOption[] = [
       { id: 'standard', label: 'Medium – רגיל'       },
       { id: 'hd',       label: 'High – איכות גבוהה' },
     ],
+    resolutions: [],
   },
   {
     id: 'gpt-image-2',
     name: 'OpenAI Image 2',
     provider: 'openai',
     sizes: [
-      { id: '1:1',  label: '1024×1024 (ריבוע)' },
-      { id: '16:9', label: '1536×1024 (לרוחב)' },
-      { id: '9:16', label: '1024×1536 (לאורך)' },
+      { id: '1:1',  label: '1:1 ריבוע'  },
+      { id: '16:9', label: '16:9 לרוחב' },
+      { id: '9:16', label: '9:16 לאורך' },
     ],
     qualities: [
       { id: 'fast',     label: 'Low – מהיר'         },
       { id: 'standard', label: 'Medium – רגיל'       },
       { id: 'hd',       label: 'High – איכות גבוהה' },
     ],
+    resolutions: RESOLUTION_TIERS,
   },
   // {
   //   id: 'fal-flux',
@@ -409,6 +425,7 @@ export const MODELS: ModelOption[] = [
     provider: 'google',
     sizes: DEFAULT_SIZES,
     qualities: DEFAULT_QUALITIES,
+    resolutions: RESOLUTION_TIERS,
   },
   // {
   //   id: 'gemini-3.1-flash-image',
@@ -423,6 +440,7 @@ export const MODELS: ModelOption[] = [
     provider: 'google',
     sizes: DEFAULT_SIZES,
     qualities: DEFAULT_QUALITIES,
+    resolutions: [],
   },
 ];
 

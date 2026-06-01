@@ -19,6 +19,7 @@ import {
   GenerationType,
   ImageQuality,
   ImageSize,
+  ImageResolution,
   AiProvider,
   getGenerationCost,
 } from '../common/constants';
@@ -48,6 +49,7 @@ export class GenerationsService {
     const type = dto.type ?? GenerationType.IMAGE;
     const quality = dto.quality ?? ImageQuality.STANDARD;
     const size = dto.size ?? ImageSize.SQUARE;
+    const resolution = dto.resolution ?? ImageResolution.ONE_K;
     const provider = dto.provider ?? AiProvider.MOCK;
     const allReferenceUrls = dto.referenceImageUrls ?? [];
     const hasReference = allReferenceUrls.length > 0;
@@ -56,6 +58,7 @@ export class GenerationsService {
       model: dto.model,
       size,
       quality,
+      resolution,
       hasReference,
       type,
     });
@@ -67,6 +70,7 @@ export class GenerationsService {
       type,
       quality,
       size,
+      resolution,
       provider,
       referenceImageUrls: allReferenceUrls.length > 0 ? allReferenceUrls : null,
       status: GenerationStatus.PENDING,

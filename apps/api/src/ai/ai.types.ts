@@ -3,6 +3,7 @@ export interface GenerateImageParams {
   model: string;
   size: string;
   quality: string;
+  resolution?: string;
   referenceImages?: string[] | null;
   provider: string;
 }

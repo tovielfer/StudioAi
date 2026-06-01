@@ -22,6 +22,8 @@ export function CreateForm({
   setSize,
   quality,
   setQuality,
+  resolution,
+  setResolution,
   selectedModel,
   references,
   removeReference,
@@ -46,6 +48,8 @@ export function CreateForm({
   setSize: (v: string) => void;
   quality: string;
   setQuality: (v: string) => void;
+  resolution: string;
+  setResolution: (v: string) => void;
   selectedModel: ModelOption;
   references: ReferenceImage[];
   removeReference: (i: number) => void;
@@ -92,22 +96,36 @@ export function CreateForm({
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm text-gray-400 mb-1.5">גודל</label>
-          <select value={size} onChange={(e) => setSize(e.target.value)} className="input-field">
-            {selectedModel.sizes.map((s) => (
-              <option key={s.id} value={s.id}>{s.label}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm text-gray-400 mb-1.5">איכות</label>
-          <select value={quality} onChange={(e) => setQuality(e.target.value)} className="input-field">
-            {selectedModel.qualities.map((q) => (
-              <option key={q.id} value={q.id}>{q.label}</option>
-            ))}
-          </select>
-        </div>
+        {selectedModel.sizes.length > 1 && (
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">יחס</label>
+            <select value={size} onChange={(e) => setSize(e.target.value)} className="input-field">
+              {selectedModel.sizes.map((s) => (
+                <option key={s.id} value={s.id}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {selectedModel.resolutions.length > 1 && (
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">רזולציה</label>
+            <select value={resolution} onChange={(e) => setResolution(e.target.value)} className="input-field">
+              {selectedModel.resolutions.map((r) => (
+                <option key={r.id} value={r.id}>{r.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {selectedModel.qualities.length > 1 && (
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">איכות</label>
+            <select value={quality} onChange={(e) => setQuality(e.target.value)} className="input-field">
+              {selectedModel.qualities.map((q) => (
+                <option key={q.id} value={q.id}>{q.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Reference drop zone — accepts files from disk AND URLs from gallery */}

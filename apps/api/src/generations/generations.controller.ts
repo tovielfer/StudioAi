@@ -18,7 +18,12 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RateLimitGuard } from '../common/rate-limit.guard';
 import { StorageService } from '../storage/storage.service';
 import { GenerationType, getGenerationCost } from '../common/constants';
-import { ImageQuality, ImageSize, AiProvider } from '../common/constants';
+import {
+  ImageQuality,
+  ImageSize,
+  ImageResolution,
+  AiProvider,
+} from '../common/constants';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
@@ -36,6 +41,7 @@ export class GenerationsController {
     @Query('model') model: string,
     @Query('size') size: string,
     @Query('quality') quality: string,
+    @Query('resolution') resolution?: string,
     @Query('hasReference') hasReference?: string,
     @Query('type') type?: GenerationType,
   ) {
@@ -44,6 +50,7 @@ export class GenerationsController {
       model: model ?? 'gpt-image-1',
       size: size ?? ImageSize.SQUARE,
       quality: quality ?? ImageQuality.STANDARD,
+      resolution: resolution ?? ImageResolution.ONE_K,
       hasReference: hasReference === 'true',
       type: type ?? GenerationType.IMAGE,
     });

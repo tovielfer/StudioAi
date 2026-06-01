@@ -31,6 +31,7 @@ function CreateContent() {
   const [model, setModel] = useState(MODELS[0].id);
   const [size, setSize] = useState('1:1');
   const [quality, setQuality] = useState('standard');
+  const [resolution, setResolution] = useState('1K');
   const [references, setReferences] = useState<ReferenceImage[]>([]);
   const [generating, setGenerating] = useState(false);
   const [currentGen, setCurrentGen] = useState<Generation | null>(null);
@@ -176,6 +177,11 @@ function CreateContent() {
     const def = MODELS.find((m) => m.id === newModel);
     if (def && !def.sizes.find((s) => s.id === size)) setSize(def.sizes[0].id);
     if (def && !def.qualities.find((q) => q.id === quality)) setQuality(def.qualities[0].id);
+    if (def) {
+      const resOptions = def.resolutions;
+      if (resOptions.length === 0) setResolution('1K');
+      else if (!resOptions.find((r) => r.id === resolution)) setResolution(resOptions[0].id);
+    }
   };
 
   // ── Cost preview ───────────────────────────────────────────────────────────
@@ -190,6 +196,7 @@ function CreateContent() {
         model: selectedModel.id,
         size,
         quality,
+        resolution,
         hasReference,
       })
       .then((p) => { if (!cancelled) setCost(p.credits); })
@@ -198,7 +205,7 @@ function CreateContent() {
       })
       .finally(() => { if (!cancelled) setCostLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedModel.provider, selectedModel.id, size, quality, hasReference]);
+  }, [selectedModel.provider, selectedModel.id, size, quality, resolution, hasReference]);
 
   // ── Polling ────────────────────────────────────────────────────────────────
 
@@ -250,6 +257,7 @@ function CreateContent() {
         model: selectedModel.id,
         size,
         quality,
+        resolution,
         provider: selectedModel.provider,
         referenceImageUrls,
       });
@@ -292,6 +300,8 @@ function CreateContent() {
             setSize={setSize}
             quality={quality}
             setQuality={setQuality}
+            resolution={resolution}
+            setResolution={setResolution}
             selectedModel={selectedModel}
             references={references}
             removeReference={removeReference}

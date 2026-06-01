@@ -6,7 +6,7 @@ export class ReplicateProvider extends BaseImageProvider {
   async generate(params: GenerateImageParams): Promise<GenerateImageResult> {
     const token = this.config.get('REPLICATE_API_TOKEN');
     const model = params.model || 'black-forest-labs/flux-schnell';
-    const { width, height } = this.sizeToDimensions(params.size);
+    const { width, height } = this.dimensions(params.size, params.resolution);
     const firstRef = this.resolveReferenceImages(params)[0];
 
     const response = await fetch('https://api.replicate.com/v1/predictions', {

@@ -28,10 +28,20 @@ export class GoogleProvider extends BaseImageProvider {
         ? [{ role: 'user', parts: [...imageParts, { text: params.prompt }] }]
         : params.prompt;
 
+    const imageConfig: { aspectRatio?: string; imageSize?: string } = {};
+    if (params.size) imageConfig.aspectRatio = params.size;
+    // Only the Pro model supports the 1K/2K/4K resolution tiers.
+    if (params.resolution && model.includes('3-pro')) {
+      imageConfig.imageSize = params.resolution;
+    }
+
     const response = await ai.models.generateContent({
       model,
       contents,
-      config: { responseModalities: ['TEXT', 'IMAGE'] },
+      config: {
+        responseModalities: ['TEXT', 'IMAGE'],
+        ...(Object.keys(imageConfig).length > 0 ? { imageConfig } : {}),
+      },
     });
 
     const usage = this.extractUsage(response);
