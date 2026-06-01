@@ -91,6 +91,8 @@ export interface FeedbackSubmission {
   status: FeedbackStatus;
   adminReply: string | null;
   answeredAt: string | null;
+  userReplyRead?: boolean;
+  adminRead?: boolean;
   createdAt: string;
 }
 
@@ -271,6 +273,26 @@ class ApiClient {
     return this.request<{ items: FeedbackSubmission[]; total: number }>(
       `/feedback${qs ? `?${qs}` : ''}`,
     );
+  }
+
+  getMyFeedbackUnreadCount() {
+    return this.request<{ unread: number }>('/feedback/unread-count');
+  }
+
+  markMyFeedbackRead() {
+    return this.request<{ unread: number }>('/feedback/mark-read', {
+      method: 'POST',
+    });
+  }
+
+  getAdminFeedbackUnreadCount() {
+    return this.request<{ unread: number }>('/feedback/admin/unread-count');
+  }
+
+  markAdminFeedbackRead() {
+    return this.request<{ unread: number }>('/feedback/admin/mark-read', {
+      method: 'POST',
+    });
   }
 
   getAdminFeedback(params?: { limit?: number; offset?: number }) {

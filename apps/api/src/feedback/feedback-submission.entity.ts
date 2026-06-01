@@ -53,6 +53,16 @@ export class FeedbackSubmission {
   @Column({ type: 'timestamptz', nullable: true })
   answeredAt: Date | null;
 
+  // Whether the user has seen the latest admin reply. Reset to false each time
+  // a new reply is added so the user gets a fresh notification.
+  @Column({ type: 'boolean', default: false })
+  userReplyRead: boolean;
+
+  // Whether an admin has opened/seen this submission. New submissions start
+  // as unread so the admin gets notified about incoming inquiries.
+  @Column({ type: 'boolean', default: false })
+  adminRead: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 }

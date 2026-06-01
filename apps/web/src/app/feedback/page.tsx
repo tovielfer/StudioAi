@@ -57,6 +57,8 @@ function FeedbackContent() {
     const res = await api.getMyFeedback({ limit: 50 });
     setFeedback(res.items);
     setTotal(res.total);
+    // Viewing the page counts as reading any replies, so clear the badge.
+    api.markMyFeedbackRead().catch(() => {});
   }, []);
 
   useEffect(() => {

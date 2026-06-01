@@ -31,6 +31,28 @@ export class FeedbackController {
     return this.feedbackService.create(req.user.id, dto);
   }
 
+  @Get('unread-count')
+  unreadCount(@Req() req: { user: { id: string } }) {
+    return this.feedbackService.countUnreadRepliesForUser(req.user.id);
+  }
+
+  @Post('mark-read')
+  markRead(@Req() req: { user: { id: string } }) {
+    return this.feedbackService.markRepliesReadForUser(req.user.id);
+  }
+
+  @Get('admin/unread-count')
+  @UseGuards(AdminGuard)
+  adminUnreadCount() {
+    return this.feedbackService.countNewForAdmin();
+  }
+
+  @Post('admin/mark-read')
+  @UseGuards(AdminGuard)
+  adminMarkRead() {
+    return this.feedbackService.markAllReadForAdmin();
+  }
+
   @Get()
   listMine(
     @Req() req: { user: { id: string } },

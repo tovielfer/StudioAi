@@ -62,6 +62,8 @@ function AdminFeedbackContent() {
     const res = await api.getAdminFeedback({ limit: PAGE_SIZE });
     setFeedback(res.items);
     setTotal(res.total);
+    // Opening the admin inbox marks all inquiries as seen, clearing the badge.
+    api.markAdminFeedbackRead().catch(() => {});
     setDraftReplies(
       res.items.reduce<Record<string, string>>((acc, item) => {
         acc[item.id] = item.adminReply ?? '';
@@ -154,11 +156,21 @@ function AdminFeedbackContent() {
               {feedback.map((item) => (
                 <article
                   key={item.id}
-                  className="rounded-xl border border-gray-200 bg-white p-5"
+                  className={`rounded-xl border bg-white p-5 ${
+                    item.adminRead === false
+                      ? 'border-red-300 ring-1 ring-red-200'
+                      : 'border-gray-200'
+                  }`}
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
+                        {item.adminRead === false && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500 px-3 py-1 text-xs font-semibold text-white">
+                            <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                            חדש
+                          </span>
+                        )}
                         <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
                           {FEEDBACK_TYPE_LABELS[item.type] ?? item.type}
                         </span>

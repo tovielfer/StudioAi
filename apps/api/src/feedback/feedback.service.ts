@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
 import { UpdateFeedbackDto } from './dto/update-feedback.dto';
 import {
@@ -24,6 +24,33 @@ export class FeedbackService {
     });
 
     return this.feedbackRepo.save(submission);
+  }
+
+  async countUnreadRepliesForUser(userId: string) {
+    const unread = await this.feedbackRepo.count({
+      where: { userId, adminReply: Not(IsNull()), userReplyRead: false },
+    });
+    return { unread };
+  }
+
+  async markRepliesReadForUser(userId: string) {
+    await this.feedbackRepo.update(
+      { userId, adminReply: Not(IsNull()), userReplyRead: false },
+      { userReplyRead: true },
+    );
+    return { unread: 0 };
+  }
+
+  async countNewForAdmin() {
+    const unread = await this.feedbackRepo.count({
+      where: { adminRead: false },
+    });
+    return { unread };
+  }
+
+  async markAllReadForAdmin() {
+    await this.feedbackRepo.update({ adminRead: false }, { adminRead: true });
+    return { unread: 0 };
   }
 
   async listByUser(userId: string, params: { limit: number; offset: number }) {
@@ -68,12 +95,21 @@ export class FeedbackService {
       throw new NotFoundException('Feedback not found');
     }
 
+    // The admin is interacting with this submission, so it's no longer "new".
+    item.adminRead = true;
+
     if (dto.status) {
       item.status = dto.status;
     }
 
     if (dto.adminReply !== undefined) {
-      item.adminReply = dto.adminReply.trim() || null;
+      const nextReply = dto.adminReply.trim() || null;
+      // When the reply content changes (and is non-empty), surface a fresh
+      // notification to the user.
+      if (nextReply && nextReply !== item.adminReply) {
+        item.userReplyRead = false;
+      }
+      item.adminReply = nextReply;
     }
 
     if (item.adminReply && item.status === FeedbackStatus.OPEN) {

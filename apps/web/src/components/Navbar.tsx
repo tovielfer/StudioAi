@@ -2,20 +2,57 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
+import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+
+const POLL_INTERVAL_MS = 30000;
 
 export function Navbar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
+  const [feedbackUnread, setFeedbackUnread] = useState(0);
+  const [adminUnread, setAdminUnread] = useState(0);
 
-  const links = user
+  const isAdmin = user?.role === 'admin';
+
+  const refreshCounts = useCallback(() => {
+    if (!user) {
+      setFeedbackUnread(0);
+      setAdminUnread(0);
+      return;
+    }
+
+    api
+      .getMyFeedbackUnreadCount()
+      .then((res) => setFeedbackUnread(res.unread))
+      .catch(() => {});
+
+    if (isAdmin) {
+      api
+        .getAdminFeedbackUnreadCount()
+        .then((res) => setAdminUnread(res.unread))
+        .catch(() => {});
+    }
+  }, [user, isAdmin]);
+
+  useEffect(() => {
+    refreshCounts();
+    if (!user) return;
+    const id = setInterval(refreshCounts, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+    // Re-run on route change so the dot clears right after visiting a page
+    // that marks items as read.
+  }, [refreshCounts, pathname, user]);
+
+  const links: { href: string; label: string; badge: number }[] = user
     ? [
-        { href: '/dashboard', label: 'לוח בקרה' },
-        { href: '/create', label: 'יצירה' },
-        { href: '/history', label: 'היסטוריה' },
-        { href: '/feedback', label: 'פניות' },
-        ...(user.role === 'admin'
-          ? [{ href: '/admin', label: 'ניהול' }]
+        { href: '/dashboard', label: 'לוח בקרה', badge: 0 },
+        { href: '/create', label: 'יצירה', badge: 0 },
+        { href: '/history', label: 'היסטוריה', badge: 0 },
+        { href: '/feedback', label: 'פניות', badge: feedbackUnread },
+        ...(isAdmin
+          ? [{ href: '/admin', label: 'ניהול', badge: adminUnread }]
           : []),
       ]
     : [];
@@ -35,13 +72,21 @@ export function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`text-sm transition-colors ${
+              className={`relative text-sm transition-colors ${
                 pathname === link.href
                   ? 'text-brand-400'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
               {link.label}
+              {link.badge > 0 && (
+                <span
+                  className="absolute -top-1.5 -left-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white"
+                  aria-label={`${link.badge} חדשים`}
+                >
+                  {link.badge > 9 ? '9+' : link.badge}
+                </span>
+              )}
             </Link>
           ))}
 
