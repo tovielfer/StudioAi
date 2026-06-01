@@ -352,6 +352,10 @@ const DEFAULT_QUALITIES: QualityOption[] = [
   { id: 'hd',       label: 'HD'   },
 ];
 
+const FIXED_STANDARD_QUALITY: QualityOption[] = [
+  { id: 'standard', label: 'רגיל' },
+];
+
 const RESOLUTION_TIERS: ResolutionOption[] = [
   { id: '1K', label: '1K – רגיל' },
   { id: '2K', label: '2K – גבוה' },
@@ -424,7 +428,7 @@ export const MODELS: ModelOption[] = [
     name: 'Nano Banana Pro',
     provider: 'google',
     sizes: DEFAULT_SIZES,
-    qualities: DEFAULT_QUALITIES,
+    qualities: FIXED_STANDARD_QUALITY,
     resolutions: RESOLUTION_TIERS,
   },
   // {
@@ -439,7 +443,7 @@ export const MODELS: ModelOption[] = [
     name: 'Nano Banana',
     provider: 'google',
     sizes: DEFAULT_SIZES,
-    qualities: DEFAULT_QUALITIES,
+    qualities: FIXED_STANDARD_QUALITY,
     resolutions: [],
   },
 ];
