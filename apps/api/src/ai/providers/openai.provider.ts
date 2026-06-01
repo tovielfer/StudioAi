@@ -3,8 +3,45 @@ import { AiProvider } from '../../common/constants';
 import { GenerateImageParams, GenerateImageResult, ImageUsage } from '../ai.types';
 import { BaseImageProvider } from './base.provider';
 
+interface TokenPrices {
+  textInput: number;
+  imageInput: number;
+  imageOutput: number;
+}
+
+// OpenAI Standard pricing, USD per 1M tokens.
+// (Batch API is 50% cheaper but is async/offline — not used for live generation.)
+const OPENAI_TOKEN_PRICES: Record<string, TokenPrices> = {
+  'gpt-image-1': { textInput: 5, imageInput: 10, imageOutput: 40 },
+  'gpt-image-1-mini': { textInput: 2, imageInput: 2.5, imageOutput: 8 },
+  'gpt-image-1.5': { textInput: 5, imageInput: 8, imageOutput: 32 },
+  'gpt-image-2': { textInput: 5, imageInput: 8, imageOutput: 30 },
+  'chatgpt-image-latest': { textInput: 5, imageInput: 8, imageOutput: 32 },
+};
+
 export class OpenAIProvider extends BaseImageProvider {
   private readonly logger = new Logger(OpenAIProvider.name);
+
+  private estimateCostUsd(model: string, usage?: ImageUsage): number {
+    if (!usage) return 0;
+
+    const prices =
+      OPENAI_TOKEN_PRICES[model] ?? OPENAI_TOKEN_PRICES['gpt-image-1'];
+
+    const inputImageTokens = usage.input_tokens_details?.image_tokens ?? 0;
+    const inputTextTokens =
+      usage.input_tokens_details?.text_tokens ??
+      Math.max((usage.input_tokens ?? 0) - inputImageTokens, 0);
+    // For image generation the output is always image tokens.
+    const outputImageTokens = usage.output_tokens ?? 0;
+
+    return (
+      (inputTextTokens * prices.textInput +
+        inputImageTokens * prices.imageInput +
+        outputImageTokens * prices.imageOutput) /
+      1_000_000
+    );
+  }
 
   async generate(params: GenerateImageParams): Promise<GenerateImageResult> {
     const model = params.model ?? 'gpt-image-1';
@@ -55,11 +92,12 @@ export class OpenAIProvider extends BaseImageProvider {
       usage?: ImageUsage;
     };
 
+    const cost = this.estimateCostUsd(model, data.usage);
     this.logger.log(
-      `OpenAI edit — input: ${data.usage?.input_tokens ?? 'N/A'}, output: ${data.usage?.output_tokens ?? 'N/A'}`,
+      `OpenAI edit (${model}) — input: ${data.usage?.input_tokens ?? 'N/A'}, output: ${data.usage?.output_tokens ?? 'N/A'}, cost: $${cost.toFixed(5)}`,
     );
 
-    return this.parseImageResponse(data);
+    return this.parseImageResponse(data, cost);
   }
 
   private async create(
@@ -85,24 +123,36 @@ export class OpenAIProvider extends BaseImageProvider {
       usage?: ImageUsage;
     };
 
+    const cost = this.estimateCostUsd(model, data.usage);
     this.logger.log(
-      `OpenAI generate — input: ${data.usage?.input_tokens ?? 'N/A'}, output: ${data.usage?.output_tokens ?? 'N/A'}`,
+      `OpenAI generate (${model}) — input: ${data.usage?.input_tokens ?? 'N/A'}, output: ${data.usage?.output_tokens ?? 'N/A'}, cost: $${cost.toFixed(5)}`,
     );
 
-    return this.parseImageResponse(data);
+    return this.parseImageResponse(data, cost);
   }
 
-  private parseImageResponse(data: {
-    data?: { url?: string; b64_json?: string }[];
-    usage?: ImageUsage;
-  }): GenerateImageResult {
+  private parseImageResponse(
+    data: {
+      data?: { url?: string; b64_json?: string }[];
+      usage?: ImageUsage;
+    },
+    costUsd: number,
+  ): GenerateImageResult {
     const item = data.data?.[0];
-    if (item?.url) return { imageUrl: item.url, provider: AiProvider.OPENAI, usage: data.usage };
+    if (item?.url) {
+      return {
+        imageUrl: item.url,
+        provider: AiProvider.OPENAI,
+        usage: data.usage,
+        costUsd,
+      };
+    }
     if (item?.b64_json) {
       return {
         imageUrl: `data:image/png;base64,${item.b64_json}`,
         provider: AiProvider.OPENAI,
         usage: data.usage,
+        costUsd,
       };
     }
     throw new Error('OpenAI returned no image');

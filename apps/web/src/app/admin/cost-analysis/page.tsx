@@ -31,6 +31,11 @@ function fmtTok(n: number | undefined) {
   return fmt(n);
 }
 
+function fmtUsd(n: number | null | undefined) {
+  if (typeof n !== 'number') return '—';
+  return `$${n.toFixed(4)}`;
+}
+
 export default function CostAnalysisPage() {
   return (
     <AdminGuard>
@@ -86,6 +91,10 @@ function CostAnalysisContent() {
     : filtered;
 
   const totalCredits = filteredByQ.reduce((s, g) => s + (g.creditCost ?? 0), 0);
+  const totalCostUsd = filteredByQ.reduce(
+    (s, g) => s + (g.actualCostUsd ?? 0),
+    0,
+  );
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
@@ -104,12 +113,16 @@ function CostAnalysisContent() {
         )}
 
         {/* ── Summary strip ─────────────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="סה״כ יצירות (כל המסד)" value={fmt(total)} />
           <StatCard
             label={`סה״כ קרדיטים (${filteredByQ.length} בדף)`}
             value={fmt(totalCredits)}
             accent
+          />
+          <StatCard
+            label={`עלות בפועל ($) (${filteredByQ.length} בדף)`}
+            value={`$${totalCostUsd.toFixed(4)}`}
           />
           <StatCard
             label="יצירות בדף"
@@ -229,6 +242,7 @@ function CostAnalysisContent() {
                     <th className="py-3 pe-3 text-right">גודל</th>
                     <th className="py-3 pe-3 text-right">איכות</th>
                     <th className="py-3 pe-3 text-right">פרומפט</th>
+                    <th className="py-3 pe-3 text-right">עלות בפועל ($)</th>
                     <th className="py-3 pe-3 text-right">כמות תמונות מקור</th>
                     <th className="py-3 pe-3 text-right">input tok</th>
                     <th className="py-3 pe-3 text-right">output tok</th>
@@ -270,6 +284,9 @@ function CostAnalysisContent() {
                         <span className="line-clamp-2 text-gray-700 text-xs">
                           {g.prompt}
                         </span>
+                      </td>
+                      <td className="py-3 pe-3 tabular-nums font-medium text-gray-900 text-xs whitespace-nowrap">
+                        {fmtUsd(g.actualCostUsd)}
                       </td>
                       <td className="py-3 pe-3 text-center">
                         {g.referenceImageUrls?.length ? (

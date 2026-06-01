@@ -57,6 +57,11 @@ export function AdminGenerationCard({
         <span className="inline-flex items-center rounded-md bg-brand-50 px-2 py-0.5 font-semibold text-brand-800">
           {gen.creditCost.toLocaleString('he-IL')} טוקנים
         </span>
+        {typeof gen.actualCostUsd === 'number' && (
+          <span className="font-medium text-gray-700">
+            ${gen.actualCostUsd.toFixed(4)}
+          </span>
+        )}
         <span>{new Date(gen.createdAt).toLocaleDateString('he-IL')}</span>
       </div>
     </button>

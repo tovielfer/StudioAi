@@ -66,11 +66,12 @@ export class GenerationRunnerService {
         provider: result.provider as AiProvider,
         errorMessage: null,
         tokensUsed: result.usage ?? null,
+        actualCostUsd: result.costUsd ?? null,
       });
 
       if (result.usage) {
         this.logger.log(
-          `Generation ${generationId} completed — tokens: input=${result.usage.input_tokens}, output=${result.usage.output_tokens}, total=${result.usage.total_tokens}`,
+          `Generation ${generationId} completed — tokens: input=${result.usage.input_tokens}, output=${result.usage.output_tokens}, total=${result.usage.total_tokens}, cost=$${(result.costUsd ?? 0).toFixed(5)}`,
         );
       } else {
         this.logger.log(`Generation ${generationId} completed`);

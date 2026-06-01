@@ -106,6 +106,7 @@ export class AdminService {
       .addSelect('g.size', 'size')
       .addSelect('g.provider', 'provider')
       .addSelect('g.creditCost', 'creditCost')
+      .addSelect('g."actualCostUsd"::float8', 'actualCostUsd')
       .addSelect('g.tokensUsed', 'tokensUsed')
       .addSelect('g.errorMessage', 'errorMessage')
       .addSelect('g.createdAt', 'createdAt')
@@ -140,6 +141,8 @@ export class AdminService {
       .addSelect('COUNT(*)::int', 'count')
       .addSelect(`SUM(g."creditCost")::int`, 'totalCredits')
       .addSelect(`ROUND(AVG(g."creditCost")::numeric, 1)`, 'avgCredits')
+      .addSelect(`COALESCE(SUM(g."actualCostUsd"), 0)::float8`, 'totalCostUsd')
+      .addSelect(`COALESCE(AVG(g."actualCostUsd"), 0)::float8`, 'avgCostUsd')
       .addSelect(
         `SUM(CASE WHEN g."referenceImageUrls" IS NOT NULL AND jsonb_array_length(g."referenceImageUrls") > 0 THEN 1 ELSE 0 END)::int`,
         'refCount',
@@ -176,6 +179,8 @@ export class AdminService {
       count: Number(r['count']),
       totalCredits: Number(r['totalCredits']),
       avgCredits: Number(r['avgCredits']),
+      totalCostUsd: Number(r['totalCostUsd']),
+      avgCostUsd: Number(r['avgCostUsd']),
       refCount: Number(r['refCount']),
       totalInputTokens: Number(r['totalInputTokens']),
       totalOutputTokens: Number(r['totalOutputTokens']),

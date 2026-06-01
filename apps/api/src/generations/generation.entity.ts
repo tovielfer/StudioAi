@@ -57,6 +57,10 @@ export class Generation {
   @Column({ type: 'int', default: 0 })
   creditCost: number;
 
+  // Actual provider cost in USD, computed from token usage at generation time.
+  @Column({ type: 'numeric', precision: 12, scale: 6, nullable: true })
+  actualCostUsd: number | null;
+
   @Column({ type: 'text', nullable: true })
   errorMessage: string | null;
 

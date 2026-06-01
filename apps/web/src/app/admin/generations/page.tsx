@@ -23,6 +23,10 @@ function formatTokens(value: number | undefined) {
   return typeof value === 'number' ? value.toLocaleString('he-IL') : '-';
 }
 
+function formatUsd(value: number | null | undefined) {
+  return typeof value === 'number' ? `$${value.toFixed(4)}` : '-';
+}
+
 export default function AdminGenerationsPage() {
   return (
     <AdminGuard>
@@ -154,6 +158,7 @@ function AdminGenerationsContent() {
                     <th className="text-right py-3 pe-4">סטטוס</th>
                     <th className="text-right py-3 pe-4">מודל</th>
                     <th className="text-right py-3 pe-4">עלות טוקנים</th>
+                    <th className="text-right py-3 pe-4">עלות בפועל ($)</th>
                     <th className="text-right py-3 pe-4">tokensUsed</th>
                     <th className="text-right py-3 pe-4">גודל</th>
                     <th className="text-right py-3 pe-4">איכות</th>
@@ -186,6 +191,9 @@ function AdminGenerationsContent() {
                         <span className="inline-flex min-w-16 justify-center rounded-lg bg-brand-50 px-3 py-1.5 font-bold text-brand-800">
                           {generation.creditCost.toLocaleString('he-IL')}
                         </span>
+                      </td>
+                      <td className="py-3 pe-4 font-medium text-gray-900">
+                        {formatUsd(generation.actualCostUsd)}
                       </td>
                       <td className="py-3 pe-4 text-gray-700">
                         <div className="font-semibold text-gray-950">

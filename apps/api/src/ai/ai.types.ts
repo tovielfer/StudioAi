@@ -38,4 +38,5 @@ export interface GenerateImageResult {
   imageUrl: string;
   provider: string;
   usage?: ImageUsage;
+  costUsd?: number;
 }

@@ -40,6 +40,7 @@ export interface Generation {
   size: string;
   provider: string;
   creditCost: number;
+  actualCostUsd: number | null;
   tokensUsed: TokensUsed | null;
   errorMessage: string | null;
   createdAt: string;
@@ -65,6 +66,8 @@ export interface AdminCostStat {
   count: number;
   totalCredits: number;
   avgCredits: number;
+  totalCostUsd: number;
+  avgCostUsd: number;
   refCount: number;
   totalInputTokens: number;
   totalOutputTokens: number;

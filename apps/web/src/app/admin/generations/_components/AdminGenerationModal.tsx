@@ -34,6 +34,12 @@ export function AdminGenerationModal({
     ['גודל', generation.size],
     ['איכות', generation.quality],
     ['עלות טוקנים', generation.creditCost.toLocaleString('he-IL')],
+    [
+      'עלות בפועל ($)',
+      typeof generation.actualCostUsd === 'number'
+        ? `$${generation.actualCostUsd.toFixed(4)}`
+        : '—',
+    ],
     ['תאריך', formatDateTime(generation.createdAt)],
   ];
 
