@@ -21,9 +21,9 @@ import {
   ImageSize,
   ImageResolution,
   AiProvider,
-  getGenerationCost,
 } from '../common/constants';
 import { moderatePrompt } from '../common/moderation';
+import { AiPricingService } from '../ai/ai-pricing.service';
 
 export const GENERATION_QUEUE = 'generation';
 
@@ -38,6 +38,7 @@ export class GenerationsService {
     @Optional() @InjectQueue(GENERATION_QUEUE) private readonly queue: Queue | null,
     private readonly creditsService: CreditsService,
     private readonly runner: GenerationRunnerService,
+    private readonly pricingService: AiPricingService,
     config: ConfigService,
   ) {
     this.syncMode = config.get('QUEUE_MODE') === 'sync';
@@ -53,7 +54,8 @@ export class GenerationsService {
     const provider = dto.provider ?? AiProvider.MOCK;
     const allReferenceUrls = dto.referenceImageUrls ?? [];
     const hasReference = allReferenceUrls.length > 0;
-    const { credits: creditCost } = getGenerationCost({
+    const { credits: creditCost, ruleId } =
+      await this.pricingService.getGenerationCost({
       provider,
       model: dto.model,
       size,
@@ -75,6 +77,7 @@ export class GenerationsService {
       referenceImageUrls: allReferenceUrls.length > 0 ? allReferenceUrls : null,
       status: GenerationStatus.PENDING,
       creditCost,
+      pricingRuleId: ruleId,
     });
 
     await this.creditsService.deductCredits(

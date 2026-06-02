@@ -17,13 +17,14 @@ import { CreateGenerationDto } from './dto/create-generation.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RateLimitGuard } from '../common/rate-limit.guard';
 import { StorageService } from '../storage/storage.service';
-import { GenerationType, getGenerationCost } from '../common/constants';
+import { GenerationType } from '../common/constants';
 import {
   ImageQuality,
   ImageSize,
   ImageResolution,
   AiProvider,
 } from '../common/constants';
+import { AiPricingService } from '../ai/ai-pricing.service';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
@@ -32,6 +33,7 @@ export class GenerationsController {
   constructor(
     private readonly generationsService: GenerationsService,
     private readonly storageService: StorageService,
+    private readonly pricingService: AiPricingService,
   ) {}
 
   @Get('cost')
@@ -45,7 +47,7 @@ export class GenerationsController {
     @Query('hasReference') hasReference?: string,
     @Query('type') type?: GenerationType,
   ) {
-    return getGenerationCost({
+    return this.pricingService.getGenerationCost({
       provider: provider ?? AiProvider.MOCK,
       model: model ?? 'gpt-image-1',
       size: size ?? ImageSize.SQUARE,

@@ -18,6 +18,8 @@ import { User } from './users/user.entity';
 import { Generation } from './generations/generation.entity';
 import { CreditTransaction } from './credits/credit-transaction.entity';
 import { FeedbackSubmission } from './feedback/feedback-submission.entity';
+import { AiPricingRule } from './ai/ai-pricing-rule.entity';
+import { AiPricingRuleAuditLog } from './ai/ai-pricing-rule-audit-log.entity';
 import { isSyncQueue } from './config/env.loader';
 
 @Module({})
@@ -42,7 +44,14 @@ export class AppModule implements NestModule {
         useFactory: (config: ConfigService) => ({
           type: 'postgres',
           url: config.get<string>('DATABASE_URL'),
-          entities: [User, Generation, CreditTransaction, FeedbackSubmission],
+          entities: [
+            User,
+            Generation,
+            CreditTransaction,
+            FeedbackSubmission,
+            AiPricingRule,
+            AiPricingRuleAuditLog,
+          ],
           migrations: [join(__dirname, 'database/migrations/*.{ts,js}')],
           migrationsRun: true,
           synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',

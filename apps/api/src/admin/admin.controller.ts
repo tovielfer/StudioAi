@@ -6,8 +6,10 @@ import {
   Param,
   ParseIntPipe,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { AdminGuard } from '../auth/admin.guard';
@@ -15,6 +17,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GenerationStatus } from '../common/constants';
 import { AdminService } from './admin.service';
 import { AddUserCreditsDto } from './dto/add-user-credits.dto';
+import { UpdatePricingRuleDto } from './dto/update-pricing-rule.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -59,6 +62,38 @@ export class AdminController {
   @Get('cost-stats')
   getCostStats() {
     return this.adminService.getCostStats();
+  }
+
+  @Get('pricing-rules')
+  listPricingRules() {
+    return this.adminService.listPricingRules();
+  }
+
+  @Patch('pricing-rules/:id')
+  updatePricingRule(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdatePricingRuleDto,
+    @Req() req: { user: { id: string } },
+  ) {
+    return this.adminService.updatePricingRule(id, dto, req.user.id);
+  }
+
+  @Get('pricing-rules/:id/generations')
+  listPricingRuleGenerations(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset = 0,
+  ) {
+    return this.adminService.listPricingRuleGenerations(
+      id,
+      Math.min(Math.max(limit, 1), 100),
+      Math.max(offset, 0),
+    );
+  }
+
+  @Get('pricing-rules/:id/audit-log')
+  getPricingRuleAuditLog(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.getPricingRuleAuditLog(id);
   }
 
   @Post('users/:id/credits')

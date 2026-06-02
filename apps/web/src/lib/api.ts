@@ -41,6 +41,7 @@ export interface Generation {
   resolution: string;
   provider: string;
   creditCost: number;
+  pricingRuleId: string | null;
   actualCostUsd: number | null;
   tokensUsed: TokensUsed | null;
   errorMessage: string | null;
@@ -74,6 +75,55 @@ export interface AdminCostStat {
   totalOutputTokens: number;
   totalInputImageTokens: number;
   totalOutputImageTokens: number;
+}
+
+export interface PricingRuleMetrics {
+  generationCount: number;
+  doneCount: number;
+  failedCount: number;
+  totalCredits: number;
+  avgCredits: number;
+  totalActualCostUsd: number;
+  avgActualCostUsd: number;
+  estimatedGrossUsd: number;
+  estimatedMarginUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalInputImageTokens: number;
+  totalOutputImageTokens: number;
+}
+
+export interface AdminPricingRule {
+  id: string;
+  type: string;
+  provider: string | null;
+  model: string | null;
+  size: string | null;
+  quality: string | null;
+  resolution: string | null;
+  baseUsd: number;
+  referenceImageUsd: number;
+  margin: number;
+  creditCostOverride: number | null;
+  isModelDefault: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  calculatedUsd: number;
+  calculatedCredits: number;
+  referenceCalculatedUsd: number;
+  referenceCalculatedCredits: number;
+  metrics: PricingRuleMetrics;
+}
+
+export interface PricingRuleAuditLog {
+  id: string;
+  ruleId: string;
+  adminUserId: string | null;
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+  createdAt: string;
 }
 
 export type FeedbackType =
@@ -260,6 +310,45 @@ class ApiClient {
 
   getAdminCostStats() {
     return this.request<AdminCostStat[]>('/admin/cost-stats');
+  }
+
+  getAdminPricingRules() {
+    return this.request<AdminPricingRule[]>('/admin/pricing-rules');
+  }
+
+  updateAdminPricingRule(
+    id: string,
+    data: {
+      baseUsd?: number;
+      referenceImageUsd?: number;
+      margin?: number;
+      creditCostOverride?: number | null;
+      isActive?: boolean;
+    },
+  ) {
+    return this.request<AdminPricingRule>(`/admin/pricing-rules/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  getAdminPricingRuleGenerations(
+    id: string,
+    params?: { limit?: number; offset?: number },
+  ) {
+    const query = new URLSearchParams();
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+    const qs = query.toString();
+    return this.request<{ items: AdminGeneration[]; total: number }>(
+      `/admin/pricing-rules/${id}/generations${qs ? `?${qs}` : ''}`,
+    );
+  }
+
+  getAdminPricingRuleAuditLog(id: string) {
+    return this.request<PricingRuleAuditLog[]>(
+      `/admin/pricing-rules/${id}/audit-log`,
+    );
   }
 
   createFeedback(data: {

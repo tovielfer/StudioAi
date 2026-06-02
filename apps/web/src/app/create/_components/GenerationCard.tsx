@@ -112,6 +112,9 @@ export function GenerationCard({
       <p className="text-sm truncate text-gray-300" title={gen.prompt}>
         {gen.prompt}
       </p>
+      <div className="mt-1 text-xs text-gray-500">
+        {gen.size} · {gen.resolution}
+      </div>
       <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
         <span>{new Date(gen.createdAt).toLocaleDateString('he-IL')}</span>
         <span>{gen.creditCost} קרד&apos;</span>

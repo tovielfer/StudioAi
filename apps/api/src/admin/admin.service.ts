@@ -1,11 +1,46 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { ILike, Repository, SelectQueryBuilder } from 'typeorm';
+import { AiPricingRuleAuditLog } from '../ai/ai-pricing-rule-audit-log.entity';
+import { AiPricingRule } from '../ai/ai-pricing-rule.entity';
 import { CreditTransaction } from '../credits/credit-transaction.entity';
 import { CreditsService } from '../credits/credits.service';
 import { Generation } from '../generations/generation.entity';
 import { GenerationStatus } from '../common/constants';
 import { User } from '../users/user.entity';
+import { UpdatePricingRuleDto } from './dto/update-pricing-rule.dto';
+
+type PricingMetric = {
+  generationCount: number;
+  doneCount: number;
+  failedCount: number;
+  totalCredits: number;
+  avgCredits: number;
+  totalActualCostUsd: number;
+  avgActualCostUsd: number;
+  estimatedGrossUsd: number;
+  estimatedMarginUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalInputImageTokens: number;
+  totalOutputImageTokens: number;
+};
+
+const EMPTY_PRICING_METRIC: PricingMetric = {
+  generationCount: 0,
+  doneCount: 0,
+  failedCount: 0,
+  totalCredits: 0,
+  avgCredits: 0,
+  totalActualCostUsd: 0,
+  avgActualCostUsd: 0,
+  estimatedGrossUsd: 0,
+  estimatedMarginUsd: 0,
+  totalInputTokens: 0,
+  totalOutputTokens: 0,
+  totalInputImageTokens: 0,
+  totalOutputImageTokens: 0,
+};
 
 @Injectable()
 export class AdminService {
@@ -16,6 +51,10 @@ export class AdminService {
     private readonly generationsRepo: Repository<Generation>,
     @InjectRepository(CreditTransaction)
     private readonly creditTransactionsRepo: Repository<CreditTransaction>,
+    @InjectRepository(AiPricingRule)
+    private readonly pricingRulesRepo: Repository<AiPricingRule>,
+    @InjectRepository(AiPricingRuleAuditLog)
+    private readonly pricingAuditRepo: Repository<AiPricingRuleAuditLog>,
     private readonly creditsService: CreditsService,
   ) {}
 
@@ -104,8 +143,10 @@ export class AdminService {
       .addSelect('g.referenceImageUrls', 'referenceImageUrls')
       .addSelect('g.quality', 'quality')
       .addSelect('g.size', 'size')
+      .addSelect('g.resolution', 'resolution')
       .addSelect('g.provider', 'provider')
       .addSelect('g.creditCost', 'creditCost')
+      .addSelect('g.pricingRuleId', 'pricingRuleId')
       .addSelect('g."actualCostUsd"::float8', 'actualCostUsd')
       .addSelect('g.tokensUsed', 'tokensUsed')
       .addSelect('g.errorMessage', 'errorMessage')
@@ -189,6 +230,140 @@ export class AdminService {
     }));
   }
 
+  async listPricingRules() {
+    const rules = await this.pricingRulesRepo.find({
+      order: {
+        type: 'ASC',
+        provider: 'ASC',
+        model: 'ASC',
+        isModelDefault: 'DESC',
+        size: 'ASC',
+        resolution: 'ASC',
+        quality: 'ASC',
+      },
+    });
+
+    const [byRuleId, byCombo] = await Promise.all([
+      this.getPricingMetricsByRuleId(),
+      this.getPricingMetricsByCombo(),
+    ]);
+
+    return rules.map((rule) => {
+      const metrics = this.addMetrics(
+        byRuleId.get(rule.id),
+        rule.isModelDefault ? undefined : byCombo.get(this.comboKey(rule)),
+      );
+      return {
+        ...rule,
+        calculatedUsd: this.calculateRuleUsd(rule, false),
+        calculatedCredits: this.calculateRuleCredits(rule, false),
+        referenceCalculatedUsd: this.calculateRuleUsd(rule, true),
+        referenceCalculatedCredits: this.calculateRuleCredits(rule, true),
+        metrics,
+      };
+    });
+  }
+
+  async updatePricingRule(
+    id: string,
+    dto: UpdatePricingRuleDto,
+    adminUserId?: string,
+  ) {
+    const rule = await this.pricingRulesRepo.findOne({ where: { id } });
+    if (!rule) {
+      throw new NotFoundException('Pricing rule not found');
+    }
+
+    const fields: (keyof UpdatePricingRuleDto)[] = [
+      'baseUsd',
+      'referenceImageUsd',
+      'margin',
+      'creditCostOverride',
+      'isActive',
+    ];
+    const logs: AiPricingRuleAuditLog[] = [];
+
+    for (const field of fields) {
+      if (!Object.prototype.hasOwnProperty.call(dto, field)) continue;
+      const oldValue = rule[field as keyof AiPricingRule] as unknown;
+      const newValue = dto[field] as unknown;
+      if (String(oldValue ?? '') === String(newValue ?? '')) continue;
+
+      (rule as unknown as Record<string, unknown>)[field] = newValue;
+      logs.push(
+        this.pricingAuditRepo.create({
+          ruleId: rule.id,
+          adminUserId: adminUserId ?? null,
+          field,
+          oldValue: oldValue === null || oldValue === undefined ? null : String(oldValue),
+          newValue: newValue === null || newValue === undefined ? null : String(newValue),
+        }),
+      );
+    }
+
+    const saved = await this.pricingRulesRepo.save(rule);
+    if (logs.length > 0) {
+      await this.pricingAuditRepo.save(logs);
+    }
+    return saved;
+  }
+
+  async getPricingRuleAuditLog(id: string) {
+    const exists = await this.pricingRulesRepo.exists({ where: { id } });
+    if (!exists) {
+      throw new NotFoundException('Pricing rule not found');
+    }
+
+    return this.pricingAuditRepo.find({
+      where: { ruleId: id },
+      order: { createdAt: 'DESC' },
+      take: 100,
+    });
+  }
+
+  async listPricingRuleGenerations(id: string, limit: number, offset: number) {
+    const rule = await this.pricingRulesRepo.findOne({ where: { id } });
+    if (!rule) {
+      throw new NotFoundException('Pricing rule not found');
+    }
+
+    const qb = this.generationsRepo
+      .createQueryBuilder('g')
+      .leftJoin('g.user', 'user')
+      .where('g.pricingRuleId = :id', { id });
+
+    if (!rule.isModelDefault) {
+      qb.orWhere(
+        `(
+          g."pricingRuleId" IS NULL
+          AND g.type = :type
+          AND g.provider = :provider
+          AND g.model = :model
+          AND g.size = :size
+          AND g.quality = :quality
+          AND g.resolution = :resolution
+        )`,
+        {
+          type: rule.type,
+          provider: rule.provider,
+          model: rule.model,
+          size: rule.size,
+          quality: rule.quality,
+          resolution: rule.resolution,
+        },
+      );
+    }
+
+    const total = await qb.clone().getCount();
+    const items = await this.selectGenerationRows(qb)
+      .orderBy('g.createdAt', 'DESC')
+      .take(limit)
+      .skip(offset)
+      .getRawMany();
+
+    return { items, total };
+  }
+
   private async getCreditTotals() {
     const row = await this.creditTransactionsRepo
       .createQueryBuilder('tx')
@@ -206,5 +381,208 @@ export class AdminService {
       issued: Number(row?.issued ?? 0),
       spent: Number(row?.spent ?? 0),
     };
+  }
+
+  private selectGenerationRows(qb: SelectQueryBuilder<Generation>) {
+    return qb
+      .select('g.id', 'id')
+      .addSelect('g.userId', 'userId')
+      .addSelect('user.email', 'userEmail')
+      .addSelect('g.type', 'type')
+      .addSelect('g.prompt', 'prompt')
+      .addSelect('g.model', 'model')
+      .addSelect('g.status', 'status')
+      .addSelect('g.resultUrl', 'resultUrl')
+      .addSelect('g.referenceImageUrls', 'referenceImageUrls')
+      .addSelect('g.quality', 'quality')
+      .addSelect('g.size', 'size')
+      .addSelect('g.resolution', 'resolution')
+      .addSelect('g.provider', 'provider')
+      .addSelect('g.creditCost', 'creditCost')
+      .addSelect('g.pricingRuleId', 'pricingRuleId')
+      .addSelect('g."actualCostUsd"::float8', 'actualCostUsd')
+      .addSelect('g.tokensUsed', 'tokensUsed')
+      .addSelect('g.errorMessage', 'errorMessage')
+      .addSelect('g.createdAt', 'createdAt');
+  }
+
+  private async getPricingMetricsByRuleId() {
+    const rows = await this.generationsRepo
+      .createQueryBuilder('g')
+      .select('g.pricingRuleId', 'pricingRuleId')
+      .addSelect('COUNT(*)::int', 'generationCount')
+      .addSelect(
+        `SUM(CASE WHEN g.status = '${GenerationStatus.DONE}' THEN 1 ELSE 0 END)::int`,
+        'doneCount',
+      )
+      .addSelect(
+        `SUM(CASE WHEN g.status = '${GenerationStatus.FAILED}' THEN 1 ELSE 0 END)::int`,
+        'failedCount',
+      )
+      .addSelect(`COALESCE(SUM(g."creditCost"), 0)::int`, 'totalCredits')
+      .addSelect(`COALESCE(AVG(g."creditCost"), 0)::float8`, 'avgCredits')
+      .addSelect(`COALESCE(SUM(g."actualCostUsd"), 0)::float8`, 'totalActualCostUsd')
+      .addSelect(`COALESCE(AVG(g."actualCostUsd"), 0)::float8`, 'avgActualCostUsd')
+      .addSelect(`COALESCE(SUM((g."tokensUsed"->>'input_tokens')::int), 0)::int`, 'totalInputTokens')
+      .addSelect(`COALESCE(SUM((g."tokensUsed"->>'output_tokens')::int), 0)::int`, 'totalOutputTokens')
+      .addSelect(
+        `COALESCE(SUM((g."tokensUsed"->'input_tokens_details'->>'image_tokens')::int), 0)::int`,
+        'totalInputImageTokens',
+      )
+      .addSelect(
+        `COALESCE(SUM((g."tokensUsed"->'output_tokens_details'->>'image_tokens')::int), 0)::int`,
+        'totalOutputImageTokens',
+      )
+      .where('g.pricingRuleId IS NOT NULL')
+      .groupBy('g.pricingRuleId')
+      .getRawMany<Record<string, string>>();
+
+    return this.metricRowsToMap(rows, (row) => row['pricingRuleId']);
+  }
+
+  private async getPricingMetricsByCombo() {
+    const rows = await this.generationsRepo
+      .createQueryBuilder('g')
+      .select('g.type', 'type')
+      .addSelect('g.provider', 'provider')
+      .addSelect('g.model', 'model')
+      .addSelect('g.size', 'size')
+      .addSelect('g.quality', 'quality')
+      .addSelect('g.resolution', 'resolution')
+      .addSelect('COUNT(*)::int', 'generationCount')
+      .addSelect(
+        `SUM(CASE WHEN g.status = '${GenerationStatus.DONE}' THEN 1 ELSE 0 END)::int`,
+        'doneCount',
+      )
+      .addSelect(
+        `SUM(CASE WHEN g.status = '${GenerationStatus.FAILED}' THEN 1 ELSE 0 END)::int`,
+        'failedCount',
+      )
+      .addSelect(`COALESCE(SUM(g."creditCost"), 0)::int`, 'totalCredits')
+      .addSelect(`COALESCE(AVG(g."creditCost"), 0)::float8`, 'avgCredits')
+      .addSelect(`COALESCE(SUM(g."actualCostUsd"), 0)::float8`, 'totalActualCostUsd')
+      .addSelect(`COALESCE(AVG(g."actualCostUsd"), 0)::float8`, 'avgActualCostUsd')
+      .addSelect(`COALESCE(SUM((g."tokensUsed"->>'input_tokens')::int), 0)::int`, 'totalInputTokens')
+      .addSelect(`COALESCE(SUM((g."tokensUsed"->>'output_tokens')::int), 0)::int`, 'totalOutputTokens')
+      .addSelect(
+        `COALESCE(SUM((g."tokensUsed"->'input_tokens_details'->>'image_tokens')::int), 0)::int`,
+        'totalInputImageTokens',
+      )
+      .addSelect(
+        `COALESCE(SUM((g."tokensUsed"->'output_tokens_details'->>'image_tokens')::int), 0)::int`,
+        'totalOutputImageTokens',
+      )
+      .where('g.pricingRuleId IS NULL')
+      .groupBy('g.type')
+      .addGroupBy('g.provider')
+      .addGroupBy('g.model')
+      .addGroupBy('g.size')
+      .addGroupBy('g.quality')
+      .addGroupBy('g.resolution')
+      .getRawMany<Record<string, string>>();
+
+    return this.metricRowsToMap(rows, (row) =>
+      this.comboKey({
+        type: row['type'],
+        provider: row['provider'],
+        model: row['model'],
+        size: row['size'],
+        quality: row['quality'],
+        resolution: row['resolution'],
+      }),
+    );
+  }
+
+  private metricRowsToMap(
+    rows: Record<string, string>[],
+    keyFn: (row: Record<string, string>) => string | undefined,
+  ) {
+    const map = new Map<string, PricingMetric>();
+    for (const row of rows) {
+      const key = keyFn(row);
+      if (!key) continue;
+      const totalCredits = Number(row['totalCredits']);
+      const totalActualCostUsd = Number(row['totalActualCostUsd']);
+      map.set(key, {
+        generationCount: Number(row['generationCount']),
+        doneCount: Number(row['doneCount']),
+        failedCount: Number(row['failedCount']),
+        totalCredits,
+        avgCredits: Number(row['avgCredits']),
+        totalActualCostUsd,
+        avgActualCostUsd: Number(row['avgActualCostUsd']),
+        estimatedGrossUsd: Math.round((totalCredits / 100) * 10000) / 10000,
+        estimatedMarginUsd:
+          Math.round((totalCredits / 100 - totalActualCostUsd) * 10000) / 10000,
+        totalInputTokens: Number(row['totalInputTokens']),
+        totalOutputTokens: Number(row['totalOutputTokens']),
+        totalInputImageTokens: Number(row['totalInputImageTokens']),
+        totalOutputImageTokens: Number(row['totalOutputImageTokens']),
+      });
+    }
+    return map;
+  }
+
+  private addMetrics(
+    first?: PricingMetric,
+    second?: PricingMetric,
+  ): PricingMetric {
+    if (!first && !second) return EMPTY_PRICING_METRIC;
+    const metrics = [first, second].filter(Boolean) as PricingMetric[];
+    const total = metrics.reduce(
+      (acc, item) => ({
+        generationCount: acc.generationCount + item.generationCount,
+        doneCount: acc.doneCount + item.doneCount,
+        failedCount: acc.failedCount + item.failedCount,
+        totalCredits: acc.totalCredits + item.totalCredits,
+        avgCredits: 0,
+        totalActualCostUsd: acc.totalActualCostUsd + item.totalActualCostUsd,
+        avgActualCostUsd: 0,
+        estimatedGrossUsd: acc.estimatedGrossUsd + item.estimatedGrossUsd,
+        estimatedMarginUsd: acc.estimatedMarginUsd + item.estimatedMarginUsd,
+        totalInputTokens: acc.totalInputTokens + item.totalInputTokens,
+        totalOutputTokens: acc.totalOutputTokens + item.totalOutputTokens,
+        totalInputImageTokens:
+          acc.totalInputImageTokens + item.totalInputImageTokens,
+        totalOutputImageTokens:
+          acc.totalOutputImageTokens + item.totalOutputImageTokens,
+      }),
+      { ...EMPTY_PRICING_METRIC },
+    );
+    total.avgCredits =
+      total.generationCount > 0 ? total.totalCredits / total.generationCount : 0;
+    total.avgActualCostUsd =
+      total.generationCount > 0
+        ? total.totalActualCostUsd / total.generationCount
+        : 0;
+    return total;
+  }
+
+  private comboKey(rule: {
+    type: string;
+    provider: string | null;
+    model: string | null;
+    size: string | null;
+    quality: string | null;
+    resolution: string | null;
+  }) {
+    return [
+      rule.type,
+      rule.provider ?? '',
+      rule.model ?? '',
+      rule.size ?? '',
+      rule.quality ?? '',
+      rule.resolution ?? '',
+    ].join('|');
+  }
+
+  private calculateRuleUsd(rule: AiPricingRule, hasReference: boolean) {
+    const referenceUsd = hasReference ? rule.referenceImageUsd : 0;
+    return Math.round((rule.baseUsd + referenceUsd) * rule.margin * 10000) / 10000;
+  }
+
+  private calculateRuleCredits(rule: AiPricingRule, hasReference: boolean) {
+    if (rule.creditCostOverride !== null) return rule.creditCostOverride;
+    return Math.ceil(this.calculateRuleUsd(rule, hasReference) * 100);
   }
 }

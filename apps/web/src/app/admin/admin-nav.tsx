@@ -31,6 +31,11 @@ const ADMIN_LINKS = [
     label: 'ניתוח עלויות',
     description: 'היסטוריה אמיתית + מחשבון',
   },
+  {
+    href: '/admin/pricing',
+    label: 'מחירון',
+    description: 'קרדיטים ועלויות בפועל',
+  },
 ];
 
 export function AdminNav() {
@@ -45,7 +50,7 @@ export function AdminNav() {
   }, [pathname]);
 
   return (
-    <div className="grid md:grid-cols-5 gap-3">
+    <div className="grid md:grid-cols-6 gap-3">
       {ADMIN_LINKS.map((link) => {
         const isActive = pathname === link.href;
         const badge = link.href === '/admin/feedback' ? feedbackUnread : 0;

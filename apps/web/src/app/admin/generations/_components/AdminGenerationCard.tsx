@@ -53,6 +53,10 @@ export function AdminGenerationCard({
         {gen.userEmail ?? gen.userId}
       </div>
 
+      <div className="mt-1 text-xs text-gray-500">
+        {gen.size} · {gen.resolution}
+      </div>
+
       <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
         <span className="inline-flex items-center rounded-md bg-brand-50 px-2 py-0.5 font-semibold text-brand-800">
           {gen.creditCost.toLocaleString('he-IL')} טוקנים

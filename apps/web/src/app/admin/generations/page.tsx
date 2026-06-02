@@ -161,6 +161,7 @@ function AdminGenerationsContent() {
                     <th className="text-right py-3 pe-4">עלות בפועל ($)</th>
                     <th className="text-right py-3 pe-4">tokensUsed</th>
                     <th className="text-right py-3 pe-4">גודל</th>
+                    <th className="text-right py-3 pe-4">רזולוציה</th>
                     <th className="text-right py-3 pe-4">איכות</th>
                     <th className="text-right py-3 pe-4">תמונת מקור</th>
                     <th className="text-right py-3 pe-4">תוצאה</th>
@@ -217,6 +218,9 @@ function AdminGenerationsContent() {
                         </div>
                       </td>
                       <td className="py-3 pe-4 text-gray-600">{generation.size}</td>
+                      <td className="py-3 pe-4 text-gray-600">
+                        {generation.resolution}
+                      </td>
                       <td className="py-3 pe-4 text-gray-600">
                         {generation.quality}
                       </td>
