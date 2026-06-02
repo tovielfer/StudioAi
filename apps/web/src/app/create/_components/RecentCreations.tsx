@@ -10,13 +10,16 @@ export function RecentCreations({
   loading,
   activeGenId,
   onUseReference,
+  type = 'image',
 }: {
   generations: Generation[];
   loading: boolean;
   activeGenId: string | null;
   onUseReference: (url: string) => void;
+  type?: 'image' | 'video';
 }) {
   const [selected, setSelected] = useState<Generation | null>(null);
+  const isVideo = type === 'video';
 
   return (
     <div className="card">
@@ -24,7 +27,9 @@ export function RecentCreations({
         <div>
           <h2 className="text-lg font-semibold">היצירות האחרונות</h2>
           <p className="text-sm text-gray-500">
-            גררו תמונה לאזור ההשראה כדי להשתמש בה כרפרנס
+            {isVideo
+              ? 'הסרטונים שנוצרו במסך הווידאו'
+              : 'גררו תמונה לאזור ההשראה כדי להשתמש בה כרפרנס'}
           </p>
         </div>
         {generations.length > 0 && (

@@ -16,6 +16,7 @@ export function CurrentGenPreview({
   const isDone = gen.status === 'done' && gen.resultUrl;
   const isProcessing = gen.status === 'pending' || gen.status === 'processing';
   const isFailed = gen.status === 'failed';
+  const isVideo = gen.type === 'video';
 
   return (
     <div className="card relative overflow-hidden">
@@ -38,7 +39,9 @@ export function CurrentGenPreview({
         <div className="flex flex-col items-center justify-center py-12 gap-3">
           <div className="w-10 h-10 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
           <p className="text-sm text-gray-400">
-            {gen.status === 'processing' ? 'ה‑AI יוצר את התמונה שלך...' : 'ממתין בתור לעיבוד...'}
+            {gen.status === 'processing'
+              ? `ה-AI יוצר את ה${isVideo ? 'ווידאו' : 'תמונה'} שלך...`
+              : 'ממתין בתור לעיבוד...'}
           </p>
           <p className="text-xs text-gray-600 max-w-xs text-center line-clamp-2" title={gen.prompt}>
             {gen.prompt}
@@ -50,32 +53,43 @@ export function CurrentGenPreview({
         <div className="flex gap-4 items-start">
           <div className="flex-1 min-w-0">
             <div className="aspect-square max-h-72 bg-surface rounded-lg overflow-hidden">
-              <img
-                src={gen.resultUrl!}
-                alt={gen.prompt}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.effectAllowed = 'copy';
-                  e.dataTransfer.setData('text/uri-list', gen.resultUrl!);
-                  e.dataTransfer.setData('text/plain', gen.resultUrl!);
-                }}
-                className="w-full h-full object-contain cursor-grab active:cursor-grabbing"
-              />
+              {isVideo ? (
+                <video
+                  src={gen.resultUrl!}
+                  controls
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <img
+                  src={gen.resultUrl!}
+                  alt={gen.prompt}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = 'copy';
+                    e.dataTransfer.setData('text/uri-list', gen.resultUrl!);
+                    e.dataTransfer.setData('text/plain', gen.resultUrl!);
+                  }}
+                  className="w-full h-full object-contain cursor-grab active:cursor-grabbing"
+                />
+              )}
             </div>
           </div>
           <div className="flex flex-col gap-2 pt-1 shrink-0">
+            {!isVideo && (
+              <button
+                type="button"
+                onClick={() => onUseReference(gen.resultUrl!)}
+                className="btn-primary inline-flex items-center gap-2 text-sm"
+                title="הוסף כתמונת השראה"
+              >
+                <PlusIcon />
+                <span className="hidden sm:inline">הוסף כרפרנס</span>
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => onUseReference(gen.resultUrl!)}
-              className="btn-primary inline-flex items-center gap-2 text-sm"
-              title="הוסף כתמונת השראה"
-            >
-              <PlusIcon />
-              <span className="hidden sm:inline">הוסף כרפרנס</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => downloadImage(gen.resultUrl!, `generation-${gen.id}.png`)}
+              onClick={() => downloadImage(gen.resultUrl!, `generation-${gen.id}.${isVideo ? 'mp4' : 'png'}`)}
               className="btn-secondary inline-flex items-center gap-2 text-sm"
               title="הורדה"
             >

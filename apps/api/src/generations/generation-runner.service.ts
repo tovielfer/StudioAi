@@ -38,6 +38,7 @@ export class GenerationRunnerService {
       const result = await this.aiService.generateImage({
         prompt: generation.prompt,
         model: generation.model,
+        type: generation.type,
         size: generation.size,
         quality: generation.quality,
         resolution: generation.resolution,

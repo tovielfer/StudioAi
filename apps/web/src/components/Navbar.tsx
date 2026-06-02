@@ -48,7 +48,8 @@ export function Navbar() {
   const links: { href: string; label: string; badge: number }[] = user
     ? [
         { href: '/dashboard', label: 'לוח בקרה', badge: 0 },
-        { href: '/create', label: 'יצירה', badge: 0 },
+        { href: '/create', label: 'תמונות', badge: 0 },
+        { href: '/create-video', label: 'סרטונים', badge: 0 },
         { href: '/history', label: 'היסטוריה', badge: 0 },
         { href: '/feedback', label: 'פניות', badge: feedbackUnread },
         ...(isAdmin

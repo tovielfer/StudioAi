@@ -14,7 +14,8 @@ export function GenerationDetailsModal({
   onUseReference: (url: string) => void;
   onClose: () => void;
 }) {
-  const hasImage = Boolean(generation.resultUrl && generation.status === 'done');
+  const hasAsset = Boolean(generation.resultUrl && generation.status === 'done');
+  const isVideo = generation.type === 'video';
 
   const formatDateTime = (d: string) =>
     new Date(d).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' });
@@ -54,32 +55,46 @@ export function GenerationDetailsModal({
         <div className="grid lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] gap-6">
           <div className="space-y-4">
             <div className="aspect-square bg-surface rounded-xl overflow-hidden flex items-center justify-center">
-              {hasImage ? (
-                <img
-                  src={generation.resultUrl!}
-                  alt={generation.prompt}
-                  className="w-full h-full object-contain"
-                />
+              {hasAsset ? (
+                isVideo ? (
+                  <video
+                    src={generation.resultUrl!}
+                    controls
+                    playsInline
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <img
+                    src={generation.resultUrl!}
+                    alt={generation.prompt}
+                    className="w-full h-full object-contain"
+                  />
+                )
               ) : (
                 <span className="text-gray-500">
                   {STATUS_LABELS[generation.status] ?? generation.status}
                 </span>
               )}
             </div>
-            {hasImage && (
+            {hasAsset && (
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => { onUseReference(generation.resultUrl!); onClose(); }}
-                  className="btn-primary inline-flex items-center gap-2 text-sm"
-                >
-                  <PlusIcon />
-                  הוסף כתמונת השראה
-                </button>
+                {!isVideo && (
+                  <button
+                    type="button"
+                    onClick={() => { onUseReference(generation.resultUrl!); onClose(); }}
+                    className="btn-primary inline-flex items-center gap-2 text-sm"
+                  >
+                    <PlusIcon />
+                    הוסף כתמונת השראה
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() =>
-                    downloadImage(generation.resultUrl!, `generation-${generation.id}.png`)
+                    downloadImage(
+                      generation.resultUrl!,
+                      `generation-${generation.id}.${isVideo ? 'mp4' : 'png'}`,
+                    )
                   }
                   className="btn-secondary inline-flex items-center gap-2 text-sm"
                 >

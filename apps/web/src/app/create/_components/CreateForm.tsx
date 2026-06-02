@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { ModelOption, User } from '@/lib/api';
 
 export type ReferenceImage = {
@@ -65,6 +66,18 @@ export function CreateForm({
   onGenerate: () => void;
   error: string;
 }) {
+  const isVideo = selectedModel.type === 'video';
+  const promptRef = useRef<HTMLTextAreaElement | null>(null);
+  const [isPromptExpanded, setIsPromptExpanded] = useState(false);
+
+  useEffect(() => {
+    const field = promptRef.current;
+    if (!field) return;
+
+    field.style.height = 'auto';
+    field.style.height = `${Math.min(field.scrollHeight, 420)}px`;
+  }, [prompt]);
+
   return (
     <div className="space-y-5">
       {error && (
@@ -74,15 +87,61 @@ export function CreateForm({
       )}
 
       <div>
-        <label className="block text-sm text-gray-400 mb-1.5">תיאור (Prompt)</label>
+        <div className="mb-1.5 flex items-center justify-between gap-3">
+          <label className="block text-sm text-gray-400">תיאור (Prompt)</label>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsPromptExpanded((value) => !value)}
+              className="text-xs font-medium text-brand-400 hover:text-brand-300"
+            >
+              עריכה נוחה
+            </button>
+            <span className="text-xs text-gray-500">{prompt.length}/2000</span>
+          </div>
+        </div>
         <textarea
+          ref={promptRef}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          className="input-field min-h-[120px] resize-y"
-          placeholder="תאר את התמונה שברצונך ליצור..."
+          className="input-field min-h-[180px] max-h-[420px] resize-y overflow-y-auto leading-7 overscroll-contain"
+          placeholder={isVideo ? 'תארו את תנועת הווידאו שברצונכם ליצור...' : 'תארו את התמונה שברצונכם ליצור...'}
           maxLength={2000}
         />
+        <p className="mt-1.5 text-xs text-gray-500">
+          לפרומפט ארוך במיוחד אפשר לפתוח עריכה נוחה בחלון גדול.
+        </p>
       </div>
+
+      {isPromptExpanded && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6">
+          <div className="w-full max-w-3xl rounded-2xl border border-surface-border bg-surface-card shadow-2xl">
+            <div className="flex items-center justify-between gap-4 border-b border-surface-border px-5 py-4">
+              <div>
+                <h2 className="text-lg font-semibold">עריכת פרומפט</h2>
+                <p className="text-xs text-gray-500">{prompt.length}/2000 תווים</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPromptExpanded(false)}
+                className="rounded-lg border border-surface-border px-3 py-1.5 text-sm text-gray-300 hover:bg-surface"
+              >
+                סגור
+              </button>
+            </div>
+            <div className="p-5">
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                className="input-field h-[60vh] min-h-[320px] resize-none overflow-y-auto leading-7"
+                placeholder={isVideo ? 'תארו את תנועת הווידאו שברצונכם ליצור...' : 'תארו את התמונה שברצונכם ליצור...'}
+                maxLength={2000}
+                autoFocus
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="block text-sm text-gray-400 mb-1.5">מודל</label>
@@ -138,10 +197,12 @@ export function CreateForm({
         }`}
       >
         <label className="block text-sm text-gray-400 mb-1">
-          תמונות השראה (אופציונלי, עד {MAX_REFERENCES})
+          {isVideo ? 'תמונת התחלה לווידאו' : 'תמונות השראה'} (אופציונלי, עד {MAX_REFERENCES})
         </label>
         <p className="text-xs text-gray-500 mb-2">
-          גררו תמונה מהמחשב או מהיצירות האחרונות לכאן
+          {isVideo
+            ? 'אפשר ליצור מטקסט בלבד, או לגרור תמונה כדי להנפיש אותה'
+            : 'גררו תמונה מהמחשב או מהיצירות האחרונות לכאן'}
         </p>
         {references.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
@@ -191,7 +252,7 @@ export function CreateForm({
           disabled={generating || cost === null || (user?.credits ?? 0) < (cost ?? 0)}
           className="btn-primary"
         >
-          {generating ? 'יוצרת...' : 'יצירה'}
+          {generating ? 'יוצרת...' : isVideo ? 'יצירת וידאו' : 'יצירה'}
         </button>
       </div>
     </div>

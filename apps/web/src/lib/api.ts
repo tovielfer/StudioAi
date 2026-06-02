@@ -154,6 +154,7 @@ class ApiClient {
   createGeneration(data: {
     prompt: string;
     model: string;
+    type?: string;
     quality?: string;
     size?: string;
     resolution?: string;
@@ -332,6 +333,7 @@ export interface ModelOption {
   id: string;
   name: string;
   provider: string;
+  type?: 'image' | 'video';
   sizes: SizeOption[];
   qualities: QualityOption[];
   // Resolution tiers (1K/2K/4K). Empty when the model has a single fixed
@@ -362,7 +364,7 @@ const RESOLUTION_TIERS: ResolutionOption[] = [
   { id: '4K', label: '4K – מקסימלי' },
 ];
 
-export const MODELS: ModelOption[] = [
+export const IMAGE_MODELS: ModelOption[] = [
   // {
   //   id: 'flux-schnell',
   //   name: 'Flux Schnell',
@@ -447,6 +449,24 @@ export const MODELS: ModelOption[] = [
     resolutions: [],
   },
 ];
+
+export const VIDEO_MODELS: ModelOption[] = [
+  {
+    id: 'kling-v3-standard',
+    name: 'Kling Video v3 Standard',
+    provider: 'fal',
+    type: 'video',
+    sizes: [
+      { id: '16:9', label: '16:9 לרוחב' },
+      { id: '9:16', label: '9:16 לאורך' },
+      { id: '1:1',  label: '1:1 ריבוע' },
+    ],
+    qualities: FIXED_STANDARD_QUALITY,
+    resolutions: [],
+  },
+];
+
+export const MODELS = IMAGE_MODELS;
 
 /** @deprecated Use api.getGenerationCostPreview() for accurate backend pricing. */
 export function estimateCost(

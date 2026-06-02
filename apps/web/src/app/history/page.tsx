@@ -41,11 +41,11 @@ function HistoryContent() {
   }, [user, filter]);
 
   const getEditHref = (generation: Generation) => {
-    const params = new URLSearchParams({
-      reference: generation.resultUrl ?? '',
-      prompt: generation.prompt,
-    });
-    return `/create?${params.toString()}`;
+    const params = new URLSearchParams({ prompt: generation.prompt });
+    if (generation.type !== 'video') {
+      params.set('reference', generation.resultUrl ?? '');
+    }
+    return `${generation.type === 'video' ? '/create-video' : '/create'}?${params.toString()}`;
   };
 
   const formatDateTime = (date: string) =>
@@ -97,11 +97,20 @@ function HistoryContent() {
                         className="block w-full h-full"
                         aria-label="פתח פרטי יצירה"
                       >
-                        <img
-                          src={gen.resultUrl!}
-                          alt={gen.prompt}
-                          className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                        />
+                        {gen.type === 'video' ? (
+                          <video
+                            src={gen.resultUrl!}
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                          />
+                        ) : (
+                          <img
+                            src={gen.resultUrl!}
+                            alt={gen.prompt}
+                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                          />
+                        )}
                       </button>
                       <div className="absolute left-2 top-2 flex gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
                         <button
@@ -126,7 +135,7 @@ function HistoryContent() {
                           onClick={() =>
                             downloadImage(
                               gen.resultUrl!,
-                              `generation-${gen.id}.png`,
+                              `generation-${gen.id}.${gen.type === 'video' ? 'mp4' : 'png'}`,
                             )
                           }
                           className="icon-button h-8 w-8 bg-black/40"
@@ -191,7 +200,8 @@ function GenerationDetailsModal({
   formatDateTime: (date: string) => string;
   onClose: () => void;
 }) {
-  const hasImage = Boolean(generation.resultUrl);
+  const hasAsset = Boolean(generation.resultUrl);
+  const isVideo = generation.type === 'video';
   const details = [
     ['סוג', generation.type],
     ['סטטוס', STATUS_LABELS[generation.status] ?? generation.status],
@@ -233,31 +243,43 @@ function GenerationDetailsModal({
         <div className="grid lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] gap-6">
           <div className="space-y-4">
             <div className="aspect-square bg-surface rounded-xl overflow-hidden flex items-center justify-center">
-              {hasImage ? (
-                <img
-                  src={generation.resultUrl!}
-                  alt={generation.prompt}
-                  className="w-full h-full object-contain"
-                />
+              {hasAsset ? (
+                isVideo ? (
+                  <video
+                    src={generation.resultUrl!}
+                    controls
+                    playsInline
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <img
+                    src={generation.resultUrl!}
+                    alt={generation.prompt}
+                    className="w-full h-full object-contain"
+                  />
+                )
               ) : (
                 <span className="text-gray-500">
                   {STATUS_LABELS[generation.status] ?? generation.status}
                 </span>
               )}
             </div>
-            {hasImage && (
+            {hasAsset && (
               <div className="flex flex-wrap gap-2">
                 <Link
                   href={editHref}
                   className="btn-primary inline-flex items-center gap-2 text-sm"
                 >
                   <EditIcon />
-                  עריכה עם התמונה כרפרנס
+                  {isVideo ? 'יצירת סרטון דומה' : 'עריכה עם התמונה כרפרנס'}
                 </Link>
                 <button
                   type="button"
                   onClick={() =>
-                    downloadImage(generation.resultUrl!, `generation-${generation.id}.png`)
+                    downloadImage(
+                      generation.resultUrl!,
+                      `generation-${generation.id}.${isVideo ? 'mp4' : 'png'}`,
+                    )
                   }
                   className="btn-secondary inline-flex items-center gap-2 text-sm"
                 >

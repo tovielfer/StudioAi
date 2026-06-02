@@ -18,6 +18,7 @@ export function GenerationCard({
 }) {
   const canUse = Boolean(gen.resultUrl && gen.status === 'done');
   const isProcessing = gen.status === 'pending' || gen.status === 'processing';
+  const isVideo = gen.type === 'video';
 
   return (
     <div className={`card p-3 group ${isActive && isProcessing ? 'ring-2 ring-brand-500' : ''}`}>
@@ -30,17 +31,26 @@ export function GenerationCard({
               className="block w-full h-full"
               aria-label="פתח פרטי יצירה"
             >
-              <img
-                src={gen.resultUrl!}
-                alt={gen.prompt}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.effectAllowed = 'copy';
-                  e.dataTransfer.setData('text/uri-list', gen.resultUrl!);
-                  e.dataTransfer.setData('text/plain', gen.resultUrl!);
-                }}
-                className="w-full h-full object-cover transition-transform group-hover:scale-105 cursor-grab active:cursor-grabbing"
-              />
+              {isVideo ? (
+                <video
+                  src={gen.resultUrl!}
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                />
+              ) : (
+                <img
+                  src={gen.resultUrl!}
+                  alt={gen.prompt}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = 'copy';
+                    e.dataTransfer.setData('text/uri-list', gen.resultUrl!);
+                    e.dataTransfer.setData('text/plain', gen.resultUrl!);
+                  }}
+                  className="w-full h-full object-cover transition-transform group-hover:scale-105 cursor-grab active:cursor-grabbing"
+                />
+              )}
             </button>
             <div className="absolute left-2 top-2 flex gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
               <button
@@ -52,18 +62,20 @@ export function GenerationCard({
               >
                 <InfoIcon />
               </button>
+              {!isVideo && (
+                <button
+                  type="button"
+                  onClick={() => onUseReference(gen.resultUrl!)}
+                  className="icon-button h-8 w-8 bg-brand-600 text-white hover:bg-brand-500"
+                  aria-label="הוסף כתמונת השראה"
+                  title="הוסף כרפרנס"
+                >
+                  <PlusIcon />
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => onUseReference(gen.resultUrl!)}
-                className="icon-button h-8 w-8 bg-brand-600 text-white hover:bg-brand-500"
-                aria-label="הוסף כתמונת השראה"
-                title="הוסף כרפרנס"
-              >
-                <PlusIcon />
-              </button>
-              <button
-                type="button"
-                onClick={() => downloadImage(gen.resultUrl!, `generation-${gen.id}.png`)}
+                onClick={() => downloadImage(gen.resultUrl!, `generation-${gen.id}.${isVideo ? 'mp4' : 'png'}`)}
                 className="icon-button h-8 w-8 bg-black/40"
                 aria-label="הורדה"
                 title="הורדה"

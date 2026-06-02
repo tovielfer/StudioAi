@@ -106,12 +106,29 @@ export class StorageService {
   async uploadFromUrl(sourceUrl: string): Promise<string> {
     const response = await fetch(sourceUrl);
     if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.statusText}`);
+      throw new Error(`Failed to fetch generated asset: ${response.statusText}`);
     }
     const buffer = Buffer.from(await response.arrayBuffer());
     const contentType = response.headers.get('content-type') || 'image/png';
-    const ext = contentType.includes('jpeg') ? 'jpg' : 'png';
+    const ext = this.extensionForContentType(contentType, sourceUrl);
     return this.uploadBuffer(buffer, ext, contentType);
+  }
+
+  private extensionForContentType(contentType: string, sourceUrl: string): string {
+    if (contentType.includes('jpeg')) return 'jpg';
+    if (contentType.includes('png')) return 'png';
+    if (contentType.includes('webp')) return 'webp';
+    if (contentType.includes('gif')) return 'gif';
+    if (contentType.includes('mp4')) return 'mp4';
+    if (contentType.includes('webm')) return 'webm';
+
+    try {
+      const ext = new URL(sourceUrl).pathname.split('.').pop()?.toLowerCase();
+      if (ext && /^[a-z0-9]{2,5}$/.test(ext)) return ext;
+    } catch {
+      // fall back below
+    }
+    return 'bin';
   }
 
 }
