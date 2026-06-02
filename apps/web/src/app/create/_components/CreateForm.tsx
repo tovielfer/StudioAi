@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ModelOption, User } from '@/lib/api';
 
 export type ReferenceImage = {
@@ -69,6 +70,11 @@ export function CreateForm({
   const isVideo = selectedModel.type === 'video';
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
   const [isPromptExpanded, setIsPromptExpanded] = useState(false);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
 
   useEffect(() => {
     const field = promptRef.current;
@@ -113,8 +119,8 @@ export function CreateForm({
         </p>
       </div>
 
-      {isPromptExpanded && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6">
+      {isPromptExpanded && portalTarget && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4 py-6">
           <div className="w-full max-w-3xl rounded-2xl border border-surface-border bg-surface-card shadow-2xl">
             <div className="flex items-center justify-between gap-4 border-b border-surface-border px-5 py-4">
               <div>
@@ -140,7 +146,8 @@ export function CreateForm({
               />
             </div>
           </div>
-        </div>
+        </div>,
+        portalTarget,
       )}
 
       <div>
