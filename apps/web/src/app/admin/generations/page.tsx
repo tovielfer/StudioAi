@@ -42,7 +42,7 @@ function AdminGenerationsContent() {
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
-  const [view, setView] = useState<ViewMode>('table');
+  const [view, setView] = useState<ViewMode>('cards');
   const [selected, setSelected] = useState<AdminGeneration | null>(null);
 
   const loadGenerations = useCallback(async () => {
