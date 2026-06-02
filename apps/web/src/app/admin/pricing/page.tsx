@@ -60,6 +60,10 @@ function ruleLabel(rule: AdminPricingRule) {
     .join(' / ');
 }
 
+function uniqueValues(values: Array<string | null>) {
+  return [...new Set(values.filter((value): value is string => Boolean(value)))];
+}
+
 function groupKey(rule: AdminPricingRule, groupBy: GroupBy) {
   if (groupBy === 'provider') return rule.provider ?? 'כללי';
   if (groupBy === 'type') return rule.type;
@@ -173,7 +177,7 @@ function AdminPricingContent() {
     <AdminShell
       eyebrow="ניהול מחירון"
       title="מחירון קרדיטים"
-      description="ניהול מחירי קרדיטים לצד שימוש בפועל, עלות ספק, טוקנים ופער משוער."
+      description="קביעה ובדיקה של כמה קרדיטים ייגבו מכל סוג יצירה, לצד עלות הספק בפועל ונתוני שימוש."
     >
       <div className="space-y-6">
         {message && (
@@ -182,12 +186,14 @@ function AdminPricingContent() {
           </div>
         )}
 
+        <PricingCalculator rules={rules} />
+
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <StatCard label="שורות מחירון" value={fmt(filtered.length)} />
           <StatCard label="יצירות" value={fmt(totalMetrics.generationCount)} />
           <StatCard label="קרדיטים שנגבו" value={fmt(totalMetrics.totalCredits)} accent />
-          <StatCard label="עלות ספק בפועל" value={fmtUsd(totalMetrics.totalActualCostUsd)} />
-          <StatCard label="פער משוער" value={fmtUsd(totalMetrics.estimatedMarginUsd)} />
+          <StatCard label="כמה עלה לנו בפועל" value={fmtUsd(totalMetrics.totalActualCostUsd)} />
+          <StatCard label="מרווח משוער" value={fmtUsd(totalMetrics.estimatedMarginUsd)} />
         </div>
 
         <section className="admin-card">
@@ -272,9 +278,9 @@ function AdminPricingContent() {
                     <th className="py-3 pe-3 text-right">קבוצה</th>
                     <th className="py-3 pe-3 text-right">שורות</th>
                     <th className="py-3 pe-3 text-right">יצירות</th>
-                    <th className="py-3 pe-3 text-right">עלות ספק</th>
-                    <th className="py-3 pe-3 text-right">קרדיטים</th>
-                    <th className="py-3 pe-3 text-right">פער משוער</th>
+                    <th className="py-3 pe-3 text-right">כמה עלה לנו בפועל</th>
+                    <th className="py-3 pe-3 text-right">קרדיטים שנגבו</th>
+                    <th className="py-3 pe-3 text-right">מרווח משוער</th>
                     <th className="py-3 pe-3 text-right">טוקנים</th>
                     <th className="py-3 text-right">פעולות</th>
                   </tr>
@@ -376,6 +382,231 @@ function AdminPricingContent() {
   );
 }
 
+function PricingCalculator({ rules }: { rules: AdminPricingRule[] }) {
+  const activeRules = useMemo(
+    () => rules.filter((rule) => rule.isActive && !rule.isModelDefault),
+    [rules],
+  );
+  const [type, setType] = useState('');
+  const [provider, setProvider] = useState('');
+  const [model, setModel] = useState('');
+  const [size, setSize] = useState('');
+  const [resolution, setResolution] = useState('');
+  const [quality, setQuality] = useState('');
+  const [hasReference, setHasReference] = useState(false);
+
+  const typeOptions = uniqueValues(activeRules.map((rule) => rule.type));
+  const providerOptions = uniqueValues(
+    activeRules
+      .filter((rule) => !type || rule.type === type)
+      .map((rule) => rule.provider),
+  );
+  const modelOptions = uniqueValues(
+    activeRules
+      .filter((rule) => !type || rule.type === type)
+      .filter((rule) => !provider || rule.provider === provider)
+      .map((rule) => rule.model),
+  );
+  const sizeOptions = uniqueValues(
+    activeRules
+      .filter((rule) => !type || rule.type === type)
+      .filter((rule) => !provider || rule.provider === provider)
+      .filter((rule) => !model || rule.model === model)
+      .map((rule) => rule.size),
+  );
+  const resolutionOptions = uniqueValues(
+    activeRules
+      .filter((rule) => !type || rule.type === type)
+      .filter((rule) => !provider || rule.provider === provider)
+      .filter((rule) => !model || rule.model === model)
+      .filter((rule) => !size || rule.size === size)
+      .map((rule) => rule.resolution),
+  );
+  const qualityOptions = uniqueValues(
+    activeRules
+      .filter((rule) => !type || rule.type === type)
+      .filter((rule) => !provider || rule.provider === provider)
+      .filter((rule) => !model || rule.model === model)
+      .filter((rule) => !size || rule.size === size)
+      .filter((rule) => !resolution || rule.resolution === resolution)
+      .map((rule) => rule.quality),
+  );
+
+  useEffect(() => {
+    if (!type && typeOptions[0]) setType(typeOptions[0]);
+  }, [type, typeOptions]);
+
+  useEffect(() => {
+    if (!providerOptions.includes(provider)) setProvider(providerOptions[0] ?? '');
+  }, [provider, providerOptions]);
+
+  useEffect(() => {
+    if (!modelOptions.includes(model)) setModel(modelOptions[0] ?? '');
+  }, [model, modelOptions]);
+
+  useEffect(() => {
+    if (!sizeOptions.includes(size)) setSize(sizeOptions[0] ?? '');
+  }, [size, sizeOptions]);
+
+  useEffect(() => {
+    if (!resolutionOptions.includes(resolution)) {
+      setResolution(resolutionOptions[0] ?? '');
+    }
+  }, [resolution, resolutionOptions]);
+
+  useEffect(() => {
+    if (!qualityOptions.includes(quality)) setQuality(qualityOptions[0] ?? '');
+  }, [quality, qualityOptions]);
+
+  const selectedRule =
+    activeRules.find(
+      (rule) =>
+        rule.type === type &&
+        rule.provider === provider &&
+        rule.model === model &&
+        rule.size === size &&
+        rule.resolution === resolution &&
+        rule.quality === quality,
+    ) ??
+    rules.find(
+      (rule) =>
+        rule.isActive &&
+        rule.isModelDefault &&
+        rule.type === type &&
+        rule.provider === provider &&
+        rule.model === model,
+    );
+
+  const credits = selectedRule
+    ? hasReference
+      ? selectedRule.referenceCalculatedCredits
+      : selectedRule.calculatedCredits
+    : null;
+  const usd = selectedRule
+    ? hasReference
+      ? selectedRule.referenceCalculatedUsd
+      : selectedRule.calculatedUsd
+    : null;
+
+  return (
+    <section className="admin-card border-brand-100 bg-brand-50/40">
+      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-950">
+            בדיקת מחיר לפי בחירה
+          </h2>
+          <p className="text-sm text-gray-600">
+            בחרי את הנתונים וראי כמה קרדיטים ייגבו ביצירה חדשה.
+          </p>
+        </div>
+        <label className="flex items-center gap-2 rounded-xl border border-brand-100 bg-white px-3 py-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={hasReference}
+            onChange={(e) => setHasReference(e.target.checked)}
+          />
+          כולל תמונת מקור
+        </label>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-6">
+        <SelectField label="סוג" value={type} onChange={setType} options={typeOptions} />
+        <SelectField
+          label="ספק"
+          value={provider}
+          onChange={setProvider}
+          options={providerOptions}
+        />
+        <SelectField
+          label="מודל"
+          value={model}
+          onChange={setModel}
+          options={modelOptions}
+        />
+        <SelectField label="יחס" value={size} onChange={setSize} options={sizeOptions} />
+        <SelectField
+          label="רזולוציה"
+          value={resolution}
+          onChange={setResolution}
+          options={resolutionOptions}
+        />
+        <SelectField
+          label="איכות"
+          value={quality}
+          onChange={setQuality}
+          options={qualityOptions}
+        />
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <div className="rounded-2xl border border-brand-200 bg-white p-5">
+          <p className="text-xs font-semibold text-brand-700">
+            קרדיטים שייגבו מעכשיו
+          </p>
+          <p className="mt-2 text-3xl font-bold text-brand-800">
+            {credits === null ? '—' : credits.toLocaleString('he-IL')}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5">
+          <p className="text-xs font-semibold text-gray-500">
+            העלות שלנו לפי המחירון
+          </p>
+          <p className="mt-2 text-3xl font-bold text-gray-950">{fmtUsd(usd)}</p>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5">
+          <p className="text-xs font-semibold text-gray-500">שורת מחירון</p>
+          <p className="mt-2 text-sm font-semibold text-gray-950">
+            {selectedRule ? ruleLabel(selectedRule) : 'לא נמצא מחיר פעיל'}
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            {!selectedRule
+              ? 'צריך להגדיר מחירון פעיל לבחירה הזו'
+              : selectedRule.creditCostOverride !== null
+                ? 'מחיר קרדיטים נקבע ידנית'
+                : 'מחיר קרדיטים מחושב מעלות ספק ומרווח'}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-semibold text-gray-500">
+        {label}
+      </span>
+      <select
+        className="admin-field w-full"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={options.length === 0}
+      >
+        {options.length === 0 ? (
+          <option value="">אין אפשרויות</option>
+        ) : (
+          options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))
+        )}
+      </select>
+    </label>
+  );
+}
+
 function RuleRow({
   rule,
   onEdit,
@@ -399,7 +630,7 @@ function RuleRow({
           {rule.creditCostOverride ?? rule.calculatedCredits}
         </div>
         <div className="text-xs text-gray-500">
-          חישוב {rule.calculatedCredits} · עם מקור {rule.referenceCalculatedCredits}
+          ייגבה מעכשיו · עם מקור {rule.referenceCalculatedCredits}
         </div>
       </td>
       <td className="py-3 pe-3 text-gray-700">{fmtUsd(rule.metrics.estimatedMarginUsd)}</td>
@@ -492,7 +723,9 @@ function EditRuleModal({
       >
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-950">עריכת מחיר</h2>
+          <h2 className="text-2xl font-bold text-gray-950">
+            עריכת קרדיטים למחירון
+          </h2>
             <p className="mt-1 text-sm text-gray-500">{ruleLabel(rule)}</p>
           </div>
           <button
@@ -511,7 +744,11 @@ function EditRuleModal({
         )}
 
         <div className="grid gap-4 md:grid-cols-2">
-          <NumberField label="עלות ספק ($)" value={baseUsd} onChange={setBaseUsd} />
+          <NumberField
+            label="כמה זה עולה לנו לפי המחירון ($)"
+            value={baseUsd}
+            onChange={setBaseUsd}
+          />
           <NumberField
             label="תוספת תמונת מקור ($)"
             value={referenceImageUsd}
@@ -519,7 +756,7 @@ function EditRuleModal({
           />
           <NumberField label="מרווח" value={margin} onChange={setMargin} />
           <NumberField
-            label="Override קרדיטים סופי"
+            label="קרדיטים שייגבו ידנית"
             value={creditCostOverride}
             onChange={setCreditCostOverride}
             placeholder="ריק = חישוב אוטומטי"
@@ -536,9 +773,10 @@ function EditRuleModal({
         </label>
 
         <div className="mt-5 rounded-xl border border-brand-100 bg-brand-50 p-4 text-sm text-brand-900">
-          <div>עלות מחושבת עם מקור: {fmtUsd(calculatedUsd)}</div>
+          <div>העלות שלנו לפי המחירון: {fmtUsd(calculatedUsd)}</div>
           <div className="mt-1 font-semibold">
-            קרדיטים שייגבו: {Number.isFinite(finalCredits) ? finalCredits : '—'}
+            קרדיטים שייגבו מעכשיו:{' '}
+            {Number.isFinite(finalCredits) ? finalCredits : '—'}
           </div>
         </div>
 
@@ -671,8 +909,8 @@ function RuleDetailsModal({
                       <th className="py-2 pe-3 text-right">תאריך</th>
                       <th className="py-2 pe-3 text-right">משתמש</th>
                       <th className="py-2 pe-3 text-right">סטטוס</th>
-                      <th className="py-2 pe-3 text-right">קרדיטים</th>
-                      <th className="py-2 pe-3 text-right">עלות ספק</th>
+                      <th className="py-2 pe-3 text-right">קרדיטים שנגבו</th>
+                      <th className="py-2 pe-3 text-right">כמה עלה לנו בפועל</th>
                       <th className="py-2 text-right">טוקנים</th>
                     </tr>
                   </thead>
