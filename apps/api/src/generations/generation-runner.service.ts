@@ -51,7 +51,17 @@ export class GenerationRunnerService {
         resultUrl.startsWith('http') &&
         !resultUrl.includes('placehold.co')
       ) {
-        resultUrl = await this.storageService.uploadFromUrl(resultUrl);
+        try {
+          resultUrl = await this.storageService.uploadFromUrl(resultUrl);
+        } catch (uploadError) {
+          const msg = uploadError instanceof Error ? uploadError.message : String(uploadError);
+          if (msg.includes('Blocked by NetFree')) {
+            this.logger.warn(`Asset blocked by NetFree during upload. Using original URL: ${result.imageUrl}`);
+            // Keep the original resultUrl
+          } else {
+            throw uploadError;
+          }
+        }
       } else if (resultUrl.startsWith('data:')) {
         const base64 = resultUrl.split(',')[1];
         const buffer = Buffer.from(base64, 'base64');

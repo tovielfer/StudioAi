@@ -104,14 +104,22 @@ export class StorageService {
   }
 
   async uploadFromUrl(sourceUrl: string): Promise<string> {
-    const response = await fetch(sourceUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch generated asset: ${response.statusText}`);
+    try {
+      const response = await fetch(sourceUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch generated asset: ${response.statusText}. URL: ${sourceUrl}`);
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const contentType = response.headers.get('content-type') || 'image/png';
+      const ext = this.extensionForContentType(contentType, sourceUrl);
+      return this.uploadBuffer(buffer, ext, contentType);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('Blocked by NetFree') && !msg.includes('URL:')) {
+        throw new Error(`${msg}. URL: ${sourceUrl}`);
+      }
+      throw error;
     }
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const contentType = response.headers.get('content-type') || 'image/png';
-    const ext = this.extensionForContentType(contentType, sourceUrl);
-    return this.uploadBuffer(buffer, ext, contentType);
   }
 
   private extensionForContentType(contentType: string, sourceUrl: string): string {

@@ -21,11 +21,22 @@ export function AdminGenerationCard({
     >
       <div className="relative mb-3 aspect-square overflow-hidden rounded-lg bg-gray-100">
         {hasImage ? (
-          <img
-            src={gen.resultUrl!}
-            alt={gen.prompt}
-            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-          />
+          gen.type === 'video' ? (
+            <video
+              src={gen.resultUrl!}
+              className="h-full w-full object-cover transition-transform group-hover:scale-105"
+              autoPlay
+              muted
+              loop
+              playsInline
+            />
+          ) : (
+            <img
+              src={gen.resultUrl!}
+              alt={gen.prompt}
+              className="h-full w-full object-cover transition-transform group-hover:scale-105"
+            />
+          )
         ) : isProcessing ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2">
             <div className="h-7 w-7 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />

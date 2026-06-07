@@ -77,11 +77,22 @@ export function AdminGenerationModal({
           <div className="space-y-4">
             <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-gray-100">
               {hasImage ? (
-                <img
-                  src={generation.resultUrl!}
-                  alt={generation.prompt}
-                  className="h-full w-full object-contain"
-                />
+                generation.type === 'video' ? (
+                  <video
+                    src={generation.resultUrl!}
+                    className="h-full w-full object-contain"
+                    controls
+                    autoPlay
+                    loop
+                    playsInline
+                  />
+                ) : (
+                  <img
+                    src={generation.resultUrl!}
+                    alt={generation.prompt}
+                    className="h-full w-full object-contain"
+                  />
+                )
               ) : (
                 <span className="text-gray-500">
                   {STATUS_LABELS[generation.status] ?? generation.status}
