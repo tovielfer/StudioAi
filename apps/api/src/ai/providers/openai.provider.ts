@@ -9,6 +9,14 @@ interface TokenPrices {
   imageOutput: number;
 }
 
+interface OpenAIErrorPayload {
+  error?: {
+    message?: string;
+    code?: string;
+    type?: string;
+  };
+}
+
 // OpenAI Standard pricing, USD per 1M tokens.
 // (Batch API is 50% cheaper but is async/offline — not used for live generation.)
 const OPENAI_TOKEN_PRICES: Record<string, TokenPrices> = {
@@ -83,8 +91,7 @@ export class OpenAIProvider extends BaseImageProvider {
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`OpenAI error: ${err}`);
+      await this.throwOpenAIError(response);
     }
 
     const data = (await response.json()) as {
@@ -114,8 +121,7 @@ export class OpenAIProvider extends BaseImageProvider {
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`OpenAI error: ${err}`);
+      await this.throwOpenAIError(response);
     }
 
     const data = (await response.json()) as {
@@ -156,6 +162,47 @@ export class OpenAIProvider extends BaseImageProvider {
       };
     }
     throw new Error('OpenAI returned no image');
+  }
+
+  private async throwOpenAIError(response: Response): Promise<never> {
+    const raw = await response.text();
+    this.logger.warn(`OpenAI request failed (${response.status}): ${raw}`);
+
+    let payload: OpenAIErrorPayload | null = null;
+    try {
+      payload = JSON.parse(raw) as OpenAIErrorPayload;
+    } catch {
+      // Some failures are plain text; fall back to the HTTP status below.
+    }
+
+    const message = payload?.error?.message;
+    const code = payload?.error?.code;
+    if (
+      code === 'invalid_image_file' ||
+      message?.includes('Invalid image file or mode')
+    ) {
+      throw new Error(this.formatInvalidImageFileError(message));
+    }
+
+    throw new Error(message ? `OpenAI error: ${message}` : `OpenAI error: ${response.statusText}`);
+  }
+
+  private formatInvalidImageFileError(message?: string): string {
+    const imageNumber = message?.match(/image\s+(\d+)/i)?.[1];
+    const imageLabel = this.hebrewReferenceImageLabel(imageNumber);
+
+    return `אי אפשר להשתמש בתמונת ההשראה ${imageLabel}: הקובץ לא תקין או בפורמט תמונה ש-OpenAI לא תומך בו. כדאי להעלות אותה מחדש כ-JPG או PNG רגיל (RGB).`;
+  }
+
+  private hebrewReferenceImageLabel(imageNumber?: string): string {
+    const labels: Record<string, string> = {
+      '1': 'הראשונה',
+      '2': 'השנייה',
+      '3': 'השלישית',
+      '4': 'הרביעית',
+      '5': 'החמישית',
+    };
+    return labels[imageNumber ?? ''] ?? 'שהועלתה';
   }
 
   // gpt-image-1 only accepts fixed ~1K sizes. gpt-image-2 accepts higher
