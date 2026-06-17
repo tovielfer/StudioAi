@@ -61,15 +61,22 @@ export interface AdminGeneration extends Generation {
 }
 
 export interface AdminCostStat {
+  type: string;
   provider: string;
   model: string;
   size: string;
   quality: string;
+  resolution: string;
+  hasReference: boolean;
   count: number;
   totalCredits: number;
   avgCredits: number;
   totalCostUsd: number;
   avgCostUsd: number;
+  costedCount: number;
+  missingCostCount: number;
+  minCostUsd: number | null;
+  maxCostUsd: number | null;
   refCount: number;
   totalInputTokens: number;
   totalOutputTokens: number;
@@ -286,6 +293,13 @@ class ApiClient {
     status?: string;
     userId?: string;
     search?: string;
+    type?: string;
+    provider?: string;
+    model?: string;
+    quality?: string;
+    size?: string;
+    resolution?: string;
+    hasReference?: boolean;
     limit?: number;
     offset?: number;
   }) {
@@ -293,6 +307,15 @@ class ApiClient {
     if (params?.status) query.set('status', params.status);
     if (params?.userId) query.set('userId', params.userId);
     if (params?.search) query.set('search', params.search);
+    if (params?.type) query.set('type', params.type);
+    if (params?.provider) query.set('provider', params.provider);
+    if (params?.model) query.set('model', params.model);
+    if (params?.quality) query.set('quality', params.quality);
+    if (params?.size) query.set('size', params.size);
+    if (params?.resolution) query.set('resolution', params.resolution);
+    if (typeof params?.hasReference === 'boolean') {
+      query.set('hasReference', String(params.hasReference));
+    }
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.offset) query.set('offset', String(params.offset));
     const qs = query.toString();

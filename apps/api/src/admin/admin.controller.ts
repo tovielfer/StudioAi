@@ -47,6 +47,13 @@ export class AdminController {
     @Query('status') status?: GenerationStatus,
     @Query('userId') userId?: string,
     @Query('search') search?: string,
+    @Query('type') type?: string,
+    @Query('provider') provider?: string,
+    @Query('model') model?: string,
+    @Query('quality') quality?: string,
+    @Query('size') size?: string,
+    @Query('resolution') resolution?: string,
+    @Query('hasReference') hasReference?: string,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
     @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset = 0,
   ) {
@@ -54,6 +61,18 @@ export class AdminController {
       status: status || undefined,
       userId: userId?.trim() || undefined,
       search: search?.trim() || undefined,
+      type: type?.trim() || undefined,
+      provider: provider?.trim() || undefined,
+      model: model?.trim() || undefined,
+      quality: quality?.trim() || undefined,
+      size: size?.trim() || undefined,
+      resolution: resolution?.trim() || undefined,
+      hasReference:
+        hasReference === 'true'
+          ? true
+          : hasReference === 'false'
+            ? false
+            : undefined,
       limit: Math.min(Math.max(limit, 1), 100),
       offset: Math.max(offset, 0),
     });

@@ -19,7 +19,7 @@ const ADMIN_LINKS = [
   {
     href: '/admin/generations',
     label: 'יצירות',
-    description: 'מעקב ועלות טוקנים',
+    description: 'מעקב יצירות',
   },
   {
     href: '/admin/feedback',
@@ -28,13 +28,13 @@ const ADMIN_LINKS = [
   },
   {
     href: '/admin/cost-analysis',
-    label: 'ניתוח עלויות',
-    description: 'היסטוריה אמיתית + מחשבון',
+    label: 'עלויות בפועל',
+    description: 'כמה עלה לנו',
   },
   {
     href: '/admin/pricing',
     label: 'מחירון',
-    description: 'קרדיטים ועלויות בפועל',
+    description: 'קרדיטים וכללים',
   },
 ];
 

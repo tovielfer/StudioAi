@@ -109,6 +109,13 @@ export class AdminService {
     status?: GenerationStatus;
     userId?: string;
     search?: string;
+    type?: string;
+    provider?: string;
+    model?: string;
+    quality?: string;
+    size?: string;
+    resolution?: string;
+    hasReference?: boolean;
     limit: number;
     offset: number;
   }) {
@@ -122,6 +129,44 @@ export class AdminService {
 
     if (params.userId) {
       qb.andWhere('g.userId = :userId', { userId: params.userId });
+    }
+
+    if (params.type) {
+      qb.andWhere('g.type = :type', { type: params.type });
+    }
+
+    if (params.provider) {
+      qb.andWhere('g.provider = :provider', { provider: params.provider });
+    }
+
+    if (params.model) {
+      qb.andWhere('g.model = :model', { model: params.model });
+    }
+
+    if (params.quality) {
+      qb.andWhere('g.quality = :quality', { quality: params.quality });
+    }
+
+    if (params.size) {
+      qb.andWhere('g.size = :size', { size: params.size });
+    }
+
+    if (params.resolution) {
+      qb.andWhere('g.resolution = :resolution', {
+        resolution: params.resolution,
+      });
+    }
+
+    if (params.hasReference === true) {
+      qb.andWhere(
+        'g."referenceImageUrls" IS NOT NULL AND jsonb_array_length(g."referenceImageUrls") > 0',
+      );
+    }
+
+    if (params.hasReference === false) {
+      qb.andWhere(
+        '(g."referenceImageUrls" IS NULL OR jsonb_array_length(g."referenceImageUrls") = 0)',
+      );
     }
 
     if (params.search) {
@@ -175,17 +220,30 @@ export class AdminService {
   async getCostStats() {
     const rows = await this.generationsRepo
       .createQueryBuilder('g')
-      .select('g.provider', 'provider')
+      .select('g.type', 'type')
+      .addSelect('g.provider', 'provider')
       .addSelect('g.model', 'model')
       .addSelect('g.size', 'size')
       .addSelect('g.quality', 'quality')
+      .addSelect('g.resolution', 'resolution')
+      .addSelect(
+        `CASE WHEN g."referenceImageUrls" IS NOT NULL AND jsonb_array_length(g."referenceImageUrls") > 0 THEN true ELSE false END`,
+        'hasReference',
+      )
       .addSelect('COUNT(*)::int', 'count')
       .addSelect(`SUM(g."creditCost")::int`, 'totalCredits')
       .addSelect(`ROUND(AVG(g."creditCost")::numeric, 1)`, 'avgCredits')
       .addSelect(`COALESCE(SUM(g."actualCostUsd"), 0)::float8`, 'totalCostUsd')
       .addSelect(`COALESCE(AVG(g."actualCostUsd"), 0)::float8`, 'avgCostUsd')
+      .addSelect(`COUNT(g."actualCostUsd")::int`, 'costedCount')
       .addSelect(
-        `SUM(CASE WHEN g."referenceImageUrls" IS NOT NULL AND jsonb_array_length(g."referenceImageUrls") > 0 THEN 1 ELSE 0 END)::int`,
+        `COUNT(*) FILTER (WHERE g."actualCostUsd" IS NULL)::int`,
+        'missingCostCount',
+      )
+      .addSelect(`MIN(g."actualCostUsd")::float8`, 'minCostUsd')
+      .addSelect(`MAX(g."actualCostUsd")::float8`, 'maxCostUsd')
+      .addSelect(
+        `COALESCE(SUM(CASE WHEN g."referenceImageUrls" IS NOT NULL THEN jsonb_array_length(g."referenceImageUrls") ELSE 0 END), 0)::int`,
         'refCount',
       )
       .addSelect(
@@ -206,22 +264,32 @@ export class AdminService {
       )
       .where('g.status = :status', { status: GenerationStatus.DONE })
       .groupBy('g.provider')
+      .addGroupBy('g.type')
       .addGroupBy('g.model')
       .addGroupBy('g.size')
       .addGroupBy('g.quality')
-      .orderBy(`SUM(g."creditCost")`, 'DESC')
+      .addGroupBy('g.resolution')
+      .addGroupBy('"hasReference"')
+      .orderBy(`COALESCE(SUM(g."actualCostUsd"), 0)`, 'DESC')
       .getRawMany<Record<string, string>>();
 
     return rows.map((r) => ({
+      type: r['type'],
       provider: r['provider'],
       model: r['model'],
       size: r['size'],
       quality: r['quality'],
+      resolution: r['resolution'],
+      hasReference: r['hasReference'] === 'true',
       count: Number(r['count']),
       totalCredits: Number(r['totalCredits']),
       avgCredits: Number(r['avgCredits']),
       totalCostUsd: Number(r['totalCostUsd']),
       avgCostUsd: Number(r['avgCostUsd']),
+      costedCount: Number(r['costedCount']),
+      missingCostCount: Number(r['missingCostCount']),
+      minCostUsd: r['minCostUsd'] === null ? null : Number(r['minCostUsd']),
+      maxCostUsd: r['maxCostUsd'] === null ? null : Number(r['maxCostUsd']),
       refCount: Number(r['refCount']),
       totalInputTokens: Number(r['totalInputTokens']),
       totalOutputTokens: Number(r['totalOutputTokens']),
