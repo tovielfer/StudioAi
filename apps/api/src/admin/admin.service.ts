@@ -280,7 +280,7 @@ export class AdminService {
       size: r['size'],
       quality: r['quality'],
       resolution: r['resolution'],
-      hasReference: r['hasReference'] === 'true',
+      hasReference: String(r['hasReference']) === 'true',
       count: Number(r['count']),
       totalCredits: Number(r['totalCredits']),
       avgCredits: Number(r['avgCredits']),

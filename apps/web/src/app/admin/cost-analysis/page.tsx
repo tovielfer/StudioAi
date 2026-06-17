@@ -377,7 +377,8 @@ function CostAnalysisContent() {
                     <th className="py-3 pe-3 text-right">כמות</th>
                     <th className="py-3 pe-3 text-right">סה״כ עלות</th>
                     <th className="py-3 pe-3 text-right">ממוצע</th>
-                    <th className="py-3 pe-3 text-right">טווח</th>
+                    <th className="py-3 pe-3 text-right">מחיר מקסימום</th>
+                    <th className="py-3 pe-3 text-right">טווח מחירים</th>
                     <th className="py-3 text-right">חסר עלות</th>
                   </tr>
                 </thead>
@@ -436,6 +437,9 @@ function CostAnalysisContent() {
                       </td>
                       <td className="py-3 pe-3 tabular-nums text-gray-700">
                         {avgWithCount(stat.avgCostUsd, stat.costedCount)}
+                      </td>
+                      <td className="py-3 pe-3 tabular-nums text-gray-600">
+                        {fmtUsd(stat.maxCostUsd)}
                       </td>
                       <td className="py-3 pe-3 tabular-nums text-gray-600">
                         {stat.minCostUsd === null && stat.maxCostUsd === null
@@ -524,12 +528,21 @@ function GenerationsModal({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 border-b border-gray-100 p-5 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 border-b border-gray-100 p-5 md:grid-cols-5">
           <MiniStat label="כמות בשורה" value={fmt(stat.count)} />
           <MiniStat label="סה״כ עלות" value={fmtUsd(stat.totalCostUsd)} />
           <MiniStat
             label="ממוצע לתמונה"
             value={avgWithCount(stat.avgCostUsd, stat.costedCount)}
+          />
+          <MiniStat label="מחיר מקסימום" value={fmtUsd(stat.maxCostUsd)} />
+          <MiniStat
+            label="טווח מחירים"
+            value={
+              stat.minCostUsd === null && stat.maxCostUsd === null
+                ? '—'
+                : `${fmtUsd(stat.minCostUsd)} - ${fmtUsd(stat.maxCostUsd)}`
+            }
           />
           <MiniStat label="תמונות מקור" value={fmt(stat.refCount)} />
         </div>
