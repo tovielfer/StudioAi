@@ -432,10 +432,10 @@ function CostAnalysisContent() {
                       <td className="py-3 pe-3 tabular-nums text-gray-700">
                         {fmt(stat.count)}
                       </td>
-                      <td className="py-3 pe-3 tabular-nums font-semibold text-gray-950">
+                      <td className="py-3 pe-3 tabular-nums text-gray-700">
                         {fmtUsd(stat.totalCostUsd)}
                       </td>
-                      <td className="py-3 pe-3 tabular-nums text-gray-700">
+                      <td className="py-3 pe-3 tabular-nums font-semibold text-gray-950 ">
                         {avgWithCount(stat.avgCostUsd, stat.costedCount)}
                       </td>
                       <td className="py-3 pe-3 tabular-nums text-gray-600">
