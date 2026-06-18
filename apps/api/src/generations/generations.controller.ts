@@ -25,8 +25,10 @@ import {
   AiProvider,
 } from '../common/constants';
 import { AiPricingService } from '../ai/ai-pricing.service';
+import { normalizeAttrs, MODEL_REGISTRY } from '../common/model-capabilities';
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+// Google caps inline image uploads at 7MB; keep one consistent limit.
+const MAX_FILE_SIZE = 7 * 1024 * 1024; // 7MB
 
 @Controller('generations')
 export class GenerationsController {
@@ -35,6 +37,15 @@ export class GenerationsController {
     private readonly storageService: StorageService,
     private readonly pricingService: AiPricingService,
   ) {}
+
+  // Public capabilities registry: single source of truth for the create-form
+  // dropdowns (sizes/qualities/resolutions per model and provider).
+  @Get('models')
+  getModels(@Query('type') type?: GenerationType) {
+    return type
+      ? MODEL_REGISTRY.filter((m) => m.type === type)
+      : MODEL_REGISTRY;
+  }
 
   @Get('cost')
   @UseGuards(JwtAuthGuard)
@@ -47,12 +58,21 @@ export class GenerationsController {
     @Query('hasReference') hasReference?: string,
     @Query('type') type?: GenerationType,
   ) {
+    const resolvedProvider = provider ?? AiProvider.MOCK;
+    const resolvedModel = model ?? 'gpt-image-1';
+    // Mirror the normalization applied at create() so the previewed cost
+    // matches the cost actually charged.
+    const normalized = normalizeAttrs(
+      resolvedModel,
+      quality ?? ImageQuality.STANDARD,
+      resolution ?? ImageResolution.ONE_K,
+    );
     return this.pricingService.getGenerationCost({
-      provider: provider ?? AiProvider.MOCK,
-      model: model ?? 'gpt-image-1',
+      provider: resolvedProvider,
+      model: resolvedModel,
       size: size ?? ImageSize.SQUARE,
-      quality: quality ?? ImageQuality.STANDARD,
-      resolution: resolution ?? ImageResolution.ONE_K,
+      quality: normalized.quality,
+      resolution: normalized.resolution,
       hasReference: hasReference === 'true',
       type: type ?? GenerationType.IMAGE,
     });

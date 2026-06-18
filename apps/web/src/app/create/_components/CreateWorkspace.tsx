@@ -63,15 +63,15 @@ export function CreateWorkspace({
 
   const addReferenceFiles = useCallback(
     (files: File[]) => {
-      const MAX_SIZE = 20 * 1024 * 1024;
+      const MAX_SIZE = 7 * 1024 * 1024;
       const valid = files.filter((f) => f.size <= MAX_SIZE);
       const skipped = files.filter((f) => f.size > MAX_SIZE);
 
       if (skipped.length > 0) {
         setError(
           skipped.length === 1
-            ? `"${skipped[0].name}" גדולה מ-20MB ולא נוספה`
-            : `${skipped.length} תמונות גדולות מ-20MB ולא נוספו`,
+            ? `"${skipped[0].name}" גדולה מ-7MB ולא נוספה`
+            : `${skipped.length} תמונות גדולות מ-7MB ולא נוספו`,
         );
       } else {
         setError('');
@@ -173,8 +173,14 @@ export function CreateWorkspace({
   const handleModelChange = (newModel: string) => {
     setModel(newModel);
     const def = models.find((m) => m.id === newModel);
-    if (def && !def.sizes.find((s) => s.id === size)) setSize(def.sizes[0].id);
-    if (def && !def.qualities.find((q) => q.id === quality)) setQuality(def.qualities[0].id);
+    if (def && def.sizes.length > 0 && !def.sizes.find((s) => s.id === size)) {
+      setSize(def.sizes[0].id);
+    }
+    if (def) {
+      const qualOptions = def.qualities;
+      if (qualOptions.length === 0) setQuality('standard');
+      else if (!qualOptions.find((q) => q.id === quality)) setQuality(qualOptions[0].id);
+    }
     if (def) {
       const resOptions = def.resolutions;
       if (resOptions.length === 0) setResolution('1K');

@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { GoogleGenAI } from '@google/genai';
 import { AiProvider } from '../../common/constants';
+import { modelSupportsResolution } from '../../common/model-capabilities';
 import { GenerateImageParams, GenerateImageResult, ImageUsage } from '../ai.types';
 import { BaseImageProvider } from './base.provider';
 
@@ -16,7 +17,7 @@ interface GoogleTokenPrices {
 const GOOGLE_TOKEN_PRICES: Record<string, GoogleTokenPrices> = {
   'gemini-2.5-flash-image': { input: 0.3, textOutput: 2.5, imageOutput: 30 },
   'gemini-3.1-flash-image': { input: 0.5, textOutput: 3, imageOutput: 60 },
-  'gemini-3-pro-image-preview': { input: 2, textOutput: 12, imageOutput: 120 },
+  'gemini-3-pro-image': { input: 2, textOutput: 12, imageOutput: 120 },
 };
 
 export class GoogleProvider extends BaseImageProvider {
@@ -63,8 +64,8 @@ export class GoogleProvider extends BaseImageProvider {
 
     const imageConfig: { aspectRatio?: string; imageSize?: string } = {};
     if (params.size) imageConfig.aspectRatio = params.size;
-    // Only the Pro model supports the 1K/2K/4K resolution tiers.
-    if (params.resolution && model.includes('3-pro')) {
+    // Only models that expose the 1K/2K/4K resolution tiers honour imageSize.
+    if (params.resolution && modelSupportsResolution(model)) {
       imageConfig.imageSize = params.resolution;
     }
 

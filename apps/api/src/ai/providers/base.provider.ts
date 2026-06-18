@@ -9,7 +9,7 @@ export abstract class BaseImageProvider {
   // Pixel dimensions for a given aspect ratio at 1K, scaled by the resolution tier.
   protected dimensions(
     ratio: string,
-    resolution?: string,
+    resolution?: string | null,
   ): { width: number; height: number } {
     const base: Record<string, { width: number; height: number }> = {
       '1:1': { width: 1024, height: 1024 },
@@ -28,7 +28,8 @@ export abstract class BaseImageProvider {
   }
 
   private static readonly REFERENCE_IMAGE_TIMEOUT_MS = 10_000;
-  private static readonly REFERENCE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+  // Google caps inline image data at 7MB; keep providers aligned with that.
+  private static readonly REFERENCE_IMAGE_MAX_BYTES = 7 * 1024 * 1024;
 
   protected async fetchReferenceImage(url: string): Promise<{ blob: Blob; filename: string }> {
     let parsed: URL;

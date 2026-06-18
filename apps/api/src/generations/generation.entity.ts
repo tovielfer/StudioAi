@@ -46,14 +46,14 @@ export class Generation {
   @Column({ type: 'jsonb', nullable: true })
   referenceImageUrls: string[] | null;
 
-  @Column({ type: 'varchar', default: ImageQuality.STANDARD })
-  quality: ImageQuality;
+  @Column({ type: 'varchar', nullable: true })
+  quality: ImageQuality | null;
 
   @Column({ type: 'varchar', default: ImageSize.SQUARE })
   size: ImageSize;
 
-  @Column({ type: 'varchar', default: ImageResolution.ONE_K })
-  resolution: ImageResolution;
+  @Column({ type: 'varchar', nullable: true })
+  resolution: ImageResolution | null;
 
   @Column({ type: 'varchar', default: AiProvider.MOCK })
   provider: AiProvider;

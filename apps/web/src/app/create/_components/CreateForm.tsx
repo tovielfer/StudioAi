@@ -236,12 +236,12 @@ export function CreateForm({
           <>
             <input
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,image/webp"
               multiple
               onChange={handleReferenceChange}
               className="input-field file:me-4 file:py-1 file:px-3 file:rounded file:border-0 file:bg-brand-600 file:text-white file:text-sm"
             />
-            <p className="text-xs text-gray-500 mt-1">כל תמונה עד 20MB</p>
+            <p className="text-xs text-gray-500 mt-1">כל תמונה עד 7MB</p>
           </>
         )}
       </div>

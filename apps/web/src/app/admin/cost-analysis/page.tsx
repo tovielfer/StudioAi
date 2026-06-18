@@ -77,7 +77,8 @@ function providerLabel(value: string) {
   return PROVIDER_LABELS[value] ?? value;
 }
 
-function qualityLabel(value: string) {
+function qualityLabel(value: string | null) {
+  if (!value) return '—';
   return QUALITY_LABELS[value] ?? value;
 }
 

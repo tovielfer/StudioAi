@@ -26,7 +26,7 @@ export function CurrentGenPreview({
     <div className="card relative overflow-hidden">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-semibold text-gray-300">
-          {isProcessing ? 'יוצרת...' : isDone ? 'תצוגה מקדימה' : 'היצירה נכשלה'}
+          {isProcessing ? 'יוצר...' : isDone ? 'תצוגה מקדימה' : 'היצירה נכשלה'}
         </h2>
         <button
           type="button"

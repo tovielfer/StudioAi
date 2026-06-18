@@ -36,9 +36,9 @@ export interface Generation {
   status: 'pending' | 'processing' | 'done' | 'failed';
   resultUrl: string | null;
   referenceImageUrls: string[] | null;
-  quality: string;
+  quality: string | null;
   size: string;
-  resolution: string;
+  resolution: string | null;
   provider: string;
   creditCost: number;
   pricingRuleId: string | null;
@@ -275,6 +275,11 @@ class ApiClient {
     );
   }
 
+  getModels(type?: 'image' | 'video') {
+    const qs = type ? `?type=${type}` : '';
+    return this.request<ModelOption[]>(`/generations/models${qs}`);
+  }
+
   getAdminStats() {
     return this.request<AdminStats>('/admin/stats');
   }
@@ -453,133 +458,6 @@ export interface ModelOption {
   // resolution; the UI only renders the selector when there is a choice.
   resolutions: ResolutionOption[];
 }
-
-const DEFAULT_SIZES: SizeOption[] = [
-  { id: '1:1',  label: '1:1 ריבוע' },
-  { id: '16:9', label: '16:9 לרוחב' },
-  { id: '9:16', label: '9:16 לאורך' },
-  { id: '4:3',  label: '4:3 סטנדרטי' },
-];
-
-const DEFAULT_QUALITIES: QualityOption[] = [
-  { id: 'fast',     label: 'מהיר' },
-  { id: 'standard', label: 'רגיל' },
-  { id: 'hd',       label: 'HD'   },
-];
-
-const FIXED_STANDARD_QUALITY: QualityOption[] = [
-  { id: 'standard', label: 'רגיל' },
-];
-
-const RESOLUTION_TIERS: ResolutionOption[] = [
-  { id: '1K', label: '1K – רגיל' },
-  { id: '2K', label: '2K – גבוה' },
-  { id: '4K', label: '4K – מקסימלי' },
-];
-
-export const IMAGE_MODELS: ModelOption[] = [
-  // {
-  //   id: 'flux-schnell',
-  //   name: 'Flux Schnell',
-  //   provider: 'mock',
-  //   sizes: DEFAULT_SIZES,
-  //   qualities: DEFAULT_QUALITIES,
-  // },
-  // {
-  //   id: 'flux-dev',
-  //   name: 'Flux Dev',
-  //   provider: 'replicate',
-  //   sizes: DEFAULT_SIZES,
-  //   qualities: DEFAULT_QUALITIES,
-  // },
-  // {
-  //   id: 'sd3',
-  //   name: 'Stable Diffusion 3',
-  //   provider: 'stability',
-  //   sizes: DEFAULT_SIZES,
-  //   qualities: DEFAULT_QUALITIES,
-  // },
-  {
-    id: 'gpt-image-1',
-    name: 'OpenAI Image 1',
-    provider: 'openai',
-    sizes: [
-      { id: '1:1',  label: '1024×1024 (ריבוע)' },
-      { id: '16:9', label: '1536×1024 (לרוחב)' },
-      { id: '9:16', label: '1024×1536 (לאורך)' },
-    ],
-    qualities: [
-      { id: 'fast',     label: 'Low – מהיר'         },
-      { id: 'standard', label: 'Medium – רגיל'       },
-      { id: 'hd',       label: 'High – איכות גבוהה' },
-    ],
-    resolutions: [],
-  },
-  {
-    id: 'gpt-image-2',
-    name: 'OpenAI Image 2',
-    provider: 'openai',
-    sizes: [
-      { id: '1:1',  label: '1:1 ריבוע'  },
-      { id: '16:9', label: '16:9 לרוחב' },
-      { id: '9:16', label: '9:16 לאורך' },
-    ],
-    qualities: [
-      { id: 'fast',     label: 'Low – מהיר'         },
-      { id: 'standard', label: 'Medium – רגיל'       },
-      { id: 'hd',       label: 'High – איכות גבוהה' },
-    ],
-    resolutions: RESOLUTION_TIERS,
-  },
-  // {
-  //   id: 'fal-flux',
-  //   name: 'Fal Flux',
-  //   provider: 'fal',
-  //   sizes: DEFAULT_SIZES,
-  //   qualities: DEFAULT_QUALITIES,
-  // },
-  {
-    id: 'gemini-3-pro-image-preview',
-    name: 'Nano Banana Pro',
-    provider: 'google',
-    sizes: DEFAULT_SIZES,
-    qualities: FIXED_STANDARD_QUALITY,
-    resolutions: RESOLUTION_TIERS,
-  },
-  // {
-  //   id: 'gemini-3.1-flash-image',
-  //   name: 'Nano Banana 2',
-  //   provider: 'google',
-  //   sizes: DEFAULT_SIZES,
-  //   qualities: DEFAULT_QUALITIES,
-  // },
-  {
-    id: 'gemini-2.5-flash-image',
-    name: 'Nano Banana',
-    provider: 'google',
-    sizes: DEFAULT_SIZES,
-    qualities: FIXED_STANDARD_QUALITY,
-    resolutions: [],
-  },
-];
-
-export const VIDEO_MODELS: ModelOption[] = [
-  {
-    id: 'kling-v3-standard',
-    name: 'Kling Video v3 Standard',
-    provider: 'fal',
-    type: 'video',
-    sizes: [
-      { id: '16:9', label: '16:9 לרוחב' },
-      { id: '9:16', label: '9:16 לאורך' },
-      { id: '1:1',  label: '1:1 ריבוע' },
-    ],
-    qualities: FIXED_STANDARD_QUALITY,
-    resolutions: [],
-  },
-];
-
-export const MODELS = IMAGE_MODELS;
 
 /** @deprecated Use api.getGenerationCostPreview() for accurate backend pricing. */
 export function estimateCost(

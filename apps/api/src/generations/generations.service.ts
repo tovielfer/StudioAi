@@ -23,6 +23,7 @@ import {
   AiProvider,
 } from '../common/constants';
 import { moderatePrompt } from '../common/moderation';
+import { normalizeAttrs } from '../common/model-capabilities';
 import { AiPricingService } from '../ai/ai-pricing.service';
 
 export const GENERATION_QUEUE = 'generation';
@@ -48,10 +49,17 @@ export class GenerationsService {
     moderatePrompt(dto.prompt);
 
     const type = dto.type ?? GenerationType.IMAGE;
-    const quality = dto.quality ?? ImageQuality.STANDARD;
     const size = dto.size ?? ImageSize.SQUARE;
-    const resolution = dto.resolution ?? ImageResolution.ONE_K;
     const provider = dto.provider ?? AiProvider.MOCK;
+
+    // Strip parameters the model does not honour (see MODEL_REGISTRY) so the
+    // DB, pricing and provider request stay in sync.
+    const { quality, resolution } = normalizeAttrs(
+      dto.model,
+      dto.quality ?? ImageQuality.STANDARD,
+      dto.resolution ?? ImageResolution.ONE_K,
+    );
+
     const allReferenceUrls = dto.referenceImageUrls ?? [];
     const hasReference = allReferenceUrls.length > 0;
     const { credits: creditCost, ruleId } =
@@ -70,9 +78,9 @@ export class GenerationsService {
       prompt: dto.prompt,
       model: dto.model,
       type,
-      quality,
+      quality: quality as ImageQuality | null,
       size,
-      resolution,
+      resolution: resolution as ImageResolution | null,
       provider,
       referenceImageUrls: allReferenceUrls.length > 0 ? allReferenceUrls : null,
       status: GenerationStatus.PENDING,

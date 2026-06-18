@@ -30,8 +30,8 @@ export function GenerationDetailsModal({
     ['ספק', generation.provider],
     ['מודל', generation.model],
     ['גודל', generation.size],
-    ['רזולוציה', generation.resolution],
-    ['איכות', generation.quality],
+    ['רזולוציה', generation.resolution ?? '—'],
+    ['איכות', generation.quality ?? '—'],
     ['עלות', `${generation.creditCost} קרדיטים`],
     ['תאריך', formatDateTime(generation.createdAt)],
   ];

@@ -234,7 +234,11 @@ export class OpenAIProvider extends BaseImageProvider {
   // resolutions too, as long as: max edge <= 3840, both edges multiples of 16,
   // long:short ratio <= 3:1, and total pixels between 655,360 and 8,294,400.
   // The values below are hand-picked to satisfy all of those constraints.
-  private mapSize(model: string, ratio: string, resolution?: string): string {
+  private mapSize(
+    model: string,
+    ratio: string,
+    resolution?: string | null,
+  ): string {
     const oneK: Record<string, string> = {
       '1:1': '1024x1024',
       '16:9': '1536x1024',
@@ -265,7 +269,7 @@ export class OpenAIProvider extends BaseImageProvider {
     return byResolution[resolution ?? '1K']?.[ratio] ?? oneK[ratio] ?? '1024x1024';
   }
 
-  private mapQuality(quality?: string): string {
+  private mapQuality(quality?: string | null): string {
     const map: Record<string, string> = { fast: 'low', standard: 'medium', hd: 'high' };
     return map[quality ?? ''] ?? 'medium';
   }

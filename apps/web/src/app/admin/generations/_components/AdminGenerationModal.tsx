@@ -36,8 +36,8 @@ export function AdminGenerationModal({
     ['ספק', generation.provider],
     ['מודל', generation.model],
     ['גודל', generation.size],
-    ['רזולוציה', generation.resolution],
-    ['איכות', generation.quality],
+    ['רזולוציה', generation.resolution ?? '—'],
+    ['איכות', generation.quality ?? '—'],
     ['עלות טוקנים', generation.creditCost.toLocaleString('he-IL')],
     [
       'עלות בפועל ($)',
