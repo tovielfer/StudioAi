@@ -72,13 +72,6 @@ const GOOGLE_SIZES: AttrOption[] = [
   { id: '21:9', label: '21:9 סינמטי' },
 ];
 
-// Nano Banana 2 (3.1 Flash) and Nano Banana Pro additionally support the
-// cinematic vertical ratio.
-const GOOGLE_EXTENDED_SIZES: AttrOption[] = [
-  ...GOOGLE_SIZES,
-  { id: '9:21', label: '9:21 סינמטי לאורך' },
-];
-
 const OPENAI_IMAGE_2_SIZES: AttrOption[] = [
   { id: '1:1', label: '1:1 ריבוע' },
   { id: '16:9', label: '16:9 לרוחב' },
@@ -167,7 +160,7 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     name: 'Nano Banana Pro',
     provider: AiProvider.GOOGLE,
     type: GenerationType.IMAGE,
-    sizes: GOOGLE_EXTENDED_SIZES,
+    sizes: GOOGLE_SIZES,
     // Google ignores quality entirely.
     qualities: [],
     resolutions: RESOLUTION_TIERS,
@@ -182,7 +175,7 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     name: 'Nano Banana 2',
     provider: AiProvider.GOOGLE,
     type: GenerationType.IMAGE,
-    sizes: GOOGLE_EXTENDED_SIZES,
+    sizes: GOOGLE_SIZES,
     qualities: [],
     resolutions: GOOGLE_FLASH_RESOLUTION_TIERS,
     // Flat price regardless of size/resolution.
