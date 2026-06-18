@@ -160,9 +160,9 @@ export function CreateForm({
         />
       </div>
 
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-nowrap gap-3">
         {selectedModel.sizes.length > 1 && (
-          <div className="flex-1 min-w-[10rem]">
+          <div className="flex-1 min-w-0">
             <label className="block text-sm text-gray-400 mb-1.5">יחס</label>
             <FancySelect
               value={size}
@@ -170,23 +170,28 @@ export function CreateForm({
               options={selectedModel.sizes.map((s) => ({
                 value: s.id,
                 label: s.label,
+                shortLabel: s.id,
                 icon: <AspectRatioIcon ratio={s.id} />,
               }))}
             />
           </div>
         )}
         {selectedModel.resolutions.length > 1 && (
-          <div className="flex-1 min-w-[10rem]">
+          <div className="flex-1 min-w-0">
             <label className="block text-sm text-gray-400 mb-1.5">רזולציה</label>
             <FancySelect
               value={resolution}
               onChange={setResolution}
-              options={selectedModel.resolutions.map((r) => ({ value: r.id, label: r.label }))}
+              options={selectedModel.resolutions.map((r) => ({
+                value: r.id,
+                label: r.label,
+                shortLabel: r.id,
+              }))}
             />
           </div>
         )}
         {selectedModel.qualities.length > 1 && (
-          <div className="flex-1 min-w-[10rem]">
+          <div className="flex-1 min-w-0">
             <label className="block text-sm text-gray-400 mb-1.5">איכות</label>
             <FancySelect
               value={quality}

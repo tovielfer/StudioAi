@@ -6,6 +6,8 @@ import { createPortal } from 'react-dom';
 export type SelectOption = {
   value: string;
   label: string;
+  /** Compact text shown on the closed trigger; the full label is shown when open. */
+  shortLabel?: string;
   icon?: React.ReactNode;
 };
 
@@ -116,7 +118,9 @@ export function FancySelect({
       >
         <span className={`flex items-center gap-2 truncate whitespace-nowrap ${selected ? '' : 'text-gray-500'}`}>
           {selected?.icon}
-          <span className="truncate">{selected ? selected.label : placeholder}</span>
+          <span className="truncate">
+            {selected ? selected.shortLabel ?? selected.label : placeholder}
+          </span>
         </span>
         <svg
           className={`h-4 w-4 shrink-0 transition-transform duration-200 ${

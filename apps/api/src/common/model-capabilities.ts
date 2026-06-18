@@ -94,7 +94,7 @@ const OPENAI_IMAGE_2_SIZES: AttrOption[] = [
 ];
 
 const OPENAI_QUALITIES: AttrOption[] = [
-  { id: 'auto', label: 'Auto – ברירת מחדל' },
+  { id: 'auto', label: 'Auto' },
   { id: 'low', label: 'Low' },
   { id: 'medium', label: 'Medium' },
   { id: 'high', label: 'High' },
