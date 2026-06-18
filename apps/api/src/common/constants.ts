@@ -30,6 +30,10 @@ export enum ImageSize {
   SOCIAL_LANDSCAPE = '5:4',
   ULTRAWIDE = '21:9',
   CINEMATIC_PORTRAIT = '9:21',
+  PANORAMA_WIDE = '4:1',
+  STRIP_WIDE = '8:1',
+  PANORAMA_TALL = '1:4',
+  STRIP_TALL = '1:8',
 }
 
 export enum ImageResolution {

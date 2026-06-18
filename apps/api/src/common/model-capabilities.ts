@@ -57,8 +57,8 @@ export interface ModelCapability {
   pricing: ModelPricing;
 }
 
-// Google models support a wider aspect-ratio set. This practical set is offered
-// across all Google image models.
+// Standard aspect ratios honoured by all Google image models
+// (gemini-2.5-flash-image and gemini-3-pro-image).
 const GOOGLE_SIZES: AttrOption[] = [
   { id: '1:1', label: '1:1 ריבוע' },
   { id: '16:9', label: '16:9 לרוחב' },
@@ -70,6 +70,16 @@ const GOOGLE_SIZES: AttrOption[] = [
   { id: '4:5', label: '4:5 רשתות חברתיות' },
   { id: '5:4', label: '5:4 לרוחב קל' },
   { id: '21:9', label: '21:9 סינמטי' },
+];
+
+// Gemini 3.1 Flash Image (Nano Banana 2) additionally supports the extreme
+// panoramic / strip ratios. Other Google models reject these.
+const GOOGLE_FLASH_2_SIZES: AttrOption[] = [
+  ...GOOGLE_SIZES,
+  { id: '4:1', label: '4:1 פנורמה רחבה' },
+  { id: '8:1', label: '8:1 רצועה רחבה' },
+  { id: '1:4', label: '1:4 רצועה לאורך' },
+  { id: '1:8', label: '1:8 רצועה צרה לאורך' },
 ];
 
 const OPENAI_IMAGE_2_SIZES: AttrOption[] = [
@@ -175,7 +185,7 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     name: 'Nano Banana 2',
     provider: AiProvider.GOOGLE,
     type: GenerationType.IMAGE,
-    sizes: GOOGLE_SIZES,
+    sizes: GOOGLE_FLASH_2_SIZES,
     qualities: [],
     resolutions: GOOGLE_FLASH_RESOLUTION_TIERS,
     // Flat price regardless of size/resolution.
