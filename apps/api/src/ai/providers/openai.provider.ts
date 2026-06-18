@@ -291,7 +291,54 @@ export class OpenAIProvider extends BaseImageProvider {
       },
     };
 
-    return byResolution[resolution ?? '1K']?.[ratio] ?? '1024x1024';
+    const resolved = byResolution[resolution ?? '1K']?.[ratio] ?? '1024x1024';
+    return this.assertValidOpenAiSize(resolved);
+  }
+
+  // gpt-image-2 constraints. This is a guard: the tables above are hand-picked
+  // to satisfy these rules, so a thrown error here means a bad edit reached the
+  // table — better to fail loudly here than to get an opaque 400 from OpenAI.
+  private static readonly SIZE_MAX_EDGE = 3840;
+  private static readonly SIZE_MIN_PIXELS = 655_360;
+  private static readonly SIZE_MAX_PIXELS = 8_294_400;
+  private static readonly SIZE_MAX_RATIO = 3;
+  private static readonly SIZE_EDGE_MULTIPLE = 16;
+
+  private assertValidOpenAiSize(size: string): string {
+    const [w, h] = size.split('x').map(Number);
+    const reject = (reason: string): never => {
+      throw new OpenAIProviderError(
+        `OPENAI_INVALID_SIZE ${size} (${reason})`,
+        `Internal size table produced an invalid OpenAI size: ${size} — ${reason}`,
+      );
+    };
+
+    if (!Number.isInteger(w) || !Number.isInteger(h) || w <= 0 || h <= 0) {
+      reject('not a positive WxH pair');
+    }
+    if (
+      Math.max(w, h) > OpenAIProvider.SIZE_MAX_EDGE
+    ) {
+      reject(`edge exceeds ${OpenAIProvider.SIZE_MAX_EDGE}`);
+    }
+    const pixels = w * h;
+    if (pixels < OpenAIProvider.SIZE_MIN_PIXELS) {
+      reject(`fewer than ${OpenAIProvider.SIZE_MIN_PIXELS} pixels`);
+    }
+    if (pixels > OpenAIProvider.SIZE_MAX_PIXELS) {
+      reject(`more than ${OpenAIProvider.SIZE_MAX_PIXELS} pixels`);
+    }
+    if (Math.max(w, h) / Math.min(w, h) > OpenAIProvider.SIZE_MAX_RATIO) {
+      reject(`aspect ratio exceeds ${OpenAIProvider.SIZE_MAX_RATIO}:1`);
+    }
+    if (
+      w % OpenAIProvider.SIZE_EDGE_MULTIPLE !== 0 ||
+      h % OpenAIProvider.SIZE_EDGE_MULTIPLE !== 0
+    ) {
+      reject(`edges must be multiples of ${OpenAIProvider.SIZE_EDGE_MULTIPLE}`);
+    }
+
+    return size;
   }
 
   private mapQuality(quality?: string | null): string {
