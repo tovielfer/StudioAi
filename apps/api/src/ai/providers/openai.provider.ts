@@ -239,38 +239,63 @@ export class OpenAIProvider extends BaseImageProvider {
     ratio: string,
     resolution?: string | null,
   ): string {
-    const oneK: Record<string, string> = {
+    const gptImageOneSizes: Record<string, string> = {
       '1:1': '1024x1024',
       '16:9': '1536x1024',
       '9:16': '1024x1536',
-      '4:3': '1536x1024',
     };
 
     if (model !== 'gpt-image-2') {
-      return oneK[ratio] ?? '1024x1024';
+      return gptImageOneSizes[ratio] ?? '1024x1024';
     }
 
     const byResolution: Record<string, Record<string, string>> = {
-      '1K': oneK,
+      '1K': {
+        '1:1': '1024x1024',
+        '16:9': '1280x720',
+        '9:16': '720x1280',
+        '4:3': '1024x768',
+        '3:4': '768x1024',
+        '3:2': '1200x800',
+        '2:3': '800x1200',
+        '4:5': '896x1120',
+        '5:4': '1120x896',
+        '21:9': '1344x576',
+        '9:21': '576x1344',
+      },
       '2K': {
         '1:1': '2048x2048',
         '16:9': '2048x1152',
         '9:16': '1152x2048',
         '4:3': '2048x1536',
+        '3:4': '1536x2048',
+        '3:2': '2048x1360',
+        '2:3': '1360x2048',
+        '4:5': '1600x2000',
+        '5:4': '2000x1600',
+        '21:9': '2048x880',
+        '9:21': '880x2048',
       },
       '4K': {
         '1:1': '2880x2880',
         '16:9': '3840x2160',
         '9:16': '2160x3840',
         '4:3': '3264x2448',
+        '3:4': '2448x3264',
+        '3:2': '3520x2352',
+        '2:3': '2352x3520',
+        '4:5': '2560x3200',
+        '5:4': '3200x2560',
+        '21:9': '3840x1648',
+        '9:21': '1648x3840',
       },
     };
 
-    return byResolution[resolution ?? '1K']?.[ratio] ?? oneK[ratio] ?? '1024x1024';
+    return byResolution[resolution ?? '1K']?.[ratio] ?? '1024x1024';
   }
 
   private mapQuality(quality?: string | null): string {
-    const map: Record<string, string> = { fast: 'low', standard: 'medium', hd: 'high' };
-    return map[quality ?? ''] ?? 'medium';
+    const supported = new Set(['low', 'medium', 'high', 'auto']);
+    return supported.has(quality ?? '') ? quality! : 'auto';
   }
 }

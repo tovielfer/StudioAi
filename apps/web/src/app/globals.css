@@ -42,3 +42,19 @@ body {
     @apply w-full bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent;
   }
 }
+
+@keyframes fancy-select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.fancy-select-menu {
+  transform-origin: top center;
+  animation: fancy-select-in 0.14s ease-out;
+}

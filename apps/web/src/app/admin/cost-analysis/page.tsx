@@ -14,6 +14,10 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const QUALITY_LABELS: Record<string, string> = {
+  low: 'נמוכה',
+  medium: 'בינונית',
+  high: 'גבוהה',
+  auto: 'אוטומטי',
   fast: 'מהיר',
   standard: 'רגיל',
   hd: 'HD',

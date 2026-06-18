@@ -56,7 +56,7 @@ export class GenerationsService {
     // DB, pricing and provider request stay in sync.
     const { quality, resolution } = normalizeAttrs(
       dto.model,
-      dto.quality ?? ImageQuality.STANDARD,
+      dto.quality ?? ImageQuality.AUTO,
       dto.resolution ?? ImageResolution.ONE_K,
     );
 

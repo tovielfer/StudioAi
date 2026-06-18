@@ -464,6 +464,6 @@ export function estimateCost(
   quality: string,
   hasReference: boolean,
 ): number {
-  const base = quality === 'hd' ? 10 : 5;
+  const base = quality === 'high' ? 10 : 5;
   return hasReference ? base + 5 : base;
 }

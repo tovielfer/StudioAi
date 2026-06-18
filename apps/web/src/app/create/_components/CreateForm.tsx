@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ModelOption, User } from '@/lib/api';
+import { AspectRatioIcon, FancySelect } from './FancySelect';
 
 export type ReferenceImage = {
   id: string;
@@ -152,44 +153,46 @@ export function CreateForm({
 
       <div>
         <label className="block text-sm text-gray-400 mb-1.5">מודל</label>
-        <select value={model} onChange={(e) => handleModelChange(e.target.value)} className="input-field">
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name} ({m.provider})
-            </option>
-          ))}
-        </select>
+        <FancySelect
+          value={model}
+          onChange={handleModelChange}
+          options={models.map((m) => ({ value: m.id, label: `${m.name} (${m.provider})` }))}
+        />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="flex flex-wrap gap-4">
         {selectedModel.sizes.length > 1 && (
-          <div>
+          <div className="flex-1 min-w-[10rem]">
             <label className="block text-sm text-gray-400 mb-1.5">יחס</label>
-            <select value={size} onChange={(e) => setSize(e.target.value)} className="input-field">
-              {selectedModel.sizes.map((s) => (
-                <option key={s.id} value={s.id}>{s.label}</option>
-              ))}
-            </select>
+            <FancySelect
+              value={size}
+              onChange={setSize}
+              options={selectedModel.sizes.map((s) => ({
+                value: s.id,
+                label: s.label,
+                icon: <AspectRatioIcon ratio={s.id} />,
+              }))}
+            />
           </div>
         )}
         {selectedModel.resolutions.length > 1 && (
-          <div>
+          <div className="flex-1 min-w-[10rem]">
             <label className="block text-sm text-gray-400 mb-1.5">רזולציה</label>
-            <select value={resolution} onChange={(e) => setResolution(e.target.value)} className="input-field">
-              {selectedModel.resolutions.map((r) => (
-                <option key={r.id} value={r.id}>{r.label}</option>
-              ))}
-            </select>
+            <FancySelect
+              value={resolution}
+              onChange={setResolution}
+              options={selectedModel.resolutions.map((r) => ({ value: r.id, label: r.label }))}
+            />
           </div>
         )}
         {selectedModel.qualities.length > 1 && (
-          <div>
+          <div className="flex-1 min-w-[10rem]">
             <label className="block text-sm text-gray-400 mb-1.5">איכות</label>
-            <select value={quality} onChange={(e) => setQuality(e.target.value)} className="input-field">
-              {selectedModel.qualities.map((q) => (
-                <option key={q.id} value={q.id}>{q.label}</option>
-              ))}
-            </select>
+            <FancySelect
+              value={quality}
+              onChange={setQuality}
+              options={selectedModel.qualities.map((q) => ({ value: q.id, label: q.label }))}
+            />
           </div>
         )}
       </div>

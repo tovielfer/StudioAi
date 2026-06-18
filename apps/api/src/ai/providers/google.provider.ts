@@ -64,7 +64,7 @@ export class GoogleProvider extends BaseImageProvider {
 
     const imageConfig: { aspectRatio?: string; imageSize?: string } = {};
     if (params.size) imageConfig.aspectRatio = params.size;
-    // Only models that expose the 1K/2K/4K resolution tiers honour imageSize.
+    // Only models that expose selectable resolution tiers honour imageSize.
     if (params.resolution && modelSupportsResolution(model)) {
       imageConfig.imageSize = params.resolution;
     }

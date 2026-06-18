@@ -27,10 +27,14 @@ export function CreateWorkspace({
   const objectUrlsRef = useRef<string[]>([]);
 
   const initialModel = models[0];
+  const initialQuality =
+    initialModel.qualities.find((q) => q.id === 'auto')?.id ??
+    initialModel.qualities[0]?.id ??
+    'auto';
   const [prompt, setPrompt] = useState('');
   const [model, setModel] = useState(initialModel.id);
   const [size, setSize] = useState(initialModel.sizes[0]?.id ?? '1:1');
-  const [quality, setQuality] = useState(initialModel.qualities[0]?.id ?? 'standard');
+  const [quality, setQuality] = useState(initialQuality);
   const [resolution, setResolution] = useState(initialModel.resolutions[0]?.id ?? '1K');
   const [references, setReferences] = useState<ReferenceImage[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -178,8 +182,10 @@ export function CreateWorkspace({
     }
     if (def) {
       const qualOptions = def.qualities;
-      if (qualOptions.length === 0) setQuality('standard');
-      else if (!qualOptions.find((q) => q.id === quality)) setQuality(qualOptions[0].id);
+      if (qualOptions.length === 0) setQuality('auto');
+      else if (!qualOptions.find((q) => q.id === quality)) {
+        setQuality(qualOptions.find((q) => q.id === 'auto')?.id ?? qualOptions[0].id);
+      }
     }
     if (def) {
       const resOptions = def.resolutions;

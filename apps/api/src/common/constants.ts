@@ -12,9 +12,10 @@ export enum GenerationStatus {
 }
 
 export enum ImageQuality {
-  FAST = 'fast',
-  STANDARD = 'standard',
-  HD = 'hd',
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  AUTO = 'auto',
 }
 
 export enum ImageSize {
@@ -32,6 +33,7 @@ export enum ImageSize {
 }
 
 export enum ImageResolution {
+  FIVE_TWELVE = '512',
   ONE_K = '1K',
   TWO_K = '2K',
   FOUR_K = '4K',

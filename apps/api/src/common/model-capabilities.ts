@@ -57,13 +57,6 @@ export interface ModelCapability {
   pricing: ModelPricing;
 }
 
-const DEFAULT_SIZES: AttrOption[] = [
-  { id: '1:1', label: '1:1 ריבוע' },
-  { id: '16:9', label: '16:9 לרוחב' },
-  { id: '9:16', label: '9:16 לאורך' },
-  { id: '4:3', label: '4:3 סטנדרטי' },
-];
-
 // Google models support a wider aspect-ratio set. This practical set is offered
 // across all Google image models.
 const GOOGLE_SIZES: AttrOption[] = [
@@ -86,16 +79,36 @@ const GOOGLE_EXTENDED_SIZES: AttrOption[] = [
   { id: '9:21', label: '9:21 סינמטי לאורך' },
 ];
 
+const OPENAI_IMAGE_2_SIZES: AttrOption[] = [
+  { id: '1:1', label: '1:1 ריבוע' },
+  { id: '16:9', label: '16:9 לרוחב' },
+  { id: '9:16', label: '9:16 לאורך' },
+  { id: '4:3', label: '4:3 סטנדרטי' },
+  { id: '3:4', label: '3:4 פורטרט' },
+  { id: '3:2', label: '3:2 צילום לרוחב' },
+  { id: '2:3', label: '2:3 צילום לאורך' },
+  { id: '4:5', label: '4:5 רשתות חברתיות' },
+  { id: '5:4', label: '5:4 לרוחב קל' },
+  { id: '21:9', label: '21:9 סינמטי' },
+  { id: '9:21', label: '9:21 סינמטי לאורך' },
+];
+
 const OPENAI_QUALITIES: AttrOption[] = [
-  { id: 'fast', label: 'Low – מהיר' },
-  { id: 'standard', label: 'Medium – רגיל' },
-  { id: 'hd', label: 'High – איכות גבוהה' },
+  { id: 'auto', label: 'Auto – ברירת מחדל' },
+  { id: 'low', label: 'Low' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'high', label: 'High' },
 ];
 
 const RESOLUTION_TIERS: AttrOption[] = [
   { id: '1K', label: '1K – רגיל' },
   { id: '2K', label: '2K – גבוה' },
   { id: '4K', label: '4K – מקסימלי' },
+];
+
+const GOOGLE_FLASH_RESOLUTION_TIERS: AttrOption[] = [
+  { id: '512', label: '512 – קטן' },
+  ...RESOLUTION_TIERS,
 ];
 
 // OpenAI gpt-image-1 has a single fixed resolution: it is still sent and priced
@@ -107,26 +120,27 @@ const FIXED_ONE_K: AttrOption[] = [{ id: '1K', label: '1K' }];
 const GPT_IMAGE_1_PRICING: ModelPricing = {
   baseUsd: 0.04,
   perSizeQuality: {
-    '1:1': { fast: 0.011, standard: 0.04, hd: 0.167 },
-    '16:9': { fast: 0.016, standard: 0.06, hd: 0.25 },
-    '9:16': { fast: 0.016, standard: 0.06, hd: 0.25 },
+    '1:1': { low: 0.011, medium: 0.04, high: 0.167, auto: 0.04 },
+    '16:9': { low: 0.016, medium: 0.06, high: 0.25, auto: 0.06 },
+    '9:16': { low: 0.016, medium: 0.06, high: 0.25, auto: 0.06 },
   },
 };
 
 const GPT_IMAGE_2_PRICING: ModelPricing = {
   baseUsd: 0.05,
-  perSizeQuality: {
-    '1:1': { fast: 0.015, standard: 0.05, hd: 0.22 },
-    '16:9': { fast: 0.015, standard: 0.05, hd: 0.22 },
-    '9:16': { fast: 0.015, standard: 0.05, hd: 0.22 },
-  },
+  perSizeQuality: Object.fromEntries(
+    OPENAI_IMAGE_2_SIZES.map((size) => [
+      size.id,
+      { low: 0.015, medium: 0.05, high: 0.22, auto: 0.05 },
+    ]),
+  ) as Record<string, Record<string, number>>,
   resolutionMultiplier: { '1K': 1, '2K': 4, '4K': 8 },
 };
 
 export const MODEL_REGISTRY: ModelCapability[] = [
   {
     id: 'gpt-image-1',
-    name: 'OpenAI Image 1',
+    name: 'gpt 1',
     provider: AiProvider.OPENAI,
     type: GenerationType.IMAGE,
     sizes: [
@@ -140,14 +154,10 @@ export const MODEL_REGISTRY: ModelCapability[] = [
   },
   {
     id: 'gpt-image-2',
-    name: 'OpenAI Image 2',
+    name: 'gpt 2',
     provider: AiProvider.OPENAI,
     type: GenerationType.IMAGE,
-    sizes: [
-      { id: '1:1', label: '1:1 ריבוע' },
-      { id: '16:9', label: '16:9 לרוחב' },
-      { id: '9:16', label: '9:16 לאורך' },
-    ],
+    sizes: OPENAI_IMAGE_2_SIZES,
     qualities: OPENAI_QUALITIES,
     resolutions: RESOLUTION_TIERS,
     pricing: GPT_IMAGE_2_PRICING,
@@ -174,8 +184,8 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     type: GenerationType.IMAGE,
     sizes: GOOGLE_EXTENDED_SIZES,
     qualities: [],
-    resolutions: [],
-    // Flat price regardless of size.
+    resolutions: GOOGLE_FLASH_RESOLUTION_TIERS,
+    // Flat price regardless of size/resolution.
     pricing: { baseUsd: 0.0672 },
   },
   {

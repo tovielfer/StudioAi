@@ -64,7 +64,7 @@ export class GenerationsController {
     // matches the cost actually charged.
     const normalized = normalizeAttrs(
       resolvedModel,
-      quality ?? ImageQuality.STANDARD,
+      quality ?? ImageQuality.AUTO,
       resolution ?? ImageResolution.ONE_K,
     );
     return this.pricingService.getGenerationCost({
