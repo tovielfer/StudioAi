@@ -195,6 +195,7 @@ export class AdminService {
       .addSelect('g."actualCostUsd"::float8', 'actualCostUsd')
       .addSelect('g.tokensUsed', 'tokensUsed')
       .addSelect('g.errorMessage', 'errorMessage')
+      .addSelect('g.providerErrorRaw', 'providerErrorRaw')
       .addSelect('g.createdAt', 'createdAt')
       .orderBy('g.createdAt', 'DESC')
       .take(params.limit)
@@ -471,6 +472,7 @@ export class AdminService {
       .addSelect('g."actualCostUsd"::float8', 'actualCostUsd')
       .addSelect('g.tokensUsed', 'tokensUsed')
       .addSelect('g.errorMessage', 'errorMessage')
+      .addSelect('g.providerErrorRaw', 'providerErrorRaw')
       .addSelect('g.createdAt', 'createdAt');
   }
 

@@ -2,6 +2,7 @@
 
 import { Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
+import { translateError } from '@/lib/he';
 import { PlusIcon, DownloadIcon, OpenIcon, CloseIcon } from './icons';
 
 export function CurrentGenPreview({
@@ -22,7 +23,7 @@ export function CurrentGenPreview({
     <div className="card relative overflow-hidden">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-semibold text-gray-300">
-          {isProcessing ? 'יוצרת...' : isDone ? 'תצוגה מקדימה' : 'היצירה נכשלה'}
+          {isProcessing ? 'יוצר...' : isDone ? 'תצוגה מקדימה' : 'היצירה נכשלה'}
         </h2>
         <button
           type="button"
@@ -114,7 +115,7 @@ export function CurrentGenPreview({
         <div className="py-8 text-center">
           <p className="text-red-400 font-medium">היצירה נכשלה</p>
           {gen.errorMessage && (
-            <p className="text-sm text-gray-500 mt-1">{gen.errorMessage}</p>
+            <p className="text-sm text-gray-500 mt-1">{translateError(gen.errorMessage)}</p>
           )}
         </div>
       )}

@@ -45,6 +45,7 @@ export interface Generation {
   actualCostUsd: number | null;
   tokensUsed: TokensUsed | null;
   errorMessage: string | null;
+  providerErrorRaw: string | null;
   createdAt: string;
 }
 
