@@ -2,7 +2,7 @@
 
 import { AdminGeneration } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
-import { STATUS_LABELS } from '@/lib/he';
+import { STATUS_LABELS, translateError } from '@/lib/he';
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('he-IL', {
@@ -132,10 +132,19 @@ export function AdminGenerationModal({
 
             {generation.errorMessage && (
               <section>
-                <h3 className="mb-2 font-semibold text-gray-950">שגיאה</h3>
+                <h3 className="mb-2 font-semibold text-gray-950">שגיאה למשתמש</h3>
                 <p className="whitespace-pre-wrap rounded-lg border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-800">
-                  {generation.errorMessage}
+                  {translateError(generation.errorMessage)}
                 </p>
+              </section>
+            )}
+
+            {generation.providerErrorRaw && (
+              <section>
+                <h3 className="mb-2 font-semibold text-gray-950">שגיאת ספק גולמית</h3>
+                <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs leading-5 text-gray-800">
+                  {generation.providerErrorRaw}
+                </pre>
               </section>
             )}
 

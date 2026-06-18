@@ -7,6 +7,17 @@ import { AiService } from '../ai/ai.service';
 import { StorageService } from '../storage/storage.service';
 import { CreditsService } from '../credits/credits.service';
 
+function providerErrorRaw(error: unknown): string | null {
+  if (
+    error instanceof Error &&
+    'providerErrorRaw' in error &&
+    typeof error.providerErrorRaw === 'string'
+  ) {
+    return error.providerErrorRaw;
+  }
+  return null;
+}
+
 @Injectable()
 export class GenerationRunnerService {
   private readonly logger = new Logger(GenerationRunnerService.name);
@@ -77,6 +88,7 @@ export class GenerationRunnerService {
         resultUrl,
         provider: result.provider as AiProvider,
         errorMessage: null,
+        providerErrorRaw: null,
         tokensUsed: result.usage ?? null,
         actualCostUsd: result.costUsd ?? null,
       });
@@ -101,6 +113,7 @@ export class GenerationRunnerService {
         await this.genRepo.update(generationId, {
           status: GenerationStatus.FAILED,
           errorMessage: message,
+          providerErrorRaw: providerErrorRaw(error),
         });
 
         if (generation.creditCost > 0) {
