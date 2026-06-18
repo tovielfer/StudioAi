@@ -9,6 +9,14 @@ interface TokenPrices {
   imageOutput: number;
 }
 
+interface OpenAIErrorPayload {
+  error?: {
+    message?: string;
+    code?: string;
+    type?: string;
+  };
+}
+
 // OpenAI Standard pricing, USD per 1M tokens.
 // (Batch API is 50% cheaper but is async/offline — not used for live generation.)
 const OPENAI_TOKEN_PRICES: Record<string, TokenPrices> = {
@@ -83,8 +91,7 @@ export class OpenAIProvider extends BaseImageProvider {
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`OpenAI error: ${err}`);
+      await this.throwOpenAIError(response);
     }
 
     const data = (await response.json()) as {
@@ -114,8 +121,7 @@ export class OpenAIProvider extends BaseImageProvider {
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`OpenAI error: ${err}`);
+      await this.throwOpenAIError(response);
     }
 
     const data = (await response.json()) as {
@@ -156,6 +162,43 @@ export class OpenAIProvider extends BaseImageProvider {
       };
     }
     throw new Error('OpenAI returned no image');
+  }
+
+  private async throwOpenAIError(response: Response): Promise<never> {
+    const raw = await response.text();
+    this.logger.warn(`OpenAI request failed (${response.status}): ${raw}`);
+
+    let payload: OpenAIErrorPayload | null = null;
+    try {
+      payload = JSON.parse(raw) as OpenAIErrorPayload;
+    } catch {
+      // Some failures are plain text; fall back to the HTTP status below.
+    }
+
+    const message = payload?.error?.message;
+    const code = payload?.error?.code;
+    if (this.isSafetyRejection(message, code)) {
+      const requestId =
+        response.headers.get('x-request-id') ??
+        message?.match(/\breq_[a-zA-Z0-9]+\b/)?.[0];
+      if (requestId) {
+        this.logger.warn(`OpenAI safety rejection request id: ${requestId}`);
+      }
+      throw new Error(this.formatSafetyRejectionError());
+    }
+
+    throw new Error(message ? `OpenAI error: ${message}` : `OpenAI error: ${response.statusText}`);
+  }
+
+  private isSafetyRejection(message?: string, code?: string): boolean {
+    return (
+      code === 'content_policy_violation' ||
+      message?.includes('rejected by the safety system') === true
+    );
+  }
+
+  private formatSafetyRejectionError(): string {
+    return 'OpenAI דחתה את הבקשה בגלל מערכת הבטיחות. נסה לשנות את התיאור או להסיר פרטים שעלולים להיחסם.';
   }
 
   // gpt-image-1 only accepts fixed ~1K sizes. gpt-image-2 accepts higher

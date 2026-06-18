@@ -2,7 +2,7 @@
 
 import { Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
-import { STATUS_LABELS } from '@/lib/he';
+import { STATUS_LABELS, translateError } from '@/lib/he';
 import { PlusIcon, DownloadIcon, OpenIcon, CloseIcon } from './icons';
 
 export function GenerationDetailsModal({
@@ -16,13 +16,17 @@ export function GenerationDetailsModal({
 }) {
   const hasAsset = Boolean(generation.resultUrl && generation.status === 'done');
   const isVideo = generation.type === 'video';
+  const displayStatus =
+    generation.status === 'failed' && generation.errorMessage
+      ? translateError(generation.errorMessage)
+      : STATUS_LABELS[generation.status] ?? generation.status;
 
   const formatDateTime = (d: string) =>
     new Date(d).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' });
 
   const details: [string, string | undefined][] = [
     ['סוג', generation.type],
-    ['סטטוס', STATUS_LABELS[generation.status] ?? generation.status],
+    ['סטטוס', displayStatus],
     ['ספק', generation.provider],
     ['מודל', generation.model],
     ['גודל', generation.size],
@@ -73,7 +77,7 @@ export function GenerationDetailsModal({
                 )
               ) : (
                 <span className="text-gray-500">
-                  {STATUS_LABELS[generation.status] ?? generation.status}
+                  {displayStatus}
                 </span>
               )}
             </div>
@@ -122,6 +126,15 @@ export function GenerationDetailsModal({
                 {generation.prompt}
               </p>
             </section>
+
+            {generation.status === 'failed' && generation.errorMessage && (
+              <section>
+                <h3 className="font-semibold mb-2">שגיאה</h3>
+                <p className="rounded-lg border border-red-900/50 bg-red-950/30 p-3 text-sm leading-6 text-red-200 whitespace-pre-wrap">
+                  {translateError(generation.errorMessage)}
+                </p>
+              </section>
+            )}
 
             <section>
               <h3 className="font-semibold mb-2">תמונות שהועלו</h3>

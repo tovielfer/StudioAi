@@ -6,7 +6,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/lib/auth-context';
 import { api, Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
-import { STATUS_LABELS } from '@/lib/he';
+import { STATUS_LABELS, translateError } from '@/lib/he';
 
 export default function HistoryPage() {
   return (
@@ -85,6 +85,10 @@ function HistoryContent() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {generations.map((gen) => {
             const canUseImage = Boolean(gen.resultUrl && gen.status === 'done');
+            const displayStatus =
+              gen.status === 'failed' && gen.errorMessage
+                ? translateError(gen.errorMessage)
+                : STATUS_LABELS[gen.status] ?? gen.status;
 
             return (
               <div key={gen.id} className="card p-3 group">
@@ -157,8 +161,8 @@ function HistoryContent() {
                       </div>
                     </>
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">
-                      {STATUS_LABELS[gen.status] ?? gen.status}
+                    <div className="w-full h-full flex items-center justify-center px-2 text-center text-gray-600 text-sm">
+                      {displayStatus}
                     </div>
                   )}
                 </div>
@@ -205,9 +209,13 @@ function GenerationDetailsModal({
 }) {
   const hasAsset = Boolean(generation.resultUrl);
   const isVideo = generation.type === 'video';
+  const displayStatus =
+    generation.status === 'failed' && generation.errorMessage
+      ? translateError(generation.errorMessage)
+      : STATUS_LABELS[generation.status] ?? generation.status;
   const details = [
     ['סוג', generation.type],
-    ['סטטוס', STATUS_LABELS[generation.status] ?? generation.status],
+    ['סטטוס', displayStatus],
     ['ספק', generation.provider],
     ['מודל', generation.model],
     ['גודל', generation.size],
@@ -264,7 +272,7 @@ function GenerationDetailsModal({
                 )
               ) : (
                 <span className="text-gray-500">
-                  {STATUS_LABELS[generation.status] ?? generation.status}
+                  {displayStatus}
                 </span>
               )}
             </div>
@@ -310,6 +318,15 @@ function GenerationDetailsModal({
                 {generation.prompt}
               </p>
             </section>
+
+            {generation.status === 'failed' && generation.errorMessage && (
+              <section>
+                <h3 className="font-semibold mb-2">שגיאה</h3>
+                <p className="rounded-lg border border-red-900/50 bg-red-950/30 p-3 text-sm leading-6 text-red-200 whitespace-pre-wrap">
+                  {translateError(generation.errorMessage)}
+                </p>
+              </section>
+            )}
 
             <section>
               <h3 className="font-semibold mb-2">תמונות שהועלו</h3>

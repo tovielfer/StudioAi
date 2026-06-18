@@ -5,7 +5,24 @@ export const STATUS_LABELS: Record<string, string> = {
   failed: 'נכשל',
 };
 
-export function translateError(message: string): string {
+const OPENAI_SAFETY_MESSAGE =
+  'OpenAI דחתה את הבקשה בגלל מערכת הבטיחות. נסה לשנות את התיאור או להסיר פרטים שעלולים להיחסם.';
+
+interface TranslateErrorOptions {
+  includeRequestId?: boolean;
+}
+
+export function translateError(
+  message: string,
+  options: TranslateErrorOptions = {},
+): string {
+  if (isOpenAISafetyError(message)) {
+    const requestId = message.match(/\breq_[a-zA-Z0-9]+\b/)?.[0];
+    return `${OPENAI_SAFETY_MESSAGE}${
+      options.includeRequestId && requestId ? ` מזהה בקשה: ${requestId}` : ''
+    }`;
+  }
+
   const map: Record<string, string> = {
     'Email already registered': 'כתובת האימייל כבר רשומה',
     'Invalid credentials': 'פרטי התחברות שגויים',
@@ -23,4 +40,12 @@ export function translateError(message: string): string {
       'חרגת ממגבלת הבקשות. נסה שוב בעוד דקה',
   };
   return map[message] ?? message;
+}
+
+function isOpenAISafetyError(message: string): boolean {
+  return (
+    message.includes('rejected by the safety system') ||
+    message.includes('content_policy_violation') ||
+    message.includes('OpenAI דחתה את הבקשה בגלל מערכת הבטיחות')
+  );
 }

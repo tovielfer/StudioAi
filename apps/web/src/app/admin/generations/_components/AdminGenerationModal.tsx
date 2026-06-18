@@ -2,7 +2,7 @@
 
 import { AdminGeneration } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
-import { STATUS_LABELS } from '@/lib/he';
+import { STATUS_LABELS, translateError } from '@/lib/he';
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('he-IL', {
@@ -24,11 +24,15 @@ export function AdminGenerationModal({
 }) {
   const hasImage = Boolean(generation.resultUrl && generation.status === 'done');
   const tokens = generation.tokensUsed;
+  const displayStatus =
+    generation.status === 'failed' && generation.errorMessage
+      ? translateError(generation.errorMessage, { includeRequestId: true })
+      : STATUS_LABELS[generation.status] ?? generation.status;
 
   const details: [string, string | undefined][] = [
     ['משתמש', generation.userEmail ?? generation.userId],
     ['סוג', generation.type],
-    ['סטטוס', STATUS_LABELS[generation.status] ?? generation.status],
+    ['סטטוס', displayStatus],
     ['ספק', generation.provider],
     ['מודל', generation.model],
     ['גודל', generation.size],
@@ -95,7 +99,7 @@ export function AdminGenerationModal({
                 )
               ) : (
                 <span className="text-gray-500">
-                  {STATUS_LABELS[generation.status] ?? generation.status}
+                  {displayStatus}
                 </span>
               )}
             </div>
@@ -134,7 +138,7 @@ export function AdminGenerationModal({
               <section>
                 <h3 className="mb-2 font-semibold text-gray-950">שגיאה</h3>
                 <p className="whitespace-pre-wrap rounded-lg border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-800">
-                  {generation.errorMessage}
+                  {translateError(generation.errorMessage, { includeRequestId: true })}
                 </p>
               </section>
             )}

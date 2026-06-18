@@ -2,7 +2,7 @@
 
 import { Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
-import { STATUS_LABELS } from '@/lib/he';
+import { STATUS_LABELS, translateError } from '@/lib/he';
 import { InfoIcon, PlusIcon, DownloadIcon, OpenIcon } from './icons';
 
 export function GenerationCard({
@@ -19,6 +19,10 @@ export function GenerationCard({
   const canUse = Boolean(gen.resultUrl && gen.status === 'done');
   const isProcessing = gen.status === 'pending' || gen.status === 'processing';
   const isVideo = gen.type === 'video';
+  const displayStatus =
+    gen.status === 'failed' && gen.errorMessage
+      ? translateError(gen.errorMessage)
+      : STATUS_LABELS[gen.status] ?? gen.status;
 
   return (
     <div className={`card p-3 group ${isActive && isProcessing ? 'ring-2 ring-brand-500' : ''}`}>
@@ -104,7 +108,7 @@ export function GenerationCard({
         ) : (
           <div className="w-full h-full flex items-center justify-center px-2 text-center">
             <span className="text-gray-500 text-sm">
-              {STATUS_LABELS[gen.status] ?? gen.status}
+              {displayStatus}
             </span>
           </div>
         )}

@@ -2,6 +2,7 @@
 
 import { Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
+import { translateError } from '@/lib/he';
 import { PlusIcon, DownloadIcon, OpenIcon, CloseIcon } from './icons';
 
 export function CurrentGenPreview({
@@ -17,12 +18,15 @@ export function CurrentGenPreview({
   const isProcessing = gen.status === 'pending' || gen.status === 'processing';
   const isFailed = gen.status === 'failed';
   const isVideo = gen.type === 'video';
+  const displayError = gen.errorMessage
+    ? translateError(gen.errorMessage)
+    : 'היצירה נכשלה';
 
   return (
     <div className="card relative overflow-hidden">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-semibold text-gray-300">
-          {isProcessing ? 'יוצרת...' : isDone ? 'תצוגה מקדימה' : 'היצירה נכשלה'}
+          {isProcessing ? 'יוצרת...' : isDone ? 'תצוגה מקדימה' : displayError}
         </h2>
         <button
           type="button"
@@ -112,10 +116,7 @@ export function CurrentGenPreview({
 
       {isFailed && (
         <div className="py-8 text-center">
-          <p className="text-red-400 font-medium">היצירה נכשלה</p>
-          {gen.errorMessage && (
-            <p className="text-sm text-gray-500 mt-1">{gen.errorMessage}</p>
-          )}
+          <p className="text-red-400 font-medium">{displayError}</p>
         </div>
       )}
     </div>
