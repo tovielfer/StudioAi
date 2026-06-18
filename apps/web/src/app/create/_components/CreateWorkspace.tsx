@@ -33,7 +33,7 @@ export function CreateWorkspace({
   const [quality, setQuality] = useState(initialModel.qualities[0]?.id ?? 'standard');
   const [resolution, setResolution] = useState(initialModel.resolutions[0]?.id ?? '1K');
   const [references, setReferences] = useState<ReferenceImage[]>([]);
-  const [generating, setGenerating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [currentGen, setCurrentGen] = useState<Generation | null>(null);
   const [error, setError] = useState('');
   const [cost, setCost] = useState<number | null>(null);
@@ -228,7 +228,6 @@ export function CreateWorkspace({
       if (gen.status === 'pending' || gen.status === 'processing') {
         setTimeout(() => pollGeneration(id), 2000);
       } else {
-        setGenerating(false);
         refreshCredits();
         if (gen.status === 'done') loadRecent();
       }
@@ -247,7 +246,7 @@ export function CreateWorkspace({
     }
 
     setError('');
-    setGenerating(true);
+    setSubmitting(true);
     setCurrentGen(null);
 
     try {
@@ -273,11 +272,17 @@ export function CreateWorkspace({
 
       setCurrentGen(gen);
       setRecentGenerations((prev) => [gen, ...prev.filter((g) => g.id !== gen.id)]);
+      setPrompt('');
+      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      objectUrlsRef.current = [];
+      setReferences([]);
+      setIsDragOver(false);
       refreshCredits();
       pollGeneration(gen.id);
+      setSubmitting(false);
     } catch (err) {
       setError(translateError(err instanceof Error ? err.message : 'Generation failed'));
-      setGenerating(false);
+      setSubmitting(false);
     }
   };
 
@@ -317,7 +322,7 @@ export function CreateWorkspace({
             costLoading={costLoading}
             costError={costError}
             user={user}
-            generating={generating}
+            submitting={submitting}
             onGenerate={handleGenerate}
             error={error}
           />

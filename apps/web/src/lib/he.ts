@@ -12,15 +12,42 @@ interface TranslateErrorOptions {
   includeRequestId?: boolean;
 }
 
+function referenceImageLabel(imageNumber?: string): string {
+  const labels: Record<string, string> = {
+    '1': 'הראשונה',
+    '2': 'השנייה',
+    '3': 'השלישית',
+    '4': 'הרביעית',
+    '5': 'החמישית',
+  };
+  return labels[imageNumber ?? ''] ?? 'שהועלתה';
+}
+
+function requestIdSuffix(message: string, includeRequestId?: boolean): string {
+  if (!includeRequestId) return '';
+  const requestId = message.match(/\breq_[a-zA-Z0-9]+\b/)?.[0];
+  return requestId ? ` מזהה בקשה: ${requestId}` : '';
+}
+
 export function translateError(
   message: string,
   options: TranslateErrorOptions = {},
 ): string {
   if (isOpenAISafetyError(message)) {
-    const requestId = message.match(/\breq_[a-zA-Z0-9]+\b/)?.[0];
-    return `${OPENAI_SAFETY_MESSAGE}${
-      options.includeRequestId && requestId ? ` מזהה בקשה: ${requestId}` : ''
-    }`;
+    return `${OPENAI_SAFETY_MESSAGE}${requestIdSuffix(message, options.includeRequestId)}`;
+  }
+
+  if (message.includes('OPENAI_INVALID_REFERENCE_IMAGE')) {
+    const imageNumber = message.match(/OPENAI_INVALID_REFERENCE_IMAGE_(\d+)/)?.[1];
+    return `אי אפשר להשתמש בתמונת ההשראה ${referenceImageLabel(imageNumber)}: הקובץ לא תקין או בפורמט תמונה ש-OpenAI לא תומך בו. כדאי להעלות אותה מחדש כ-JPG או PNG רגיל (RGB).`;
+  }
+
+  if (
+    message.includes('invalid_image_file') ||
+    message.includes('Invalid image file or mode')
+  ) {
+    const imageNumber = message.match(/image\s+(\d+)/i)?.[1];
+    return `אי אפשר להשתמש בתמונת ההשראה ${referenceImageLabel(imageNumber)}: הקובץ לא תקין או בפורמט תמונה ש-OpenAI לא תומך בו. כדאי להעלות אותה מחדש כ-JPG או PNG רגיל (RGB).`;
   }
 
   const map: Record<string, string> = {
@@ -44,6 +71,7 @@ export function translateError(
 
 function isOpenAISafetyError(message: string): boolean {
   return (
+    message.includes('OPENAI_SAFETY_REJECTED') ||
     message.includes('rejected by the safety system') ||
     message.includes('content_policy_violation') ||
     message.includes('OpenAI דחתה את הבקשה בגלל מערכת הבטיחות')

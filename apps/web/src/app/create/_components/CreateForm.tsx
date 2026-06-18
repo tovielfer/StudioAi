@@ -37,7 +37,7 @@ export function CreateForm({
   costLoading,
   costError,
   user,
-  generating,
+  submitting,
   onGenerate,
   error,
 }: {
@@ -63,7 +63,7 @@ export function CreateForm({
   costLoading: boolean;
   costError: string;
   user: User | null;
-  generating: boolean;
+  submitting: boolean;
   onGenerate: () => void;
   error: string;
 }) {
@@ -256,10 +256,10 @@ export function CreateForm({
         </div>
         <button
           onClick={onGenerate}
-          disabled={generating || cost === null || (user?.credits ?? 0) < (cost ?? 0)}
+          disabled={submitting || cost === null || (user?.credits ?? 0) < (cost ?? 0)}
           className="btn-primary"
         >
-          {generating ? 'יוצרת...' : isVideo ? 'יצירת וידאו' : 'יצירה'}
+          {submitting ? 'שולחת...' : isVideo ? 'יצירת וידאו' : 'יצירה'}
         </button>
       </div>
     </div>

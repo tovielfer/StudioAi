@@ -17,6 +17,16 @@ interface OpenAIErrorPayload {
   };
 }
 
+class OpenAIProviderError extends Error {
+  constructor(
+    message: string,
+    readonly providerErrorRaw: string,
+  ) {
+    super(message);
+    this.name = 'OpenAIProviderError';
+  }
+}
+
 // OpenAI Standard pricing, USD per 1M tokens.
 // (Batch API is 50% cheaper but is async/offline — not used for live generation.)
 const OPENAI_TOKEN_PRICES: Record<string, TokenPrices> = {
@@ -178,16 +188,23 @@ export class OpenAIProvider extends BaseImageProvider {
     const message = payload?.error?.message;
     const code = payload?.error?.code;
     if (this.isSafetyRejection(message, code)) {
-      const requestId =
-        response.headers.get('x-request-id') ??
-        message?.match(/\breq_[a-zA-Z0-9]+\b/)?.[0];
-      if (requestId) {
-        this.logger.warn(`OpenAI safety rejection request id: ${requestId}`);
-      }
-      throw new Error(this.formatSafetyRejectionError());
+      throw new OpenAIProviderError(
+        this.formatSafetyRejectionCode(message, response),
+        raw,
+      );
     }
 
-    throw new Error(message ? `OpenAI error: ${message}` : `OpenAI error: ${response.statusText}`);
+    if (
+      code === 'invalid_image_file' ||
+      message?.includes('Invalid image file or mode')
+    ) {
+      throw new OpenAIProviderError(this.formatInvalidImageFileCode(message), raw);
+    }
+
+    throw new OpenAIProviderError(
+      message ? `OpenAI error: ${message}` : `OpenAI error: ${response.statusText}`,
+      raw,
+    );
   }
 
   private isSafetyRejection(message?: string, code?: string): boolean {
@@ -197,8 +214,20 @@ export class OpenAIProvider extends BaseImageProvider {
     );
   }
 
-  private formatSafetyRejectionError(): string {
-    return 'OpenAI דחתה את הבקשה בגלל מערכת הבטיחות. נסה לשנות את התיאור או להסיר פרטים שעלולים להיחסם.';
+  private formatSafetyRejectionCode(message: string | undefined, response: Response): string {
+    const requestId =
+      response.headers.get('x-request-id') ??
+      message?.match(/\breq_[a-zA-Z0-9]+\b/)?.[0];
+    return requestId
+      ? `OPENAI_SAFETY_REJECTED ${requestId}`
+      : 'OPENAI_SAFETY_REJECTED';
+  }
+
+  private formatInvalidImageFileCode(message?: string): string {
+    const imageNumber = message?.match(/image\s+(\d+)/i)?.[1];
+    return imageNumber
+      ? `OPENAI_INVALID_REFERENCE_IMAGE_${imageNumber}`
+      : 'OPENAI_INVALID_REFERENCE_IMAGE';
   }
 
   // gpt-image-1 only accepts fixed ~1K sizes. gpt-image-2 accepts higher
