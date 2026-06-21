@@ -267,7 +267,7 @@ export function CreateForm({
         </div>
         <button
           onClick={onGenerate}
-          disabled={submitting || cost === null || (user?.credits ?? 0) < (cost ?? 0)}
+          disabled={prompt.trim().length === 0 || submitting || cost === null || (user?.credits ?? 0) < (cost ?? 0)}
           className="btn-primary"
         >
           {submitting ? 'שולחת...' : isVideo ? 'יצירת וידאו' : 'יצירה'}
