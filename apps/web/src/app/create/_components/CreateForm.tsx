@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ModelOption, User } from '@/lib/api';
 import { AspectRatioIcon, FancySelect } from './FancySelect';
+import { EditIcon, PlusIcon } from './icons';
 
 export type ReferenceImage = {
   id: string;
@@ -69,7 +70,6 @@ export function CreateForm({
   error: string;
 }) {
   const isVideo = selectedModel.type === 'video';
-  const promptRef = useRef<HTMLTextAreaElement | null>(null);
   const [isPromptExpanded, setIsPromptExpanded] = useState(false);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
@@ -77,47 +77,38 @@ export function CreateForm({
     setPortalTarget(document.body);
   }, []);
 
-  useEffect(() => {
-    const field = promptRef.current;
-    if (!field) return;
-
-    field.style.height = 'auto';
-    field.style.height = `${Math.min(field.scrollHeight, 420)}px`;
-  }, [prompt]);
-
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:px-1">
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg px-4 py-3">
           {error}
         </div>
       )}
 
-      <div>
+      <div className="flex flex-col lg:min-h-0 lg:flex-1">
         <div className="mb-1.5 flex items-center justify-between gap-3">
           <label className="block text-sm text-gray-400">תיאור (Prompt)</label>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setIsPromptExpanded((value) => !value)}
-              className="text-xs font-medium text-brand-400 hover:text-brand-300"
-            >
-              עריכה נוחה
-            </button>
-            <span className="text-xs text-gray-500">{prompt.length}/2000</span>
-          </div>
+          <span className="text-xs text-gray-500">{prompt.length}/2000</span>
         </div>
-        <textarea
-          ref={promptRef}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          className="input-field min-h-[180px] max-h-[420px] resize-y overflow-y-auto leading-7 overscroll-contain"
-          placeholder={isVideo ? 'תארו את תנועת הווידאו שברצונכם ליצור...' : 'תארו את התמונה שברצונכם ליצור...'}
-          maxLength={2000}
-        />
-        <p className="mt-1.5 text-xs text-gray-500">
-          לפרומפט ארוך במיוחד אפשר לפתוח עריכה נוחה בחלון גדול.
-        </p>
+        <div className="relative flex-1 lg:min-h-[120px]">
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            className="input-field h-40 w-full resize-none overflow-y-auto leading-7 overscroll-contain pb-9 lg:h-full"
+            placeholder={isVideo ? 'תארו את תנועת הווידאו שברצונכם ליצור...' : 'תארו את התמונה שברצונכם ליצור...'}
+            maxLength={2000}
+          />
+          <button
+            type="button"
+            onClick={() => setIsPromptExpanded(true)}
+            title="עריכה נוחה בחלון גדול"
+            aria-label="עריכה נוחה בחלון גדול"
+            className="absolute bottom-2 left-2 inline-flex items-center gap-1.5 rounded-md bg-surface/80 px-2 py-1 text-xs text-gray-400 backdrop-blur transition-colors hover:text-brand-300"
+          >
+            <EditIcon />
+            עריכה נוחה
+          </button>
+        </div>
       </div>
 
       {isPromptExpanded && portalTarget && createPortal(
@@ -203,55 +194,53 @@ export function CreateForm({
       </div>
 
       {/* Reference drop zone — accepts files from disk AND URLs from gallery */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); if (!isDragOver) setIsDragOver(true); }}
-        onDragLeave={() => setIsDragOver(false)}
-        onDrop={handleReferenceDrop}
-        className={`rounded-lg border-2 border-dashed p-3 transition-colors ${
-          isDragOver ? 'border-brand-500 bg-brand-500/10' : 'border-surface-border'
-        }`}
-      >
-        <label className="block text-sm text-gray-400 mb-1">
-          {isVideo ? 'תמונת התחלה לווידאו' : 'תמונות השראה'} (אופציונלי, עד {MAX_REFERENCES})
+      <div>
+        <label className="mb-1.5 block text-sm text-gray-400">
+          {isVideo ? 'תמונת התחלה' : 'תמונות השראה'}
+          <span className="text-gray-600"> · אופציונלי</span>
         </label>
-        <p className="text-xs text-gray-500 mb-2">
-          {isVideo
-            ? 'אפשר ליצור מטקסט בלבד, או לגרור תמונה כדי להנפיש אותה'
-            : 'גררו תמונה מהמחשב או מהיצירות האחרונות לכאן'}
-        </p>
-        {references.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-3">
-            {references.map((ref, i) => (
-              <div key={ref.id} className="relative group">
-                <img
-                  src={ref.previewUrl}
-                  alt={`תמונת השראה ${i + 1}`}
-                  className="w-20 h-20 object-cover rounded-lg border border-surface-border"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeReference(i)}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs flex items-center justify-center leading-none transition-colors"
-                  aria-label="הסר תמונה"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        {references.length < MAX_REFERENCES && (
-          <>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              multiple
-              onChange={handleReferenceChange}
-              className="input-field file:me-4 file:py-1 file:px-3 file:rounded file:border-0 file:bg-brand-600 file:text-white file:text-sm"
-            />
-            <p className="text-xs text-gray-500 mt-1">כל תמונה עד 7MB</p>
-          </>
-        )}
+        <div
+          onDragOver={(e) => { e.preventDefault(); if (!isDragOver) setIsDragOver(true); }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={handleReferenceDrop}
+          className={`flex flex-wrap items-center gap-2 rounded-lg border border-dashed p-2 transition-colors ${
+            isDragOver ? 'border-brand-500 bg-brand-500/10' : 'border-surface-border'
+          }`}
+        >
+          {references.map((ref, i) => (
+            <div key={ref.id} className="relative group">
+              <img
+                src={ref.previewUrl}
+                alt={`תמונת השראה ${i + 1}`}
+                className="h-16 w-16 rounded-md border border-surface-border object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => removeReference(i)}
+                className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs leading-none text-white transition-colors hover:bg-red-600"
+                aria-label="הסר תמונה"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          {references.length < MAX_REFERENCES && (
+            <label className="flex h-16 w-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-surface-border text-gray-500 transition-colors hover:border-brand-500/60 hover:text-brand-300">
+              <PlusIcon />
+              <span className="text-[11px] leading-none">הוספה</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                multiple
+                onChange={handleReferenceChange}
+                className="hidden"
+              />
+            </label>
+          )}
+          {references.length === 0 && (
+            <span className="px-1 text-xs text-gray-500">גררו תמונה לכאן או לחצו על +</span>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-between pt-2">

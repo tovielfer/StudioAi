@@ -46,7 +46,7 @@ export function RecentCreations({
           עדיין אין יצירות — לחצי על &quot;יצירה&quot; כדי להתחיל
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
           {generations.map((gen) => (
             <GenerationCard
               key={gen.id}

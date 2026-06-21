@@ -306,11 +306,11 @@ export function CreateWorkspace({
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-10">
-      <h1 className="text-3xl font-bold mb-8">{title}</h1>
+    <div className="max-w-[1920px] mx-auto px-6 sm:px-8 py-10 lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:overflow-hidden">
+      <h1 className="text-3xl font-bold mb-8 lg:shrink-0">{title}</h1>
 
-      <div className="grid lg:grid-cols-3 gap-6 items-start">
-        <div className="lg:col-span-1 lg:sticky lg:top-4">
+      <div className="flex flex-col gap-6 lg:min-h-0 lg:flex-1 lg:flex-row lg:items-stretch">
+        <div className="lg:h-full lg:min-h-0 lg:w-[380px] lg:shrink-0">
           <CreateForm
             prompt={prompt}
             setPrompt={setPrompt}
@@ -340,7 +340,7 @@ export function CreateWorkspace({
           />
         </div>
 
-        <div className="lg:col-span-2 space-y-4">
+        <div className="space-y-4 lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pe-1">
           {currentGen && (
             <CurrentGenPreview
               gen={currentGen}
