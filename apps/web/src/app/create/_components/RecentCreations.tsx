@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Generation } from '@/lib/api';
+import { useSendGenerationEmail, EmailToast } from '@/components/SendEmail';
 import { GenerationCard } from './GenerationCard';
 import { GenerationDetailsModal } from './GenerationDetailsModal';
 
@@ -21,6 +22,7 @@ export function RecentCreations({
   type?: 'image' | 'video';
 }) {
   const [selected, setSelected] = useState<Generation | null>(null);
+  const { sendingId, toast, sendEmail } = useSendGenerationEmail();
   const isVideo = type === 'video';
 
   return (
@@ -57,6 +59,8 @@ export function RecentCreations({
               onUseReference={onUseReference}
               onReuse={onReuse}
               onSelect={setSelected}
+              onSendEmail={sendEmail}
+              sendingEmail={sendingId === gen.id}
             />
           ))}
         </div>
@@ -68,8 +72,12 @@ export function RecentCreations({
           onUseReference={onUseReference}
           onReuse={onReuse}
           onClose={() => setSelected(null)}
+          onSendEmail={sendEmail}
+          sendingEmail={sendingId === selected.id}
         />
       )}
+
+      <EmailToast toast={toast} />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
 import { STATUS_LABELS, translateError } from '@/lib/he';
 import { PlusIcon, DownloadIcon, OpenIcon, CloseIcon, RefreshIcon } from './icons';
+import { EnvelopeIcon, SpinnerIcon } from '@/components/SendEmail';
 import { CopyButton } from './CopyButton';
 
 export function GenerationDetailsModal({
@@ -11,11 +12,15 @@ export function GenerationDetailsModal({
   onUseReference,
   onReuse,
   onClose,
+  onSendEmail,
+  sendingEmail,
 }: {
   generation: Generation;
   onUseReference: (url: string) => void;
   onReuse: (gen: Generation) => void;
   onClose: () => void;
+  onSendEmail: (gen: Generation) => void;
+  sendingEmail: boolean;
 }) {
   const hasAsset = Boolean(generation.resultUrl && generation.status === 'done');
   const isVideo = generation.type === 'video';
@@ -128,6 +133,15 @@ export function GenerationDetailsModal({
                   <OpenIcon />
                   פתיחה
                 </a>
+                <button
+                  type="button"
+                  onClick={() => onSendEmail(generation)}
+                  disabled={sendingEmail}
+                  className="btn-secondary inline-flex items-center gap-2 text-sm disabled:opacity-60"
+                >
+                  {sendingEmail ? <SpinnerIcon /> : <EnvelopeIcon />}
+                  {sendingEmail ? 'שולח...' : 'שלח לי במייל'}
+                </button>
                 </>
               )}
             </div>

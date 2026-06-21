@@ -4,6 +4,7 @@ import { Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
 import { STATUS_LABELS, translateError } from '@/lib/he';
 import { Tooltip } from '@/components/Tooltip';
+import { EnvelopeIcon, SpinnerIcon } from '@/components/SendEmail';
 import { InfoIcon, PlusIcon, DownloadIcon, OpenIcon, RefreshIcon } from './icons';
 
 export function GenerationCard({
@@ -12,12 +13,16 @@ export function GenerationCard({
   onUseReference,
   onReuse,
   onSelect,
+  onSendEmail,
+  sendingEmail,
 }: {
   gen: Generation;
   isActive: boolean;
   onUseReference: (url: string) => void;
   onReuse: (gen: Generation) => void;
   onSelect: (gen: Generation) => void;
+  onSendEmail: (gen: Generation) => void;
+  sendingEmail: boolean;
 }) {
   const canUse = Boolean(gen.resultUrl && gen.status === 'done');
   const isProcessing = gen.status === 'pending' || gen.status === 'processing';
@@ -112,6 +117,17 @@ export function GenerationCard({
                 >
                   <OpenIcon />
                 </a>
+              </Tooltip>
+              <Tooltip label="שלח לי במייל">
+                <button
+                  type="button"
+                  onClick={() => onSendEmail(gen)}
+                  disabled={sendingEmail}
+                  className="icon-button h-8 w-8 bg-black/40 disabled:opacity-60"
+                  aria-label="שלח לי במייל"
+                >
+                  {sendingEmail ? <SpinnerIcon /> : <EnvelopeIcon />}
+                </button>
               </Tooltip>
             </div>
           </>

@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Tooltip } from '@/components/Tooltip';
+import {
+  useSendGenerationEmail,
+  EmailToast,
+  EnvelopeIcon,
+  SpinnerIcon,
+} from '@/components/SendEmail';
 import { useAuth } from '@/lib/auth-context';
 import { api, Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
@@ -25,6 +31,7 @@ function HistoryContent() {
   const [total, setTotal] = useState(0);
   const [filter, setFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const { sendingId, toast, sendEmail } = useSendGenerationEmail();
 
   useEffect(() => {
     if (!user) return;
@@ -163,6 +170,17 @@ function HistoryContent() {
                             <OpenIcon />
                           </a>
                         </Tooltip>
+                        <Tooltip label="שלח לי במייל">
+                          <button
+                            type="button"
+                            onClick={() => sendEmail(gen)}
+                            disabled={sendingId === gen.id}
+                            className="icon-button h-8 w-8 bg-black/40 disabled:opacity-60"
+                            aria-label="שלח לי במייל"
+                          >
+                            {sendingId === gen.id ? <SpinnerIcon /> : <EnvelopeIcon />}
+                          </button>
+                        </Tooltip>
                       </div>
                     </>
                   ) : (
@@ -195,8 +213,12 @@ function HistoryContent() {
           editHref={getEditHref(selectedGeneration)}
           formatDateTime={formatDateTime}
           onClose={() => setSelectedGeneration(null)}
+          onSendEmail={sendEmail}
+          sendingEmail={sendingId === selectedGeneration.id}
         />
       )}
+
+      <EmailToast toast={toast} />
     </div>
   );
 }
@@ -206,11 +228,15 @@ function GenerationDetailsModal({
   editHref,
   formatDateTime,
   onClose,
+  onSendEmail,
+  sendingEmail,
 }: {
   generation: Generation;
   editHref: string;
   formatDateTime: (date: string) => string;
   onClose: () => void;
+  onSendEmail: (generation: Generation) => void;
+  sendingEmail: boolean;
 }) {
   const hasAsset = Boolean(generation.resultUrl);
   const isVideo = generation.type === 'video';
@@ -312,6 +338,15 @@ function GenerationDetailsModal({
                   <OpenIcon />
                   פתיחה
                 </a>
+                <button
+                  type="button"
+                  onClick={() => onSendEmail(generation)}
+                  disabled={sendingEmail}
+                  className="btn-secondary inline-flex items-center gap-2 text-sm disabled:opacity-60"
+                >
+                  {sendingEmail ? <SpinnerIcon /> : <EnvelopeIcon />}
+                  {sendingEmail ? 'שולח...' : 'שלח לי במייל'}
+                </button>
               </div>
             )}
           </div>
