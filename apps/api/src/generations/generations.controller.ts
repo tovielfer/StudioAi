@@ -23,9 +23,11 @@ import {
   ImageSize,
   ImageResolution,
   AiProvider,
+  GenerationStatus,
 } from '../common/constants';
 import { AiPricingService } from '../ai/ai-pricing.service';
 import { normalizeAttrs, MODEL_REGISTRY } from '../common/model-capabilities';
+import { MailService } from '../mail/mail.service';
 
 // Google caps inline image uploads at 7MB; keep one consistent limit.
 const MAX_FILE_SIZE = 7 * 1024 * 1024; // 7MB
@@ -36,6 +38,7 @@ export class GenerationsController {
     private readonly generationsService: GenerationsService,
     private readonly storageService: StorageService,
     private readonly pricingService: AiPricingService,
+    private readonly mailService: MailService,
   ) {}
 
   // Public capabilities registry: single source of truth for the create-form
@@ -128,6 +131,28 @@ export class GenerationsController {
       limit: limit ? parseInt(limit, 10) : undefined,
       offset: offset ? parseInt(offset, 10) : undefined,
     });
+  }
+
+  @Post(':id/send-email')
+  @UseGuards(JwtAuthGuard)
+  async sendEmail(
+    @Req() req: { user: { id: string; email: string } },
+    @Param('id') id: string,
+  ) {
+    // findById enforces ownership (throws if the generation belongs to someone
+    // else), so we don't need a separate authorization check here.
+    const generation = await this.generationsService.findById(id, req.user.id);
+
+    if (generation.status !== GenerationStatus.DONE || !generation.resultUrl) {
+      throw new BadRequestException('Generation is not ready to be sent');
+    }
+
+    await this.mailService.sendGenerationImage({
+      to: req.user.email,
+      generation,
+    });
+
+    return { success: true };
   }
 
   @Get(':id')

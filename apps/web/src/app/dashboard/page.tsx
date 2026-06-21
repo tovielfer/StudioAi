@@ -37,6 +37,34 @@ function DashboardContent() {
   const [selectedGeneration, setSelectedGeneration] =
     useState<Generation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  const handleSendEmail = async (generation: Generation) => {
+    if (sendingEmailId) return;
+    setSendingEmailId(generation.id);
+    setToast(null);
+    try {
+      await api.sendGenerationByEmail(generation.id);
+      setToast({ type: 'success', message: 'נשלח למייל שלך' });
+    } catch (err) {
+      setToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'שליחת המייל נכשלה',
+      });
+    } finally {
+      setSendingEmailId(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     if (!user) return;
@@ -194,6 +222,21 @@ function DashboardContent() {
                               <OpenIcon />
                             </a>
                           </Tooltip>
+                          <Tooltip label="שלח לי במייל">
+                            <button
+                              type="button"
+                              onClick={() => handleSendEmail(gen)}
+                              disabled={sendingEmailId === gen.id}
+                              className="icon-button h-8 w-8 bg-black/40 disabled:opacity-60"
+                              aria-label="שלח לי במייל"
+                            >
+                              {sendingEmailId === gen.id ? (
+                                <SpinnerIcon />
+                              ) : (
+                                <EnvelopeIcon />
+                              )}
+                            </button>
+                          </Tooltip>
                         </div>
                       </>
                     ) : (
@@ -224,7 +267,22 @@ function DashboardContent() {
           editHref={getEditHref(selectedGeneration)}
           formatDateTime={formatDateTime}
           onClose={() => setSelectedGeneration(null)}
+          onSendEmail={handleSendEmail}
+          sendingEmail={sendingEmailId === selectedGeneration.id}
         />
+      )}
+
+      {toast && (
+        <div
+          className={`fixed bottom-6 left-1/2 z-[80] -translate-x-1/2 rounded-xl border px-5 py-3 text-sm font-medium shadow-2xl ${
+            toast.type === 'success'
+              ? 'border-green-500/30 bg-green-500/15 text-green-200'
+              : 'border-red-500/30 bg-red-500/15 text-red-200'
+          }`}
+          role="status"
+        >
+          {toast.message}
+        </div>
       )}
     </div>
   );
@@ -235,11 +293,15 @@ function GenerationDetailsModal({
   editHref,
   formatDateTime,
   onClose,
+  onSendEmail,
+  sendingEmail,
 }: {
   generation: Generation;
   editHref: string;
   formatDateTime: (date: string) => string;
   onClose: () => void;
+  onSendEmail: (generation: Generation) => void;
+  sendingEmail: boolean;
 }) {
   const hasAsset = Boolean(generation.resultUrl);
   const isVideo = generation.type === 'video';
@@ -338,6 +400,15 @@ function GenerationDetailsModal({
                   <OpenIcon />
                   פתיחה
                 </a>
+                <button
+                  type="button"
+                  onClick={() => onSendEmail(generation)}
+                  disabled={sendingEmail}
+                  className="btn-secondary inline-flex items-center gap-2 text-sm disabled:opacity-60"
+                >
+                  {sendingEmail ? <SpinnerIcon /> : <EnvelopeIcon />}
+                  {sendingEmail ? 'שולח...' : 'שלח לי במייל'}
+                </button>
               </div>
             )}
           </div>
@@ -439,5 +510,20 @@ function CloseIcon() {
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
     </svg>
+  );
+}
+
+function EnvelopeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </svg>
+  );
+}
+
+function SpinnerIcon() {
+  return (
+    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
   );
 }

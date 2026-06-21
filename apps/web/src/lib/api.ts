@@ -229,6 +229,13 @@ class ApiClient {
     return this.request<Generation>(`/generations/${id}`);
   }
 
+  sendGenerationByEmail(id: string) {
+    return this.request<{ success: boolean }>(
+      `/generations/${id}/send-email`,
+      { method: 'POST' },
+    );
+  }
+
   getUserGenerations(
     userId: string,
     params?: { type?: string; limit?: number; offset?: number },
