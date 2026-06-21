@@ -19,6 +19,7 @@ export const MAX_REFERENCES = 5;
 export function CreateForm({
   prompt,
   setPrompt,
+  onClearPrompt,
   model,
   handleModelChange,
   models,
@@ -45,6 +46,7 @@ export function CreateForm({
 }: {
   prompt: string;
   setPrompt: (v: string) => void;
+  onClearPrompt: () => void;
   model: string;
   handleModelChange: (v: string) => void;
   models: ModelOption[];
@@ -88,7 +90,19 @@ export function CreateForm({
       <div className="flex flex-col lg:min-h-0 lg:flex-1">
         <div className="mb-1.5 flex items-center justify-between gap-3">
           <label className="block text-sm text-gray-400">תיאור (Prompt)</label>
-          <span className="text-xs text-gray-500">{prompt.length}/2000</span>
+          <div className="flex items-center gap-3">
+            {prompt.length > 0 && (
+              <button
+                type="button"
+                onClick={onClearPrompt}
+                className="text-xs text-gray-500 transition-colors hover:text-red-400"
+                title="נקה את הפרומפט"
+              >
+                נקה
+              </button>
+            )}
+            <span className="text-xs text-gray-500">{prompt.length}/2000</span>
+          </div>
         </div>
         <div className="relative flex-1 lg:min-h-[120px]">
           <textarea

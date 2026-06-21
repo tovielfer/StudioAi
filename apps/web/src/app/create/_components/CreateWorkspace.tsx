@@ -7,7 +7,6 @@ import { api, Generation, ModelOption } from '@/lib/api';
 import { translateError } from '@/lib/he';
 
 import { CreateForm, ReferenceImage, MAX_REFERENCES } from './CreateForm';
-import { CurrentGenPreview } from './CurrentGenPreview';
 import { RecentCreations } from './RecentCreations';
 
 type CreateWorkspaceProps = {
@@ -117,6 +116,29 @@ export function CreateWorkspace({
       return prev.filter((_, i) => i !== index);
     });
   };
+
+  const clearReferences = useCallback(() => {
+    objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrlsRef.current = [];
+    setReferences([]);
+  }, []);
+
+  const reuseGeneration = useCallback(
+    (gen: Generation) => {
+      setPrompt(gen.prompt);
+      clearReferences();
+      const urls = (gen.referenceImageUrls ?? []).filter(Boolean).slice(0, MAX_REFERENCES);
+      setReferences(
+        urls.map((url) => ({
+          id: `url-${Date.now()}-${url}`,
+          previewUrl: url,
+          sourceUrl: url,
+        })),
+      );
+      setError('');
+    },
+    [clearReferences],
+  );
 
   const handleReferenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -284,7 +306,6 @@ export function CreateWorkspace({
 
       setCurrentGen(gen);
       setRecentGenerations((prev) => [gen, ...prev.filter((g) => g.id !== gen.id)]);
-      setPrompt('');
       objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       objectUrlsRef.current = [];
       setReferences([]);
@@ -314,6 +335,7 @@ export function CreateWorkspace({
           <CreateForm
             prompt={prompt}
             setPrompt={setPrompt}
+            onClearPrompt={() => setPrompt('')}
             model={model}
             handleModelChange={handleModelChange}
             models={models}
@@ -341,18 +363,12 @@ export function CreateWorkspace({
         </div>
 
         <div className="space-y-4 lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pe-1">
-          {currentGen && (
-            <CurrentGenPreview
-              gen={currentGen}
-              onUseReference={addReferenceUrl}
-              onDismiss={() => setCurrentGen(null)}
-            />
-          )}
           <RecentCreations
             generations={recentGenerations}
             loading={recentLoading}
             activeGenId={currentGen?.id ?? null}
             onUseReference={addReferenceUrl}
+            onReuse={reuseGeneration}
             type={generationType}
           />
         </div>

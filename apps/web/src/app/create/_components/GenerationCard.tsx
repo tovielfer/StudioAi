@@ -3,17 +3,20 @@
 import { Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
 import { STATUS_LABELS, translateError } from '@/lib/he';
-import { InfoIcon, PlusIcon, DownloadIcon, OpenIcon } from './icons';
+import { Tooltip } from '@/components/Tooltip';
+import { InfoIcon, PlusIcon, DownloadIcon, OpenIcon, RefreshIcon } from './icons';
 
 export function GenerationCard({
   gen,
   isActive,
   onUseReference,
+  onReuse,
   onSelect,
 }: {
   gen: Generation;
   isActive: boolean;
   onUseReference: (url: string) => void;
+  onReuse: (gen: Generation) => void;
   onSelect: (gen: Generation) => void;
 }) {
   const canUse = Boolean(gen.resultUrl && gen.status === 'done');
@@ -56,46 +59,60 @@ export function GenerationCard({
                 />
               )}
             </button>
-            <div className="absolute left-2 top-2 flex gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
-              <button
-                type="button"
-                onClick={() => onSelect(gen)}
-                className="icon-button h-8 w-8 bg-black/40"
-                aria-label="פרטים"
-                title="פרטים"
-              >
-                <InfoIcon />
-              </button>
-              {!isVideo && (
+            <div className="absolute left-2 top-2 flex flex-wrap gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
+              <Tooltip label="פרטים">
                 <button
                   type="button"
-                  onClick={() => onUseReference(gen.resultUrl!)}
-                  className="icon-button h-8 w-8 bg-brand-600 text-white hover:bg-brand-500"
-                  aria-label="הוסף כתמונת השראה"
-                  title="הוסף כרפרנס"
+                  onClick={() => onSelect(gen)}
+                  className="icon-button h-8 w-8 bg-black/40"
+                  aria-label="פרטים"
                 >
-                  <PlusIcon />
+                  <InfoIcon />
                 </button>
+              </Tooltip>
+              <Tooltip label="צור מחדש">
+                <button
+                  type="button"
+                  onClick={() => onReuse(gen)}
+                  className="icon-button h-8 w-8 bg-black/40"
+                  aria-label="צור מחדש"
+                >
+                  <RefreshIcon />
+                </button>
+              </Tooltip>
+              {!isVideo && (
+                <Tooltip label="הוסף כרפרנס">
+                  <button
+                    type="button"
+                    onClick={() => onUseReference(gen.resultUrl!)}
+                    className="icon-button h-8 w-8 bg-brand-600 text-white hover:bg-brand-500"
+                    aria-label="הוסף כתמונת השראה"
+                  >
+                    <PlusIcon />
+                  </button>
+                </Tooltip>
               )}
-              <button
-                type="button"
-                onClick={() => downloadImage(gen.resultUrl!, `generation-${gen.id}.${isVideo ? 'mp4' : 'png'}`)}
-                className="icon-button h-8 w-8 bg-black/40"
-                aria-label="הורדה"
-                title="הורדה"
-              >
-                <DownloadIcon />
-              </button>
-              <a
-                href={gen.resultUrl!}
-                target="_blank"
-                rel="noreferrer"
-                className="icon-button h-8 w-8 bg-black/40"
-                aria-label="פתיחה בטאב חדש"
-                title="פתיחה"
-              >
-                <OpenIcon />
-              </a>
+              <Tooltip label="הורדה">
+                <button
+                  type="button"
+                  onClick={() => downloadImage(gen.resultUrl!, `generation-${gen.id}.${isVideo ? 'mp4' : 'png'}`)}
+                  className="icon-button h-8 w-8 bg-black/40"
+                  aria-label="הורדה"
+                >
+                  <DownloadIcon />
+                </button>
+              </Tooltip>
+              <Tooltip label="פתיחה">
+                <a
+                  href={gen.resultUrl!}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="icon-button h-8 w-8 bg-black/40"
+                  aria-label="פתיחה בטאב חדש"
+                >
+                  <OpenIcon />
+                </a>
+              </Tooltip>
             </div>
           </>
         ) : isProcessing ? (

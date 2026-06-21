@@ -10,12 +10,14 @@ export function RecentCreations({
   loading,
   activeGenId,
   onUseReference,
+  onReuse,
   type = 'image',
 }: {
   generations: Generation[];
   loading: boolean;
   activeGenId: string | null;
   onUseReference: (url: string) => void;
+  onReuse: (gen: Generation) => void;
   type?: 'image' | 'video';
 }) {
   const [selected, setSelected] = useState<Generation | null>(null);
@@ -53,6 +55,7 @@ export function RecentCreations({
               gen={gen}
               isActive={gen.id === activeGenId}
               onUseReference={onUseReference}
+              onReuse={onReuse}
               onSelect={setSelected}
             />
           ))}
@@ -63,6 +66,7 @@ export function RecentCreations({
         <GenerationDetailsModal
           generation={selected}
           onUseReference={onUseReference}
+          onReuse={onReuse}
           onClose={() => setSelected(null)}
         />
       )}

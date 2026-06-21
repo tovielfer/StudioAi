@@ -3,15 +3,18 @@
 import { Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
 import { STATUS_LABELS, translateError } from '@/lib/he';
-import { PlusIcon, DownloadIcon, OpenIcon, CloseIcon } from './icons';
+import { PlusIcon, DownloadIcon, OpenIcon, CloseIcon, RefreshIcon } from './icons';
+import { CopyButton } from './CopyButton';
 
 export function GenerationDetailsModal({
   generation,
   onUseReference,
+  onReuse,
   onClose,
 }: {
   generation: Generation;
   onUseReference: (url: string) => void;
+  onReuse: (gen: Generation) => void;
   onClose: () => void;
 }) {
   const hasAsset = Boolean(generation.resultUrl && generation.status === 'done');
@@ -81,13 +84,23 @@ export function GenerationDetailsModal({
                 </span>
               )}
             </div>
-            {hasAsset && (
-              <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => { onReuse(generation); onClose(); }}
+                className="btn-primary inline-flex items-center gap-2 text-sm"
+                title="העתקת הפרומפט והרפרנסים לטופס לעריכה ויצירה מחדש"
+              >
+                <RefreshIcon />
+                צור מחדש
+              </button>
+              {hasAsset && (
+                <>
                 {!isVideo && (
                   <button
                     type="button"
                     onClick={() => { onUseReference(generation.resultUrl!); onClose(); }}
-                    className="btn-primary inline-flex items-center gap-2 text-sm"
+                    className="btn-secondary inline-flex items-center gap-2 text-sm"
                   >
                     <PlusIcon />
                     הוסף כתמונת השראה
@@ -115,13 +128,20 @@ export function GenerationDetailsModal({
                   <OpenIcon />
                   פתיחה
                 </a>
-              </div>
-            )}
+                </>
+              )}
+            </div>
           </div>
 
           <div className="space-y-5">
             <section>
-              <h3 className="font-semibold mb-2">Prompt</h3>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <h3 className="font-semibold">Prompt</h3>
+                <CopyButton
+                  text={generation.prompt}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border px-2.5 py-1 text-xs text-gray-300 transition-colors hover:bg-surface"
+                />
+              </div>
               <p className="rounded-lg bg-surface p-3 text-sm leading-6 text-gray-200 whitespace-pre-wrap">
                 {generation.prompt}
               </p>

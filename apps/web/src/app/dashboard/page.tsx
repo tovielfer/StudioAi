@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AuthGuard } from '@/components/AuthGuard';
+import { Tooltip } from '@/components/Tooltip';
 import { useAuth } from '@/lib/auth-context';
 import { api, Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
@@ -146,48 +147,52 @@ function DashboardContent() {
                             />
                           )}
                         </button>
-                        <div className="absolute left-2 top-2 flex gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedGeneration(gen)}
-                            className="icon-button h-8 w-8 bg-black/40"
-                            aria-label="פרטים"
-                            title="פרטים"
-                          >
-                            <InfoIcon />
-                          </button>
-                          <Link
-                            href={getEditHref(gen)}
-                            className="icon-button h-8 w-8 bg-brand-600 text-white hover:bg-brand-500"
-                            aria-label="עריכה"
-                            title="עריכה"
-                          >
-                            <EditIcon />
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              downloadImage(
-                                gen.resultUrl!,
-                                `generation-${gen.id}.${gen.type === 'video' ? 'mp4' : 'png'}`,
-                              )
-                            }
-                            className="icon-button h-8 w-8 bg-black/40"
-                            aria-label="הורדה"
-                            title="הורדה"
-                          >
-                            <DownloadIcon />
-                          </button>
-                          <a
-                            href={gen.resultUrl!}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="icon-button h-8 w-8 bg-black/40"
-                            aria-label="פתיחה בטאב חדש"
-                            title="פתיחה"
-                          >
-                            <OpenIcon />
-                          </a>
+                        <div className="absolute left-2 top-2 flex flex-wrap gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
+                          <Tooltip label="פרטים">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedGeneration(gen)}
+                              className="icon-button h-8 w-8 bg-black/40"
+                              aria-label="פרטים"
+                            >
+                              <InfoIcon />
+                            </button>
+                          </Tooltip>
+                          <Tooltip label="עריכה">
+                            <Link
+                              href={getEditHref(gen)}
+                              className="icon-button h-8 w-8 bg-brand-600 text-white hover:bg-brand-500"
+                              aria-label="עריכה"
+                            >
+                              <EditIcon />
+                            </Link>
+                          </Tooltip>
+                          <Tooltip label="הורדה">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                downloadImage(
+                                  gen.resultUrl!,
+                                  `generation-${gen.id}.${gen.type === 'video' ? 'mp4' : 'png'}`,
+                                )
+                              }
+                              className="icon-button h-8 w-8 bg-black/40"
+                              aria-label="הורדה"
+                            >
+                              <DownloadIcon />
+                            </button>
+                          </Tooltip>
+                          <Tooltip label="פתיחה">
+                            <a
+                              href={gen.resultUrl!}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="icon-button h-8 w-8 bg-black/40"
+                              aria-label="פתיחה בטאב חדש"
+                            >
+                              <OpenIcon />
+                            </a>
+                          </Tooltip>
                         </div>
                       </>
                     ) : (
