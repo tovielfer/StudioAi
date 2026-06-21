@@ -45,7 +45,8 @@ function DashboardContent() {
       .getUserGenerations(user.id, { limit: 6 })
       .then((res) => setRecent(res.items))
       .finally(() => setLoading(false));
-  }, [user, refreshCredits]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const getEditHref = (generation: Generation) => {
     const params = new URLSearchParams({ prompt: generation.prompt });

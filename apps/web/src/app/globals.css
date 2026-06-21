@@ -73,6 +73,35 @@ body {
   }
 }
 
+@keyframes auth-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-card-in {
+  animation: auth-card-in 0.25s ease-out;
+}
+
+@layer components {
+  .auth-tab {
+    @apply flex-1 text-center text-sm font-medium py-2 rounded-md transition-colors;
+  }
+
+  .auth-tab-active {
+    @apply bg-brand-600 text-white;
+  }
+
+  .auth-tab-inactive {
+    @apply text-gray-400 hover:text-white;
+  }
+}
+
 @keyframes fancy-select-in {
   from {
     opacity: 0;

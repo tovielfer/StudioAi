@@ -56,12 +56,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshCredits = useCallback(async () => {
-    if (!user) return;
     const { credits } = await api.getCredits();
-    const updated = { ...user, credits };
-    setUser(updated);
-    localStorage.setItem('user', JSON.stringify(updated));
-  }, [user]);
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, credits };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   return (
     <AuthContext.Provider
