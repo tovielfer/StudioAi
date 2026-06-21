@@ -156,60 +156,56 @@ function AdminFeedbackContent() {
               {feedback.map((item) => (
                 <article
                   key={item.id}
-                  className={`rounded-xl border bg-white p-5 ${
+                  className={`overflow-hidden rounded-2xl border bg-white ${
                     item.adminRead === false
                       ? 'border-red-300 ring-1 ring-red-200'
                       : 'border-gray-200'
                   }`}
                 >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {item.adminRead === false && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500 px-3 py-1 text-xs font-semibold text-white">
-                            <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                            חדש
-                          </span>
-                        )}
-                        <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-                          {FEEDBACK_TYPE_LABELS[item.type] ?? item.type}
-                        </span>
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                          {FEEDBACK_STATUS_LABELS[item.status] ?? item.status}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {formatDate(item.createdAt)}
-                        </span>
-                      </div>
-                      <h3 className="mt-3 text-lg font-semibold text-gray-950">
+                  <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/60 px-5 py-3">
+                    {item.adminRead === false && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-500 px-2.5 py-0.5 text-xs font-semibold text-white">
+                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                        חדש
+                      </span>
+                    )}
+                    <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700">
+                      {FEEDBACK_TYPE_LABELS[item.type] ?? item.type}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                      {FEEDBACK_STATUS_LABELS[item.status] ?? item.status}
+                    </span>
+                    <span className="font-medium text-xs text-gray-600">
+                      {item.userEmail ?? 'משתמש לא ידוע'}
+                    </span>
+                    <span className="ms-auto text-xs text-gray-400">
+                      {formatDate(item.createdAt)}
+                    </span>
+                  </div>
+
+                  <div className="px-5 py-4">
+                    {item.title && (
+                      <h3 className="mb-1.5 font-semibold text-gray-950">
                         {item.title}
                       </h3>
-                    </div>
-                    <p className="text-sm text-gray-500">
-                      {item.userEmail ?? 'משתמש לא ידוע'}
+                    )}
+                    <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700">
+                      {item.message}
                     </p>
                   </div>
-                  <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-gray-700">
-                    {item.message}
-                  </p>
 
-                  <div className="mt-5 grid gap-3 md:grid-cols-[180px_1fr_auto] md:items-start">
-                    <select
-                      value={draftStatuses[item.id] ?? item.status}
-                      onChange={(e) =>
-                        setDraftStatuses((current) => ({
-                          ...current,
-                          [item.id]: e.target.value as FeedbackStatus,
-                        }))
-                      }
-                      className="admin-field"
-                    >
-                      {FEEDBACK_STATUSES.map((status) => (
-                        <option key={status} value={status}>
-                          {FEEDBACK_STATUS_LABELS[status]}
-                        </option>
-                      ))}
-                    </select>
+                  {item.adminReply && (
+                    <div className="border-s-2 border-green-500 bg-green-50/60 px-5 py-3">
+                      <p className="text-xs font-semibold text-green-700">
+                        התשובה ששמורה כעת
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-green-900">
+                        {item.adminReply}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="border-t border-gray-100 bg-gray-50/40 px-5 py-4">
                     <textarea
                       value={draftReplies[item.id] ?? ''}
                       onChange={(e) =>
@@ -218,29 +214,43 @@ function AdminFeedbackContent() {
                           [item.id]: e.target.value,
                         }))
                       }
-                      className="admin-field min-h-24 resize-y"
-                      placeholder="כתיבת תשובה שתוצג למשתמשת"
+                      className="admin-field min-h-20 resize-y"
+                      placeholder={
+                        item.adminReply
+                          ? 'עדכון התשובה...'
+                          : 'כתיבת תשובה שתוצג למשתמש...'
+                      }
                     />
-                    <button
-                      type="button"
-                      onClick={() => saveFeedback(item)}
-                      disabled={savingId === item.id}
-                      className="btn-primary whitespace-nowrap disabled:opacity-50"
-                    >
-                      {savingId === item.id ? 'שומר...' : 'שמירת תשובה'}
-                    </button>
-                  </div>
-
-                  {item.adminReply && (
-                    <div className="mt-4 rounded-xl border border-green-100 bg-green-50 p-4">
-                      <p className="text-sm font-semibold text-green-800">
-                        תשובה שמורה
-                      </p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-green-900">
-                        {item.adminReply}
-                      </p>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                      <label className="flex items-center gap-2 text-sm text-gray-500">
+                        סטטוס:
+                        <select
+                          value={draftStatuses[item.id] ?? item.status}
+                          onChange={(e) =>
+                            setDraftStatuses((current) => ({
+                              ...current,
+                              [item.id]: e.target.value as FeedbackStatus,
+                            }))
+                          }
+                          className="admin-field !w-auto !py-1.5"
+                        >
+                          {FEEDBACK_STATUSES.map((status) => (
+                            <option key={status} value={status}>
+                              {FEEDBACK_STATUS_LABELS[status]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => saveFeedback(item)}
+                        disabled={savingId === item.id}
+                        className="btn-primary whitespace-nowrap disabled:opacity-50"
+                      >
+                        {savingId === item.id ? 'שומר...' : 'שליחת תשובה'}
+                      </button>
                     </div>
-                  )}
+                  </div>
                 </article>
               ))}
             </div>

@@ -22,26 +22,22 @@ export function FeedbackWidget() {
 
       {open && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 px-4 py-6 backdrop-blur-sm md:items-center">
-          <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-surface-border bg-surface-card shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-surface-border px-5 py-4">
-              <div>
-                <h2 className="mt-1 text-xl font-bold text-white">
-                  שליחת פניה מהירה
-                </h2>
-                <p className="mt-1 text-sm text-gray-400">
-                  אפשר לשלוח רעיון, הערה, הארה או קיצור שחסר לך .
-                </p>
-              </div>
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-surface-border bg-surface-card shadow-2xl">
+            <div className="flex items-center justify-between gap-4 border-b border-surface-border px-5 py-3.5">
+              <h2 className="text-base font-semibold text-white">
+                שליחת הודעה מהירה
+              </h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-full border border-surface-border px-3 py-1 text-sm text-gray-300 hover:bg-surface"
+                aria-label="סגירה"
+                className="rounded-full px-2 text-lg text-gray-400 hover:text-gray-200"
               >
-                סגירה
+                ✕
               </button>
             </div>
 
-            <div className="max-h-[75vh] overflow-y-auto px-5 py-5">
+            <div className="max-h-[75vh] overflow-y-auto px-5 py-4">
               <FeedbackForm />
             </div>
           </div>

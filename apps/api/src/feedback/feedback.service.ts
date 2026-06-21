@@ -19,7 +19,7 @@ export class FeedbackService {
     const submission = this.feedbackRepo.create({
       userId,
       type: dto.type,
-      title: dto.title.trim(),
+      title: dto.title?.trim() ?? '',
       message: dto.message.trim(),
     });
 

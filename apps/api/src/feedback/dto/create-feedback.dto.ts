@@ -1,14 +1,20 @@
-import { IsEnum, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { FeedbackType } from '../feedback-submission.entity';
 
 export class CreateFeedbackDto {
   @IsEnum(FeedbackType)
   type: FeedbackType;
 
+  @IsOptional()
   @IsString()
-  @MinLength(2)
   @MaxLength(120)
-  title: string;
+  title?: string;
 
   @IsString()
   @MinLength(3)

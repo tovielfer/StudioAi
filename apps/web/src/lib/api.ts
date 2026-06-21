@@ -382,7 +382,7 @@ class ApiClient {
 
   createFeedback(data: {
     type: FeedbackType;
-    title: string;
+    title?: string;
     message: string;
   }) {
     return this.request<FeedbackSubmission>('/feedback', {
