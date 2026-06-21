@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
+import { Resend } from 'resend';
 import { Generation } from '../generations/generation.entity';
 
 // Maps a response content-type to a file extension for the attachment name.
@@ -19,30 +18,30 @@ const CONTENT_TYPE_EXT: Record<string, string> = {
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private transporter: Transporter | null = null;
+  private resend: Resend | null = null;
   private mailFrom: string | null = null;
 
   constructor(private readonly config: ConfigService) {}
 
-  // Lazily build the transporter so the app still boots when SMTP is not
+  // Lazily build the Resend client so the app still boots when mail is not
   // configured; the error only surfaces when someone actually sends a mail.
-  private getTransporter(): { transporter: Transporter; from: string } {
-    if (this.transporter && this.mailFrom) {
-      return { transporter: this.transporter, from: this.mailFrom };
+  // We send over Resend's HTTP API (port 443) instead of SMTP, because most
+  // cloud hosts (Railway, Render, Fly, etc.) block/throttle outbound SMTP
+  // ports (25/465/587), which makes SMTP sends hang for a long time.
+  private getClient(): { resend: Resend; from: string } {
+    if (this.resend && this.mailFrom) {
+      return { resend: this.resend, from: this.mailFrom };
     }
 
-    const host = this.config.get<string>('SMTP_HOST');
-    const port = this.config.get<string>('SMTP_PORT');
-    const secure = this.config.get<string>('SMTP_SECURE');
-    const user = this.config.get<string>('SMTP_USER');
-    const pass = this.config.get<string>('SMTP_PASS');
+    // Prefer RESEND_API_KEY, but fall back to the legacy SMTP_PASS, which on
+    // Resend was already the API key (user "resend" / pass "re_...").
+    const apiKey =
+      this.config.get<string>('RESEND_API_KEY') ??
+      this.config.get<string>('SMTP_PASS');
     const from = this.config.get<string>('MAIL_FROM');
 
     const missing = Object.entries({
-      SMTP_HOST: host,
-      SMTP_PORT: port,
-      SMTP_USER: user,
-      SMTP_PASS: pass,
+      RESEND_API_KEY: apiKey,
       MAIL_FROM: from,
     })
       .filter(([, value]) => !value)
@@ -54,15 +53,10 @@ export class MailService {
       throw new Error(message);
     }
 
-    this.transporter = nodemailer.createTransport({
-      host,
-      port: Number(port),
-      secure: secure === 'true',
-      auth: { user, pass },
-    });
+    this.resend = new Resend(apiKey as string);
     this.mailFrom = from as string;
 
-    return { transporter: this.transporter, from: this.mailFrom };
+    return { resend: this.resend, from: this.mailFrom };
   }
 
   async sendGenerationImage({
@@ -72,7 +66,7 @@ export class MailService {
     to: string;
     generation: Generation;
   }): Promise<void> {
-    const { transporter, from } = this.getTransporter();
+    const { resend, from } = this.getClient();
 
     if (!generation.resultUrl) {
       throw new Error('Generation has no result URL to attach');
@@ -107,7 +101,7 @@ export class MailService {
 
     const text = `${assetLabel} שלך מוכן/ה!\n\nצירפנו את ${assetLabel} למייל הזה כקובץ.\n\nתיאור: ${generation.prompt}\n\nתודה שהשתמשת בשירות שלנו.`;
 
-    await transporter.sendMail({
+    const { error } = await resend.emails.send({
       from,
       to,
       subject,
@@ -121,6 +115,10 @@ export class MailService {
         },
       ],
     });
+
+    if (error) {
+      throw new Error(`Failed to send email: ${error.message}`);
+    }
 
     this.logger.log(`Sent generation ${generation.id} to ${to}`);
   }
