@@ -54,9 +54,16 @@ export class MailService {
     }
 
     this.resend = new Resend(apiKey as string);
-    this.mailFrom = from as string;
+    // Some hosting platforms don't strip surrounding quotes from env vars, so a
+    // value like `"My App <noreply@example.com>"` reaches us with the quotes
+    // intact, which Resend rejects as an invalid `from`. Normalize it here.
+    this.mailFrom = this.sanitizeFrom(from as string);
 
     return { resend: this.resend, from: this.mailFrom };
+  }
+
+  private sanitizeFrom(value: string): string {
+    return value.trim().replace(/^["']+|["']+$/g, '').trim();
   }
 
   async sendGenerationImage({

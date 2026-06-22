@@ -87,7 +87,7 @@ export function CreateForm({
         </div>
       )}
 
-      <div className="flex flex-col lg:min-h-0 lg:flex-1">
+      <div className="flex flex-col lg:flex-1 lg:min-h-[180px]">
         <div className="mb-1.5 flex items-center justify-between gap-3">
           <label className="block text-sm text-gray-400">תיאור (Prompt)</label>
           <div className="flex items-center gap-3">
@@ -156,7 +156,7 @@ export function CreateForm({
         portalTarget,
       )}
 
-      <div>
+      <div className="lg:shrink-0">
         <label className="block text-sm text-gray-400 mb-1.5">מודל</label>
         <FancySelect
           value={model}
@@ -165,7 +165,7 @@ export function CreateForm({
         />
       </div>
 
-      <div className="flex flex-nowrap gap-3">
+      <div className="flex flex-nowrap gap-3 lg:shrink-0">
         {selectedModel.sizes.length > 1 && (
           <div className="flex-1 min-w-0">
             <label className="block text-sm text-gray-400 mb-1.5">יחס</label>
@@ -208,7 +208,7 @@ export function CreateForm({
       </div>
 
       {/* Reference drop zone — accepts files from disk AND URLs from gallery */}
-      <div>
+      <div className="lg:shrink-0">
         <label className="mb-1.5 block text-sm text-gray-400">
           {isVideo ? 'תמונת התחלה' : 'תמונות השראה'}
           <span className="text-gray-600"> · אופציונלי</span>
@@ -257,7 +257,7 @@ export function CreateForm({
         </div>
       </div>
 
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex items-center justify-between pt-2 lg:shrink-0">
         <div className="text-sm text-gray-400">
           עלות:{' '}
           <span className="text-brand-400 font-medium">
