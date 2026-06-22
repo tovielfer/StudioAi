@@ -20,6 +20,7 @@ export class MailService {
   private readonly logger = new Logger(MailService.name);
   private resend: Resend | null = null;
   private mailFrom: string | null = null;
+  private mailReplyTo: string | null = null;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -28,9 +29,17 @@ export class MailService {
   // We send over Resend's HTTP API (port 443) instead of SMTP, because most
   // cloud hosts (Railway, Render, Fly, etc.) block/throttle outbound SMTP
   // ports (25/465/587), which makes SMTP sends hang for a long time.
-  private getClient(): { resend: Resend; from: string } {
+  private getClient(): {
+    resend: Resend;
+    from: string;
+    replyTo: string | null;
+  } {
     if (this.resend && this.mailFrom) {
-      return { resend: this.resend, from: this.mailFrom };
+      return {
+        resend: this.resend,
+        from: this.mailFrom,
+        replyTo: this.mailReplyTo,
+      };
     }
 
     // Prefer RESEND_API_KEY, but fall back to the legacy SMTP_PASS, which on
@@ -59,7 +68,16 @@ export class MailService {
     // intact, which Resend rejects as an invalid `from`. Normalize it here.
     this.mailFrom = this.sanitizeFrom(from as string);
 
-    return { resend: this.resend, from: this.mailFrom };
+    // Optional: where user replies should go. When unset, replies go to the
+    // `from` address (e.g. a noreply inbox nobody reads).
+    const replyTo = this.config.get<string>('MAIL_REPLY_TO');
+    this.mailReplyTo = replyTo ? this.sanitizeFrom(replyTo) : null;
+
+    return {
+      resend: this.resend,
+      from: this.mailFrom,
+      replyTo: this.mailReplyTo,
+    };
   }
 
   private sanitizeFrom(value: string): string {
@@ -73,7 +91,7 @@ export class MailService {
     to: string;
     generation: Generation;
   }): Promise<void> {
-    const { resend, from } = this.getClient();
+    const { resend, from, replyTo } = this.getClient();
 
     if (!generation.resultUrl) {
       throw new Error('Generation has no result URL to attach');
@@ -111,6 +129,7 @@ export class MailService {
     const { error } = await resend.emails.send({
       from,
       to,
+      ...(replyTo ? { replyTo } : {}),
       subject,
       text,
       html,
