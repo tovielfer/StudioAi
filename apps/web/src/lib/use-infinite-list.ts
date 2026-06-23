@@ -34,6 +34,12 @@ export function useInfiniteList<T>(
   const offsetRef = useRef(0);
   const busyRef = useRef(false);
   const doneRef = useRef(false);
+  // Mirrors `items` so reset/loadMore can decide whether to show a loading
+  // state without depending on `items` (which would change their identity).
+  const itemsRef = useRef<T[]>([]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
   // Bumped on every reset so in-flight responses from a previous filter are
   // ignored instead of being appended to the new list.
   const epochRef = useRef(0);
@@ -44,8 +50,12 @@ export function useInfiniteList<T>(
     busyRef.current = true;
     const epoch = epochRef.current;
     const isFirst = offsetRef.current === 0;
-    if (isFirst) setLoading(true);
-    else setLoadingMore(true);
+    // Only show the blocking loading state when there is nothing on screen yet.
+    // On a reload (filters change / explicit reload) we keep the previous items
+    // visible until the new first page arrives, avoiding a flicker.
+    if (isFirst) {
+      if (itemsRef.current.length === 0) setLoading(true);
+    } else setLoadingMore(true);
 
     try {
       const res = await fetchPage({ limit: pageSize, offset: offsetRef.current });
@@ -76,7 +86,8 @@ export function useInfiniteList<T>(
     doneRef.current = false;
     busyRef.current = false;
     setHasMore(true);
-    setLoading(true);
+    // loadMore decides whether to flip `loading` (only when the list is empty),
+    // so a reload with existing items swaps content in place without a flicker.
     void loadMore();
   }, [loadMore]);
 

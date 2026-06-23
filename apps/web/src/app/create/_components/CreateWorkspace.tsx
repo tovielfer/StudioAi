@@ -58,16 +58,19 @@ export function CreateWorkspace({
     return () => mq.removeEventListener('change', update);
   }, []);
 
+  // Depend on the user id (not the whole user object) so that refreshing
+  // credits — which replaces the user object — does not reset the list.
+  const userId = user?.id;
   const fetchRecent = useCallback(
     ({ limit, offset }: { limit: number; offset: number }) =>
-      user
-        ? api.getUserGenerations(user.id, {
+      userId
+        ? api.getUserGenerations(userId, {
             type: generationType,
             limit,
             offset,
           })
         : Promise.resolve({ items: [] as Generation[], total: 0 }),
-    [user, generationType],
+    [userId, generationType],
   );
 
   const {
