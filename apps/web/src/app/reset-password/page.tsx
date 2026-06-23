@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -48,6 +48,96 @@ export default function ResetPasswordPage() {
   };
 
   return (
+    <div className="card auth-card-in">
+      <h1 className="text-2xl font-bold mb-2">איפוס סיסמה</h1>
+      <p className="text-gray-400 text-sm mb-6">הזן סיסמה חדשה לחשבון שלך</p>
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg px-4 py-3 mb-4">
+          {error}
+        </div>
+      )}
+
+      {success ? (
+        <div className="bg-green-500/10 border border-green-500/30 text-green-400 text-sm rounded-lg px-4 py-4 text-center">
+          <div className="text-base font-semibold mb-1">הסיסמה עודכנה! ✅</div>
+          <div>מעבירים אותך לדף ההתחברות...</div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">
+              סיסמה חדשה
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="input-field pl-10"
+                required
+                minLength={6}
+                dir="ltr"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'הסתר סיסמה' : 'הצג סיסמה'}
+                className="absolute inset-y-0 left-0 flex items-center px-3 text-gray-200 hover:text-white"
+              >
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1.5">לפחות 6 תווים</p>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1.5">
+              אימות סיסמה
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="input-field pl-10"
+                required
+                minLength={6}
+                dir="ltr"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'הסתר סיסמה' : 'הצג סיסמה'}
+                className="absolute inset-y-0 left-0 flex items-center px-3 text-gray-200 hover:text-white"
+              >
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn-primary w-full"
+          >
+            {loading ? 'מעדכן...' : 'עדכן סיסמה'}
+          </button>
+        </form>
+      )}
+
+      <div className="mt-6 text-center">
+        <Link
+          href="/login"
+          className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
+        >
+          ← חזרה להתחברות
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
     <div className="max-w-md mx-auto px-4 py-16">
       <div className="flex flex-col items-center mb-10">
         <Image
@@ -64,91 +154,16 @@ export default function ResetPasswordPage() {
         <p className="text-gray-500 text-sm mt-1">צור תמונות מרהיבות בעזרת AI</p>
       </div>
 
-      <div className="card auth-card-in">
-        <h1 className="text-2xl font-bold mb-2">איפוס סיסמה</h1>
-        <p className="text-gray-400 text-sm mb-6">הזן סיסמה חדשה לחשבון שלך</p>
-
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg px-4 py-3 mb-4">
-            {error}
+      <Suspense
+        fallback={
+          <div className="card auth-card-in">
+            <div className="w-10 h-10 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-400 text-center">טוען...</p>
           </div>
-        )}
-
-        {success ? (
-          <div className="bg-green-500/10 border border-green-500/30 text-green-400 text-sm rounded-lg px-4 py-4 text-center">
-            <div className="text-base font-semibold mb-1">הסיסמה עודכנה! ✅</div>
-            <div>מעבירים אותך לדף ההתחברות...</div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">
-                סיסמה חדשה
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input-field pl-10"
-                  required
-                  minLength={6}
-                  dir="ltr"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? 'הסתר סיסמה' : 'הצג סיסמה'}
-                  className="absolute inset-y-0 left-0 flex items-center px-3 text-gray-200 hover:text-white"
-                >
-                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 mt-1.5">לפחות 6 תווים</p>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">
-                אימות סיסמה
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="input-field pl-10"
-                  required
-                  minLength={6}
-                  dir="ltr"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? 'הסתר סיסמה' : 'הצג סיסמה'}
-                  className="absolute inset-y-0 left-0 flex items-center px-3 text-gray-200 hover:text-white"
-                >
-                  {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full"
-            >
-              {loading ? 'מעדכן...' : 'עדכן סיסמה'}
-            </button>
-          </form>
-        )}
-
-        <div className="mt-6 text-center">
-          <Link
-            href="/login"
-            className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
-          >
-            ← חזרה להתחברות
-          </Link>
-        </div>
-      </div>
+        }
+      >
+        <ResetPasswordContent />
+      </Suspense>
     </div>
   );
 }
