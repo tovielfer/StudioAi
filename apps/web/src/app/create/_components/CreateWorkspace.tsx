@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { api, Generation, ModelOption } from '@/lib/api';
+import { useInfiniteList } from '@/lib/use-infinite-list';
 import { translateError } from '@/lib/he';
 
 import { CreateForm, ReferenceImage, MAX_REFERENCES } from './CreateForm';
@@ -42,9 +43,49 @@ export function CreateWorkspace({
   const [cost, setCost] = useState<number | null>(null);
   const [costLoading, setCostLoading] = useState(false);
   const [costError, setCostError] = useState('');
-  const [recentGenerations, setRecentGenerations] = useState<Generation[]>([]);
-  const [recentLoading, setRecentLoading] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // On desktop the right column is its own scroll container, so the infinite
+  // scroll sentinel must observe it; on mobile the whole page scrolls (root null).
+  const [recentScrollEl, setRecentScrollEl] = useState<HTMLDivElement | null>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  const fetchRecent = useCallback(
+    ({ limit, offset }: { limit: number; offset: number }) =>
+      user
+        ? api.getUserGenerations(user.id, {
+            type: generationType,
+            limit,
+            offset,
+          })
+        : Promise.resolve({ items: [] as Generation[], total: 0 }),
+    [user, generationType],
+  );
+
+  const {
+    items: recentItems,
+    setItems: setRecentGenerations,
+    loading: recentLoading,
+    loadingMore: recentLoadingMore,
+    hasMore: recentHasMore,
+    sentinelRef: recentSentinelRef,
+    reload: reloadRecent,
+  } = useInfiniteList<Generation>(fetchRecent, {
+    pageSize: 24,
+    root: isDesktop ? recentScrollEl : null,
+  });
+
+  // Failed generations are hidden in the create view but still paginated by the
+  // server, so we filter them out only when rendering.
+  const recentGenerations = recentItems.filter((g) => g.status !== 'failed');
 
   const selectedModel = models.find((m) => m.id === model) ?? initialModel;
   const hasReference = references.length > 0;
@@ -164,26 +205,6 @@ export function CreateWorkspace({
     if (url) addReferenceUrl(url);
   };
 
-  const loadRecent = useCallback(async () => {
-    if (!user) return;
-    try {
-      const res = await api.getUserGenerations(user.id, {
-        type: generationType,
-        limit: 50,
-      });
-      setRecentGenerations(res.items.filter((g) => g.status !== 'failed'));
-    } catch {
-      // keep existing list on error
-    } finally {
-      setRecentLoading(false);
-    }
-  }, [user, generationType]);
-
-  useEffect(() => {
-    setRecentLoading(true);
-    loadRecent();
-  }, [loadRecent]);
-
   useEffect(() => {
     if (initializedFromParams.current) return;
     initializedFromParams.current = true;
@@ -263,10 +284,10 @@ export function CreateWorkspace({
         setTimeout(() => pollGeneration(id), 2000);
       } else {
         refreshCredits();
-        if (gen.status === 'done') loadRecent();
+        if (gen.status === 'done') reloadRecent();
       }
     },
-    [refreshCredits, loadRecent],
+    [refreshCredits, reloadRecent, setRecentGenerations],
   );
 
   const handleGenerate = async () => {
@@ -362,7 +383,10 @@ export function CreateWorkspace({
           />
         </div>
 
-        <div className="space-y-4 lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pe-1">
+        <div
+          ref={setRecentScrollEl}
+          className="space-y-4 lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pe-1"
+        >
           <RecentCreations
             generations={recentGenerations}
             loading={recentLoading}
@@ -371,6 +395,16 @@ export function CreateWorkspace({
             onReuse={reuseGeneration}
             type={generationType}
           />
+
+          {!recentLoading && recentHasMore && (
+            <div ref={recentSentinelRef} className="h-px" />
+          )}
+
+          {recentLoadingMore && (
+            <div className="flex justify-center py-6">
+              <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
         </div>
       </div>
     </div>

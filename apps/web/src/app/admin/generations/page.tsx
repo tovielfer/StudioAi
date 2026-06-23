@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { AdminGuard } from '@/components/AdminGuard';
 import { AdminGeneration, api } from '@/lib/api';
+import { useInfiniteList } from '@/lib/use-infinite-list';
 import { STATUS_LABELS } from '@/lib/he';
 import { AdminShell } from '../admin-shell';
 import { AdminGenerationCard } from './_components/AdminGenerationCard';
@@ -36,31 +37,31 @@ export default function AdminGenerationsPage() {
 }
 
 function AdminGenerationsContent() {
-  const [generations, setGenerations] = useState<AdminGeneration[]>([]);
-  const [generationsTotal, setGenerationsTotal] = useState(0);
   const [generationSearch, setGenerationSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>('cards');
   const [selected, setSelected] = useState<AdminGeneration | null>(null);
 
-  const loadGenerations = useCallback(async () => {
-    const res = await api.getAdminGenerations({
-      search: generationSearch || undefined,
-      status: statusFilter || undefined,
-      limit: PAGE_SIZE,
-    });
-    setGenerations(res.items);
-    setGenerationsTotal(res.total);
-  }, [generationSearch, statusFilter]);
+  const fetchPage = useCallback(
+    ({ limit, offset }: { limit: number; offset: number }) =>
+      api.getAdminGenerations({
+        search: generationSearch || undefined,
+        status: statusFilter || undefined,
+        limit,
+        offset,
+      }),
+    [generationSearch, statusFilter],
+  );
 
-  useEffect(() => {
-    setLoading(true);
-    loadGenerations()
-      .catch((err) => setMessage(err.message))
-      .finally(() => setLoading(false));
-  }, [loadGenerations]);
+  const {
+    items: generations,
+    total: generationsTotal,
+    loading,
+    loadingMore,
+    hasMore,
+    error: message,
+    sentinelRef,
+  } = useInfiniteList<AdminGeneration>(fetchPage, { pageSize: PAGE_SIZE });
 
   return (
     <AdminShell
@@ -270,6 +271,14 @@ function AdminGenerationsContent() {
                   לא נמצאו יצירות לפי הסינון הנוכחי
                 </div>
               )}
+            </div>
+          )}
+
+          {!loading && hasMore && <div ref={sentinelRef} className="h-px" />}
+
+          {loadingMore && (
+            <div className="flex justify-center py-8">
+              <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
             </div>
           )}
         </section>

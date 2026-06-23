@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Tooltip } from '@/components/Tooltip';
@@ -12,6 +12,7 @@ import {
 } from '@/components/SendEmail';
 import { useAuth } from '@/lib/auth-context';
 import { api, Generation } from '@/lib/api';
+import { useInfiniteList } from '@/lib/use-infinite-list';
 import { downloadImage } from '@/lib/download';
 import { STATUS_LABELS, translateError } from '@/lib/he';
 
@@ -25,28 +26,31 @@ export default function HistoryPage() {
 
 function HistoryContent() {
   const { user } = useAuth();
-  const [generations, setGenerations] = useState<Generation[]>([]);
   const [selectedGeneration, setSelectedGeneration] =
     useState<Generation | null>(null);
-  const [total, setTotal] = useState(0);
   const [filter, setFilter] = useState<string>('');
-  const [loading, setLoading] = useState(true);
   const { sendingId, toast, sendEmail } = useSendGenerationEmail();
 
-  useEffect(() => {
-    if (!user) return;
-    setLoading(true);
-    api
-      .getUserGenerations(user.id, {
-        type: filter || undefined,
-        limit: 50,
-      })
-      .then((res) => {
-        setGenerations(res.items);
-        setTotal(res.total);
-      })
-      .finally(() => setLoading(false));
-  }, [user, filter]);
+  const fetchPage = useCallback(
+    ({ limit, offset }: { limit: number; offset: number }) =>
+      user
+        ? api.getUserGenerations(user.id, {
+            type: filter || undefined,
+            limit,
+            offset,
+          })
+        : Promise.resolve({ items: [] as Generation[], total: 0 }),
+    [user, filter],
+  );
+
+  const {
+    items: generations,
+    total,
+    loading,
+    loadingMore,
+    hasMore,
+    sentinelRef,
+  } = useInfiniteList<Generation>(fetchPage, { pageSize: 24 });
 
   const getEditHref = (generation: Generation) => {
     const params = new URLSearchParams({ prompt: generation.prompt });
@@ -204,6 +208,14 @@ function HistoryContent() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {!loading && hasMore && <div ref={sentinelRef} className="h-px" />}
+
+      {loadingMore && (
+        <div className="flex justify-center py-8">
+          <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
