@@ -198,8 +198,8 @@ export class AdminService {
       .addSelect('g.providerErrorRaw', 'providerErrorRaw')
       .addSelect('g.createdAt', 'createdAt')
       .orderBy('g.createdAt', 'DESC')
-      .take(params.limit)
-      .skip(params.offset)
+      .limit(params.limit)
+      .offset(params.offset)
       .getRawMany();
 
     return { items, total };
