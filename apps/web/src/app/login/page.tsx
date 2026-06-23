@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { translateError } from '@/lib/he';
@@ -46,7 +47,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto px-4 py-20">
+    <div className="max-w-md mx-auto px-4 py-16">
+      {/* Logo */}
+      <div className="flex flex-col items-center mb-10">
+        <Image src="/logo.png" alt="vookaPix" width={110} height={110} className="rounded-2xl shadow-lg shadow-brand-900/40 mb-4" />
+        <div className="text-3xl font-bold tracking-tight">
+          <span className="text-white">vooka</span><span className="text-brand-400">Pix</span>
+        </div>
+        <p className="text-gray-500 text-sm mt-1">צור תמונות מרהיבות בעזרת AI</p>
+      </div>
+
       <div className="card auth-card-in">
         <div className="flex gap-1 bg-black/20 border border-surface-border rounded-lg p-1 mb-6">
           <Link href="/login" className="auth-tab auth-tab-active">
