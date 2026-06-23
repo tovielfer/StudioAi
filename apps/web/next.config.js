@@ -1,4 +1,5 @@
 const path = require('path');
+const withSerwist = require('@serwist/next').default;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -12,4 +13,9 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withSerwist({
+  swSrc: 'src/app/sw.ts',
+  swDest: 'public/sw.js',
+  reloadOnOnline: true,
+  disable: process.env.NODE_ENV === 'development',
+})(nextConfig);

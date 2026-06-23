@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Heebo } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
@@ -7,12 +7,32 @@ import { FeedbackWidget } from '@/components/FeedbackWidget';
 
 const heebo = Heebo({ subsets: ['hebrew', 'latin'], variable: '--font-heebo' });
 
+export const viewport: Viewport = {
+  themeColor: '#7c3aed',
+  width: 'device-width',
+  initialScale: 1,
+  minimumScale: 1,
+  viewportFit: 'cover',
+};
+
 export const metadata: Metadata = {
-  title: 'vookaPix — יצירת תמונות ווידאו',
+  title: 'vookaPix — יצירת תמונות וווידאו',
   description: 'צור תמונות מרהיבות בעזרת בינה מלאכותית עם vookaPix',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'vookaPix',
+  },
   icons: {
-    icon: '/logo.png',
-    apple: '/logo.png',
+    icon: [
+      { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icons/icon-152x152.png', sizes: '152x152', type: 'image/png' },
+      { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+    ],
   },
 };
 
