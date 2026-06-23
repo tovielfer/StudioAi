@@ -58,7 +58,7 @@ export default function LoginPage() {
         </div>
 
         <h1 className="text-2xl font-bold mb-2">ברוך שובך</h1>
-        <p className="text-gray-400 text-sm mb-6">התחבר לחשבון AI Studio שלך</p>
+        <p className="text-gray-400 text-sm mb-6">התחבר לחשבון vookaPix שלך</p>
 
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg px-4 py-3 mb-4">

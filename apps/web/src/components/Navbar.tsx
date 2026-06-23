@@ -62,10 +62,10 @@ export function Navbar() {
     <nav className="border-b border-surface-border bg-surface/80 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         <Link href={user ? '/dashboard' : '/'} className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-700 flex items-center justify-center text-sm font-bold">
-            AI
-          </div>
-          <span className="font-semibold text-lg">Studio</span>
+          <Image src="/logo.png" alt="vookaPix" width={48} height={48} className="rounded-xl" />
+          <span className="font-semibold text-lg tracking-tight">
+            <span className="text-white">vooka</span><span className="text-brand-400">Pix</span>
+          </span>
         </Link>
 
         <div className="flex items-center gap-6">

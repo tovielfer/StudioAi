@@ -8,8 +8,12 @@ import { FeedbackWidget } from '@/components/FeedbackWidget';
 const heebo = Heebo({ subsets: ['hebrew', 'latin'], variable: '--font-heebo' });
 
 export const metadata: Metadata = {
-  title: 'AI Studio — יצירת תמונות ווידאו',
-  description: 'צור תמונות מרהיבות בעזרת בינה מלאכותית',
+  title: 'vookaPix — יצירת תמונות ווידאו',
+  description: 'צור תמונות מרהיבות בעזרת בינה מלאכותית עם vookaPix',
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png',
+  },
 };
 
 export default function RootLayout({

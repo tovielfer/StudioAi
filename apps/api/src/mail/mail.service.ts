@@ -114,17 +114,34 @@ export class MailService {
     const subject = isVideo ? 'הסרטון שיצרת מצורף 🎬' : 'התמונה שיצרת מצורפת 🖼️';
 
     const html = `
-      <div dir="rtl" style="font-family: Arial, 'Segoe UI', sans-serif; text-align: right; line-height: 1.7; color: #1f2937;">
-        <h2 style="margin: 0 0 12px;">${assetLabel} שלך מוכן/ה!</h2>
-        <p style="margin: 0 0 8px;">צירפנו את ${assetLabel} למייל הזה כקובץ.</p>
-        <p style="margin: 0 0 8px; color: #6b7280; font-size: 14px;">
-          <strong>תיאור:</strong> ${this.escapeHtml(generation.prompt)}
-        </p>
-        <p style="margin: 16px 0 0; color: #9ca3af; font-size: 12px;">תודה שהשתמשת בשירות שלנו 🙏</p>
+      <div style="background-color: #0f0f13; padding: 0; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">
+        <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px;">
+          <!-- Header / Logo -->
+          <div dir="rtl" style="text-align: right; margin-bottom: 28px;">
+            <span style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">vooka</span><span style="font-size: 22px; font-weight: 700; color: #a78bfa;">Pix</span>
+          </div>
+
+          <!-- Card -->
+          <div dir="rtl" style="background: #1a1a24; border: 1px solid #2d2d3d; border-radius: 16px; padding: 28px 24px; text-align: right; line-height: 1.7; color: #e5e7eb;">
+            <h2 style="margin: 0 0 12px; font-size: 20px; color: #ffffff;">${assetLabel} שלך מוכן/ה! ✨</h2>
+            <p style="margin: 0 0 8px; color: #d1d5db;">צירפנו את ${assetLabel} למייל הזה כקובץ.</p>
+            <p style="margin: 0 0 16px; color: #9ca3af; font-size: 14px;">
+              <strong style="color: #c4b5fd;">תיאור:</strong> ${this.escapeHtml(generation.prompt)}
+            </p>
+            <div style="border-top: 1px solid #2d2d3d; padding-top: 16px; margin-top: 8px;">
+              <p style="margin: 0; color: #6b7280; font-size: 13px;">תודה שבחרת ב‑<strong style="color: #a78bfa;">vookaPix</strong> 🙏</p>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <p style="text-align: center; margin-top: 20px; color: #4b5563; font-size: 12px;">
+            © ${new Date().getFullYear()} vookaPix · כל הזכויות שמורות
+          </p>
+        </div>
       </div>
     `;
 
-    const text = `${assetLabel} שלך מוכן/ה!\n\nצירפנו את ${assetLabel} למייל הזה כקובץ.\n\nתיאור: ${generation.prompt}\n\nתודה שהשתמשת בשירות שלנו.`;
+    const text = `${assetLabel} שלך מוכן/ה!\n\nצירפנו את ${assetLabel} למייל הזה כקובץ.\n\nתיאור: ${generation.prompt}\n\nתודה שבחרת ב-vookaPix.`;
 
     const { error } = await resend.emails.send({
       from,
