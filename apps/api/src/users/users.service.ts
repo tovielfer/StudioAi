@@ -18,9 +18,55 @@ export class UsersService {
     return this.usersRepo.findOne({ where: { id } });
   }
 
-  create(email: string, passwordHash: string) {
-    const user = this.usersRepo.create({ email, passwordHash, credits: 25 });
+  findByEmailVerificationToken(token: string) {
+    return this.usersRepo.findOne({ where: { emailVerificationToken: token } });
+  }
+
+  findByResetPasswordToken(token: string) {
+    return this.usersRepo.findOne({ where: { resetPasswordToken: token } });
+  }
+
+  create(
+    email: string,
+    passwordHash: string,
+    opts?: { emailVerificationToken?: string; emailVerificationExpiry?: Date },
+  ) {
+    const user = this.usersRepo.create({
+      email,
+      passwordHash,
+      credits: 25,
+      emailVerified: false,
+      emailVerificationToken: opts?.emailVerificationToken ?? null,
+      emailVerificationExpiry: opts?.emailVerificationExpiry ?? null,
+    });
     return this.usersRepo.save(user);
+  }
+
+  async markEmailVerified(userId: string) {
+    await this.usersRepo.update(userId, {
+      emailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationExpiry: null,
+    });
+  }
+
+  async setResetPasswordToken(
+    userId: string,
+    token: string,
+    expiry: Date,
+  ) {
+    await this.usersRepo.update(userId, {
+      resetPasswordToken: token,
+      resetPasswordExpiry: expiry,
+    });
+  }
+
+  async resetPassword(userId: string, passwordHash: string) {
+    await this.usersRepo.update(userId, {
+      passwordHash,
+      resetPasswordToken: null,
+      resetPasswordExpiry: null,
+    });
   }
 
   async updateCredits(userId: string, amount: number) {

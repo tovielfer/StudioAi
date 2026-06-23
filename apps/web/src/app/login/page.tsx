@@ -89,7 +89,15 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1.5">סיסמה</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm text-gray-400">סיסמה</label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-brand-400 hover:text-brand-300 transition-colors"
+              >
+                שכחתי סיסמה
+              </Link>
+            </div>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}

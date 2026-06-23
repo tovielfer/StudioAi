@@ -53,6 +53,7 @@ export function translateError(
   const map: Record<string, string> = {
     'Email already registered': 'כתובת האימייל כבר רשומה',
     'Invalid credentials': 'פרטי התחברות שגויים',
+    'Email not verified': 'המייל עדיין לא אומת. בדוק את תיבת הדואר שלך.',
     'Insufficient credits': 'אין מספיק קרדיטים',
     'Login failed': 'ההתחברות נכשלה',
     'Registration failed': 'ההרשמה נכשלה',

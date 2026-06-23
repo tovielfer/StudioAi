@@ -45,8 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (email: string, password: string) => {
-    const res = await api.register(email, password);
-    persist(res.token, res.user);
+    await api.register(email, password);
+    // Registration no longer returns a token — user must verify email first
   }, []);
 
   const logout = useCallback(() => {

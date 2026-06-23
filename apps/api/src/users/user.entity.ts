@@ -30,6 +30,21 @@ export class User {
   @Column({ type: 'varchar', default: UserRole.USER })
   role: UserRole;
 
+  @Column({ default: false })
+  emailVerified: boolean;
+
+  @Column({ type: 'varchar', nullable: true, default: null })
+  emailVerificationToken: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true, default: null })
+  emailVerificationExpiry: Date | null;
+
+  @Column({ type: 'varchar', nullable: true, default: null })
+  resetPasswordToken: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true, default: null })
+  resetPasswordExpiry: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

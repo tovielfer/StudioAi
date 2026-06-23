@@ -192,16 +192,34 @@ class ApiClient {
   }
 
   register(email: string, password: string) {
-    return this.request<AuthResponse>('/auth/register', {
+    return this.request<{ message: string }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
+  }
+
+  verifyEmail(token: string) {
+    return this.request<AuthResponse>(`/auth/verify-email?token=${token}`);
   }
 
   login(email: string, password: string) {
     return this.request<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    });
+  }
+
+  forgotPassword(email: string) {
+    return this.request<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  resetPassword(token: string, newPassword: string) {
+    return this.request<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
     });
   }
 
