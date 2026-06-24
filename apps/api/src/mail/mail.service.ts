@@ -111,6 +111,7 @@ export class MailService {
 
     const isVideo = generation.type === 'video';
     const assetLabel = isVideo ? 'הסרטון' : 'התמונה';
+    const readyLabel = isVideo ? 'הסרטון מוכן' : 'התמונה מוכנה';
     const subject = isVideo ? 'הסרטון שיצרת מצורף 🎬' : 'התמונה שיצרת מצורפת 🖼️';
 
     const html = `
@@ -123,7 +124,7 @@ export class MailService {
 
           <!-- Card -->
           <div dir="rtl" style="background: #1a1a24; border: 1px solid #2d2d3d; border-radius: 16px; padding: 28px 24px; text-align: right; line-height: 1.7; color: #e5e7eb;">
-            <h2 style="margin: 0 0 12px; font-size: 20px; color: #ffffff;">${assetLabel} שלך מוכן/ה! ✨</h2>
+            <h2 style="margin: 0 0 12px; font-size: 20px; color: #ffffff;">${readyLabel}! ✨</h2>
             <p style="margin: 0 0 8px; color: #d1d5db;">צירפנו את ${assetLabel} למייל הזה כקובץ.</p>
             <p style="margin: 0 0 16px; color: #9ca3af; font-size: 14px;">
               <strong style="color: #c4b5fd;">תיאור:</strong> ${this.escapeHtml(generation.prompt)}
@@ -141,7 +142,7 @@ export class MailService {
       </div>
     `;
 
-    const text = `${assetLabel} שלך מוכן/ה!\n\nצירפנו את ${assetLabel} למייל הזה כקובץ.\n\nתיאור: ${generation.prompt}\n\nתודה שבחרת ב-vookaPix.`;
+    const text = `${readyLabel}!\n\nצירפנו את ${assetLabel} למייל הזה כקובץ.\n\nתיאור: ${generation.prompt}\n\nתודה שבחרת ב-vookaPix.`;
 
     const { error } = await resend.emails.send({
       from,
