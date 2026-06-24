@@ -106,6 +106,88 @@ export class AdminService {
     return { items, total };
   }
 
+  async listCreditTransactions(params: {
+    search?: string;
+    userId?: string;
+    direction?: 'credit' | 'debit';
+    from?: string;
+    to?: string;
+    limit: number;
+    offset: number;
+  }) {
+    const qb = this.creditTransactionsRepo
+      .createQueryBuilder('tx')
+      .leftJoin('tx.user', 'user');
+
+    if (params.search) {
+      qb.andWhere('(tx.reason ILIKE :search OR user.email ILIKE :search)', {
+        search: `%${params.search}%`,
+      });
+    }
+
+    if (params.userId) {
+      qb.andWhere('tx.userId = :userId', { userId: params.userId });
+    }
+
+    if (params.direction === 'credit') {
+      qb.andWhere('tx.amount > 0');
+    }
+
+    if (params.direction === 'debit') {
+      qb.andWhere('tx.amount < 0');
+    }
+
+    const fromDate = this.parseDateFilter(params.from, 'start');
+    if (fromDate) {
+      qb.andWhere('tx.createdAt >= :fromDate', { fromDate });
+    }
+
+    const toDate = this.parseDateFilter(params.to, 'end');
+    if (toDate) {
+      qb.andWhere('tx.createdAt <= :toDate', { toDate });
+    }
+
+    const [total, summaryRow, items] = await Promise.all([
+      qb.clone().getCount(),
+      qb
+        .clone()
+        .select(
+          'COALESCE(SUM(CASE WHEN tx.amount > 0 THEN tx.amount ELSE 0 END), 0)',
+          'issued',
+        )
+        .addSelect(
+          'COALESCE(SUM(CASE WHEN tx.amount < 0 THEN -tx.amount ELSE 0 END), 0)',
+          'spent',
+        )
+        .addSelect('COALESCE(SUM(tx.amount), 0)', 'net')
+        .getRawOne<{ issued: string; spent: string; net: string }>(),
+      qb
+        .select('tx.id', 'id')
+        .addSelect('tx.userId', 'userId')
+        .addSelect('user.email', 'userEmail')
+        .addSelect('tx.amount', 'amount')
+        .addSelect('tx.reason', 'reason')
+        .addSelect('tx.createdAt', 'createdAt')
+        .orderBy('tx.createdAt', 'DESC')
+        .limit(params.limit)
+        .offset(params.offset)
+        .getRawMany(),
+    ]);
+
+    return {
+      items: items.map((item) => ({
+        ...item,
+        amount: Number(item.amount),
+      })),
+      total,
+      summary: {
+        issued: Number(summaryRow?.issued ?? 0),
+        spent: Number(summaryRow?.spent ?? 0),
+        net: Number(summaryRow?.net ?? 0),
+      },
+    };
+  }
+
   async listGenerations(params: {
     status?: GenerationStatus;
     userId?: string;
@@ -462,6 +544,14 @@ export class AdminService {
       issued: Number(row?.issued ?? 0),
       spent: Number(row?.spent ?? 0),
     };
+  }
+
+  private parseDateFilter(value: string | undefined, boundary: 'start' | 'end') {
+    if (!value) return null;
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T${boundary === 'start' ? '00:00:00.000' : '23:59:59.999'}`)
+      : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
   }
 
   private selectGenerationRows(qb: SelectQueryBuilder<Generation>) {

@@ -61,6 +61,23 @@ export interface AdminGeneration extends Generation {
   userEmail: string | null;
 }
 
+export type CreditTransactionDirection = 'credit' | 'debit';
+
+export interface AdminCreditTransaction {
+  id: string;
+  userId: string;
+  userEmail: string | null;
+  amount: number;
+  reason: string;
+  createdAt: string;
+}
+
+export interface AdminCreditTransactionSummary {
+  issued: number;
+  spent: number;
+  net: number;
+}
+
 export interface AdminCostStat {
   type: string;
   provider: string;
@@ -419,6 +436,31 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ amount, reason }),
     });
+  }
+
+  getAdminCreditTransactions(params?: {
+    search?: string;
+    userId?: string;
+    direction?: CreditTransactionDirection;
+    from?: string;
+    to?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.userId) query.set('userId', params.userId);
+    if (params?.direction) query.set('direction', params.direction);
+    if (params?.from) query.set('from', params.from);
+    if (params?.to) query.set('to', params.to);
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+    const qs = query.toString();
+    return this.request<{
+      items: AdminCreditTransaction[];
+      total: number;
+      summary: AdminCreditTransactionSummary;
+    }>(`/admin/credit-transactions${qs ? `?${qs}` : ''}`);
   }
 
   getAdminCostStats() {

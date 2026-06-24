@@ -42,6 +42,30 @@ export class AdminController {
     });
   }
 
+  @Get('credit-transactions')
+  listCreditTransactions(
+    @Query('search') search?: string,
+    @Query('userId') userId?: string,
+    @Query('direction') direction?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset = 0,
+  ) {
+    return this.adminService.listCreditTransactions({
+      search: search?.trim() || undefined,
+      userId: userId?.trim() || undefined,
+      direction:
+        direction === 'credit' || direction === 'debit'
+          ? direction
+          : undefined,
+      from: from?.trim() || undefined,
+      to: to?.trim() || undefined,
+      limit: Math.min(Math.max(limit, 1), 100),
+      offset: Math.max(offset, 0),
+    });
+  }
+
   @Get('generations')
   listGenerations(
     @Query('status') status?: GenerationStatus,
