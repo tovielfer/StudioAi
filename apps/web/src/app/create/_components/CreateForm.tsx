@@ -121,7 +121,7 @@ export function CreateForm({
             className="absolute bottom-2 left-2 inline-flex items-center gap-1.5 rounded-md bg-surface/80 px-2 py-1 text-xs text-gray-400 backdrop-blur transition-colors hover:text-brand-300"
           >
             <EditIcon />
-            עריכה נוחה
+            הרחב
           </button>
         </div>
       </div>
