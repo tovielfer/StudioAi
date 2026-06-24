@@ -9,6 +9,7 @@ import { translateError } from '@/lib/he';
 
 import { CreateForm, ReferenceImage, MAX_REFERENCES } from './CreateForm';
 import { RecentCreations } from './RecentCreations';
+import { PanelLeftIcon, PanelRightIcon } from './icons';
 
 type CreateWorkspaceProps = {
   title: string;
@@ -44,6 +45,19 @@ export function CreateWorkspace({
   const [costLoading, setCostLoading] = useState(false);
   const [costError, setCostError] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
+  const [formOnLeft, setFormOnLeft] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('createFormOnLeft') === 'true';
+  });
+
+  const toggleFormSide = () => {
+    setFormOnLeft((prev) => {
+      const next = !prev;
+      localStorage.setItem('createFormOnLeft', String(next));
+      window.dispatchEvent(new CustomEvent('formSideChange', { detail: next }));
+      return next;
+    });
+  };
 
   // On desktop the right column is its own scroll container, so the infinite
   // scroll sentinel must observe it; on mobile the whole page scrolls (root null).
@@ -352,9 +366,19 @@ export function CreateWorkspace({
 
   return (
     <div className="max-w-[1920px] mx-auto px-6 sm:px-8 py-10 lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:overflow-hidden">
-      <h1 className="text-3xl font-bold mb-8 lg:shrink-0">{title}</h1>
+      <div className="flex items-center justify-between mb-8 lg:shrink-0">
+        <h1 className="text-3xl font-bold">{title}</h1>
+        <button
+          onClick={toggleFormSide}
+          title={formOnLeft ? 'העבר טופס לימין' : 'העבר טופס לשמאל'}
+          className="hidden lg:flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-white transition-colors"
+        >
+          {formOnLeft ? <PanelRightIcon /> : <PanelLeftIcon />}
+          <span>{formOnLeft ? 'טופס לימין' : 'טופס לשמאל'}</span>
+        </button>
+      </div>
 
-      <div className="flex flex-col gap-6 lg:min-h-0 lg:flex-1 lg:flex-row lg:items-stretch">
+      <div className={`flex flex-col gap-6 lg:min-h-0 lg:flex-1 lg:items-stretch ${formOnLeft ? 'lg:flex-row-reverse' : 'lg:flex-row'}`}>
         <div className="lg:h-full lg:min-h-0 lg:w-[380px] lg:shrink-0">
           <CreateForm
             prompt={prompt}

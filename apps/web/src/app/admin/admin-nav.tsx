@@ -36,24 +36,44 @@ const ADMIN_LINKS = [
     label: 'מחירון',
     description: 'קרדיטים וכללים',
   },
+  {
+    href: '/admin/packages',
+    label: 'חבילות',
+    description: 'חבילות קנייה',
+  },
+  {
+    href: '/admin/orders',
+    label: 'רכישות',
+    description: 'אישור הזמנות',
+  },
 ];
 
 export function AdminNav() {
   const pathname = usePathname();
   const [feedbackUnread, setFeedbackUnread] = useState(0);
+  const [pendingOrders, setPendingOrders] = useState(0);
 
   useEffect(() => {
     api
       .getAdminFeedbackUnreadCount()
       .then((res) => setFeedbackUnread(res.unread))
       .catch(() => {});
+    api
+      .getAdminOrdersPendingCount()
+      .then((res) => setPendingOrders(res.pending))
+      .catch(() => {});
   }, [pathname]);
 
   return (
-    <div className="grid md:grid-cols-6 gap-3">
+    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
       {ADMIN_LINKS.map((link) => {
         const isActive = pathname === link.href;
-        const badge = link.href === '/admin/feedback' ? feedbackUnread : 0;
+        const badge =
+          link.href === '/admin/feedback'
+            ? feedbackUnread
+            : link.href === '/admin/orders'
+              ? pendingOrders
+              : 0;
 
         return (
           <Link
@@ -68,7 +88,7 @@ export function AdminNav() {
             {badge > 0 && (
               <span
                 className="absolute -top-2 -left-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold leading-none text-white shadow"
-                aria-label={`${badge} פניות חדשות`}
+                aria-label={`${badge} חדשים`}
               >
                 {badge > 9 ? '9+' : badge}
               </span>

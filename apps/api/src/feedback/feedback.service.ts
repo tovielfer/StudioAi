@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
+import { MailService } from '../mail/mail.service';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
 import { UpdateFeedbackDto } from './dto/update-feedback.dto';
 import {
@@ -10,9 +11,12 @@ import {
 
 @Injectable()
 export class FeedbackService {
+  private readonly logger = new Logger(FeedbackService.name);
+
   constructor(
     @InjectRepository(FeedbackSubmission)
     private readonly feedbackRepo: Repository<FeedbackSubmission>,
+    private readonly mailService: MailService,
   ) {}
 
   create(userId: string, dto: CreateFeedbackDto) {
@@ -90,7 +94,10 @@ export class FeedbackService {
   }
 
   async updateAdmin(id: string, dto: UpdateFeedbackDto) {
-    const item = await this.feedbackRepo.findOne({ where: { id } });
+    const item = await this.feedbackRepo.findOne({
+      where: { id },
+      relations: ['user'],
+    });
     if (!item) {
       throw new NotFoundException('Feedback not found');
     }
@@ -102,12 +109,14 @@ export class FeedbackService {
       item.status = dto.status;
     }
 
+    let shouldSendEmail = false;
     if (dto.adminReply !== undefined) {
       const nextReply = dto.adminReply.trim() || null;
       // When the reply content changes (and is non-empty), surface a fresh
       // notification to the user.
       if (nextReply && nextReply !== item.adminReply) {
         item.userReplyRead = false;
+        shouldSendEmail = true;
       }
       item.adminReply = nextReply;
     }
@@ -121,6 +130,23 @@ export class FeedbackService {
         ? new Date()
         : item.answeredAt;
 
-    return this.feedbackRepo.save(item);
+    const saved = await this.feedbackRepo.save(item);
+
+    if (shouldSendEmail && item.adminReply && item.user?.email) {
+      this.mailService
+        .sendFeedbackReply({
+          to: item.user.email,
+          feedbackTitle: item.title,
+          feedbackMessage: item.message,
+          adminReply: item.adminReply,
+        })
+        .catch((err: unknown) =>
+          this.logger.error(
+            `Failed to send feedback reply email to ${item.user.email}: ${err instanceof Error ? err.message : String(err)}`,
+          ),
+        );
+    }
+
+    return saved;
   }
 }

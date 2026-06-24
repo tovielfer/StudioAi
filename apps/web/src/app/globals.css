@@ -117,3 +117,31 @@ body {
   transform-origin: top center;
   animation: fancy-select-in 0.14s ease-out;
 }
+
+@keyframes pay-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pay-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pay-overlay-in {
+  animation: pay-overlay-in 0.2s ease-out;
+}
+
+.pay-modal-in {
+  animation: pay-modal-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}

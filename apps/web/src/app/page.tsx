@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PricingTiers } from '@/components/PricingTiers';
 
 export default function LandingPage() {
   return (
@@ -34,7 +35,7 @@ export default function LandingPage() {
         </div>
 
         <p className="text-sm text-gray-500 mt-4">
-          25 קרדיטים חינם בהרשמה — ללא צורך בכרטיס אשראי
+          150 קרדיטים חינם בהרשמה — ללא צורך בכרטיס אשראי
         </p>
       </section>
 
@@ -53,7 +54,7 @@ export default function LandingPage() {
             },
             {
               title: 'מערכת קרדיטים',
-              desc: 'שלם רק על מה שאתה משתמש. תמונה רגילה מ-5 קרדיטים, HD מ-10.',
+              desc: 'שלם רק על מה שאתה משתמש — בלי מנוי ובלי תפוגת קרדיטים.',
               icon: '💎',
             },
           ].map((feature) => (
@@ -68,43 +69,11 @@ export default function LandingPage() {
 
       <section className="border-t border-surface-border bg-surface-card/50">
         <div className="max-w-6xl mx-auto px-4 py-16">
-          <h2 className="text-2xl font-bold text-center mb-10">תמחור</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                name: 'חינם',
-                price: '₪0',
-                credits: '25 קרדיטים',
-                features: ['5 תמונות', 'איכות רגילה'],
-              },
-              {
-                name: 'בסיסי',
-                price: '₪29',
-                credits: '100 קרדיטים',
-                features: ['100 תמונות', 'כל המודלים', 'תמונות השראה'],
-              },
-              {
-                name: 'פרו',
-                price: '₪79',
-                credits: '400 קרדיטים',
-                features: ['400 תמונות', 'איכות HD', 'תור עדיפות'],
-              },
-            ].map((plan) => (
-              <div
-                key={plan.name}
-                className={`card ${plan.name === 'בסיסי' ? 'ring-2 ring-brand-500' : ''}`}
-              >
-                <h3 className="text-lg font-semibold">{plan.name}</h3>
-                <div className="text-3xl font-bold my-3">{plan.price}</div>
-                <p className="text-brand-400 text-sm mb-4">{plan.credits}</p>
-                <ul className="space-y-2 text-sm text-gray-400">
-                  {plan.features.map((f) => (
-                    <li key={f}>✓ {f}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
+          <h2 className="text-2xl font-bold text-center mb-3">תמחור</h2>
+          <p className="text-center text-gray-400 mb-10">
+            חבילות קרדיטים לפי שימוש. ככל שהחבילה גדולה יותר — זול יותר לקרדיט.
+          </p>
+          <PricingTiers />
         </div>
       </section>
     </div>

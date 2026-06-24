@@ -119,9 +119,41 @@ export interface AdminPricingRule {
   updatedAt: string;
   calculatedUsd: number;
   calculatedCredits: number;
+  calculatedIls: number;
   referenceCalculatedUsd: number;
   referenceCalculatedCredits: number;
+  referenceCalculatedIls: number;
+  underpriced: boolean;
   metrics: PricingRuleMetrics;
+}
+
+export interface CreditPackage {
+  id: string;
+  name: string;
+  priceIls: number;
+  credits: number;
+  badge: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type OrderStatus = 'pending' | 'approved' | 'rejected';
+
+export interface Order {
+  id: string;
+  userId: string;
+  userEmail?: string | null;
+  packageId: string | null;
+  packageName: string;
+  priceIls: number;
+  credits: number;
+  status: OrderStatus;
+  note: string | null;
+  decidedByUserId?: string | null;
+  decidedAt?: string | null;
+  createdAt: string;
 }
 
 export interface PricingRuleAuditLog {
@@ -295,8 +327,35 @@ class ApiClient {
     });
     if (params.resolution) query.set('resolution', params.resolution);
     if (params.type) query.set('type', params.type);
-    return this.request<{ credits: number; usd: number }>(
+    return this.request<{ credits: number; usd: number; priceIls: number }>(
       `/generations/cost?${query.toString()}`,
+    );
+  }
+
+  // --- Packages & orders (public/user) ---
+
+  getPackages() {
+    return this.request<CreditPackage[]>('/packages');
+  }
+
+  createOrder(packageId: string, note?: string) {
+    return this.request<Order>('/orders', {
+      method: 'POST',
+      body: JSON.stringify({ packageId, note }),
+    });
+  }
+
+  getMyOrders() {
+    return this.request<Order[]>('/orders');
+  }
+
+  payOrder(orderId: string, singleUseToken: string) {
+    return this.request<{ order: Order; credits: number }>(
+      `/orders/${orderId}/pay`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ singleUseToken }),
+      },
     );
   }
 
@@ -403,6 +462,72 @@ class ApiClient {
     return this.request<PricingRuleAuditLog[]>(
       `/admin/pricing-rules/${id}/audit-log`,
     );
+  }
+
+  // --- Admin packages & orders ---
+
+  getAdminBillingConfig() {
+    return this.request<{
+      usdIls: number;
+      targetMargin: number;
+      creditValueIls: number;
+    }>('/admin/billing-config');
+  }
+
+  getAdminPackages() {
+    return this.request<CreditPackage[]>('/admin/packages');
+  }
+
+  createAdminPackage(data: {
+    name: string;
+    priceIls: number;
+    credits: number;
+    badge?: string | null;
+    isActive?: boolean;
+    sortOrder?: number;
+  }) {
+    return this.request<CreditPackage>('/admin/packages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  updateAdminPackage(
+    id: string,
+    data: {
+      name?: string;
+      priceIls?: number;
+      credits?: number;
+      badge?: string | null;
+      isActive?: boolean;
+      sortOrder?: number;
+    },
+  ) {
+    return this.request<CreditPackage>(`/admin/packages/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  getAdminOrders(status?: OrderStatus) {
+    const qs = status ? `?status=${status}` : '';
+    return this.request<Order[]>(`/admin/orders${qs}`);
+  }
+
+  getAdminOrdersPendingCount() {
+    return this.request<{ pending: number }>('/admin/orders/pending-count');
+  }
+
+  approveAdminOrder(id: string) {
+    return this.request<Order>(`/admin/orders/${id}/approve`, {
+      method: 'POST',
+    });
+  }
+
+  rejectAdminOrder(id: string) {
+    return this.request<Order>(`/admin/orders/${id}/reject`, {
+      method: 'POST',
+    });
   }
 
   createFeedback(data: {

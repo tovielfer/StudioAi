@@ -78,7 +78,7 @@ export default function RegisterPage() {
 
         <h1 className="text-2xl font-bold mb-2">יצירת חשבון</h1>
         <p className="text-gray-400 text-sm mb-6">
-          קבל 25 קרדיטים חינם כדי להתחיל ליצור
+          קבל 150 קרדיטים חינם כדי להתחיל ליצור
         </p>
 
         {error && (

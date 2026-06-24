@@ -24,7 +24,7 @@ export class User {
   @Column()
   passwordHash: string;
 
-  @Column({ default: 25 })
+  @Column({ default: 150 })
   credits: number;
 
   @Column({ type: 'varchar', default: UserRole.USER })

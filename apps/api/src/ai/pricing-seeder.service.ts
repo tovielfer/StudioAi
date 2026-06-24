@@ -2,13 +2,13 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AiProvider, GenerationType } from '../common/constants';
+import { getBillingConfig } from '../config/billing';
 import {
   MODEL_REGISTRY,
   ModelCapability,
 } from '../common/model-capabilities';
 import { AiPricingRule } from './ai-pricing-rule.entity';
 
-const DEFAULT_MARGIN = 2.5;
 const DEFAULT_REFERENCE_IMAGE_USD = 0.005;
 
 interface DesiredRule {
@@ -147,7 +147,7 @@ export class PricingSeederService implements OnApplicationBootstrap {
 
   private rulesForModel(model: ModelCapability): DesiredRule[] {
     const { pricing } = model;
-    const margin = pricing.margin ?? DEFAULT_MARGIN;
+    const margin = pricing.margin ?? getBillingConfig().targetMargin;
     const referenceImageUsd =
       pricing.referenceImageUsd ?? DEFAULT_REFERENCE_IMAGE_USD;
     const creditCostOverride = pricing.creditCostOverride ?? null;

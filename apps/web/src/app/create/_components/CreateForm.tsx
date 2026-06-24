@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { ModelOption, User } from '@/lib/api';
 import { AspectRatioIcon, FancySelect } from './FancySelect';
@@ -264,6 +265,22 @@ export function CreateForm({
             {costLoading ? 'מחשב...' : cost !== null ? `${cost} קרדיטים` : costError || 'לא זמין'}
           </span>
           {' · '}יתרה: {user?.credits ?? 0}
+          <Link
+            href="/buy"
+            className="mr-2 inline-flex items-center gap-1 rounded-full border border-brand-500/40 bg-brand-500/10 px-2.5 py-0.5 text-xs font-medium text-brand-300 transition-colors hover:bg-brand-500/20 hover:text-brand-200"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3 w-3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+            קניית קרדיטים
+          </Link>
         </div>
         <button
           onClick={onGenerate}

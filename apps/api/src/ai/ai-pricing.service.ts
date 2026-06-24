@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GenerationType } from '../common/constants';
+import { creditsToIls, usdToCredits } from '../config/billing';
 import { AiPricingRule } from './ai-pricing-rule.entity';
 
 export interface PricingParams {
@@ -15,7 +16,10 @@ export interface PricingParams {
 }
 
 export interface PricingResult {
+  /** Sell price in USD (provider cost * margin). */
   usd: number;
+  /** What the customer pays in shekels at the best rate. */
+  priceIls: number;
   credits: number;
   ruleId: string;
   usedOverride: boolean;
@@ -55,13 +59,17 @@ export class AiPricingService {
     }
 
     const referenceUsd = params.hasReference ? rule.referenceImageUsd : 0;
+    // Sell price in USD = provider cost * margin. Credits are then derived in
+    // ILS via the decoupled credit value (see config/billing.ts).
     const calculatedUsd = (rule.baseUsd + referenceUsd) * rule.margin;
-    const calculatedCredits = Math.ceil(calculatedUsd * 100);
+    const calculatedCredits = usdToCredits(calculatedUsd);
     const hasOverride = rule.creditCostOverride !== null;
+    const credits = hasOverride ? rule.creditCostOverride! : calculatedCredits;
 
     return {
       usd: Math.round(calculatedUsd * 10000) / 10000,
-      credits: hasOverride ? rule.creditCostOverride! : calculatedCredits,
+      priceIls: creditsToIls(credits),
+      credits,
       ruleId: rule.id,
       usedOverride: hasOverride,
     };

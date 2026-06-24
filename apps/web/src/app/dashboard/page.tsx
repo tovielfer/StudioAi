@@ -93,15 +93,19 @@ function DashboardContent() {
             {user?.credits ?? 0}
           </p>
         </div>
-        <div className="card">
-          <p className="text-sm text-gray-400">תמונה רגילה</p>
-          <p className="text-3xl font-bold mt-1">5</p>
-          <p className="text-xs text-gray-500">קרדיטים לתמונה</p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-gray-400">תמונת HD</p>
-          <p className="text-3xl font-bold mt-1">10</p>
-          <p className="text-xs text-gray-500">קרדיטים לתמונה</p>
+        <div className="card md:col-span-2 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm text-gray-400">נגמרים הקרדיטים?</p>
+            <p className="text-lg font-semibold mt-1">
+              קנה חבילה — ככל שגדולה יותר, זול יותר לקרדיט
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              בלי מנוי, בלי תפוגה. משלמים רק על מה שיוצרים.
+            </p>
+          </div>
+          <Link href="/buy" className="btn-primary whitespace-nowrap">
+            קניית קרדיטים
+          </Link>
         </div>
       </div>
 

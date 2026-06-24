@@ -1,12 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { FeedbackForm } from './FeedbackForm';
 
 export function FeedbackWidget() {
   const { user, loading } = useAuth();
   const [open, setOpen] = useState(false);
+  const [formOnLeft, setFormOnLeft] = useState(false);
+
+  useEffect(() => {
+    setFormOnLeft(localStorage.getItem('createFormOnLeft') === 'true');
+    const handler = (e: Event) => setFormOnLeft((e as CustomEvent<boolean>).detail);
+    window.addEventListener('formSideChange', handler);
+    return () => window.removeEventListener('formSideChange', handler);
+  }, []);
 
   if (loading || !user) return null;
 
@@ -15,7 +23,7 @@ export function FeedbackWidget() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 left-4 z-40 rounded-full bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-black/30 transition-colors hover:bg-brand-500 md:left-6"
+        className={`fixed bottom-6 z-40 rounded-full bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-black/30 transition-colors hover:bg-brand-500 ${formOnLeft ? 'right-4 md:right-6' : 'left-4 md:left-6'}`}
       >
         פניה / הערה
       </button>

@@ -120,24 +120,35 @@ const FIXED_ONE_K: AttrOption[] = [{ id: '1K', label: '1K' }];
 
 // Default base USD prices, mirroring the seed migrations so a fresh DB
 // reproduces today's pricing. Admin edits in the DB take precedence at runtime.
+// `auto` is priced the same as `high`: when OpenAI receives quality="auto" it
+// routinely renders at high quality, so the measured cost matches `high`
+// (~$0.167 at 1:1). Pricing auto as cheap (previously $0.04) sold every auto
+// generation well below cost. Worst-case pricing avoids the loss.
 const GPT_IMAGE_1_PRICING: ModelPricing = {
-  baseUsd: 0.04,
+  baseUsd: 0.167,
   perSizeQuality: {
-    '1:1': { low: 0.011, medium: 0.04, high: 0.167, auto: 0.04 },
-    '16:9': { low: 0.016, medium: 0.06, high: 0.25, auto: 0.06 },
-    '9:16': { low: 0.016, medium: 0.06, high: 0.25, auto: 0.06 },
+    '1:1': { low: 0.011, medium: 0.04, high: 0.167, auto: 0.167 },
+    '16:9': { low: 0.016, medium: 0.06, high: 0.25, auto: 0.25 },
+    '9:16': { low: 0.016, medium: 0.06, high: 0.25, auto: 0.25 },
   },
 };
 
+// Real OpenAI gpt-image-2 output pricing (1024^2 reference): low $0.006,
+// medium $0.053, high $0.211. The previous ×8 4K multiplier double-counted and
+// produced a fictional ~$1.76 cost; the resolution curve below is realistic and
+// is auto-verified against measured actualCostUsd (see PricingSeederService).
+// `auto` is priced the same as `high` ($0.211): OpenAI renders quality="auto"
+// at high quality, so pricing it like `medium` ($0.053) sold auto generations
+// below cost (same root cause as gpt-image-1). Worst-case pricing avoids loss.
 const GPT_IMAGE_2_PRICING: ModelPricing = {
-  baseUsd: 0.05,
+  baseUsd: 0.211,
   perSizeQuality: Object.fromEntries(
     OPENAI_IMAGE_2_SIZES.map((size) => [
       size.id,
-      { low: 0.015, medium: 0.05, high: 0.22, auto: 0.05 },
+      { low: 0.006, medium: 0.053, high: 0.211, auto: 0.211 },
     ]),
   ) as Record<string, Record<string, number>>,
-  resolutionMultiplier: { '1K': 1, '2K': 4, '4K': 8 },
+  resolutionMultiplier: { '1K': 1, '2K': 2, '4K': 4 },
 };
 
 export const MODEL_REGISTRY: ModelCapability[] = [
@@ -188,8 +199,12 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     sizes: GOOGLE_FLASH_2_SIZES,
     qualities: [],
     resolutions: GOOGLE_FLASH_RESOLUTION_TIERS,
-    // Flat price regardless of size/resolution.
-    pricing: { baseUsd: 0.0672 },
+    // Priced by resolution (Google charges more for 2K/4K). Previously flat,
+    // which sold 2K/4K below cost ($0.101 / $0.151 charged as $0.067).
+    pricing: {
+      baseUsd: 0.0672,
+      resolutionMultiplier: { '512': 0.67, '1K': 1, '2K': 1.5, '4K': 2.25 },
+    },
   },
   {
     id: 'gemini-2.5-flash-image',
@@ -213,12 +228,14 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     ],
     qualities: [],
     resolutions: [],
-    // Flat credit cost (margin/baseUsd unused).
+    // Flat credit cost (margin/baseUsd unused). Rescaled to the new credit unit
+    // (credit = ILS 0.01): 185 credits = ILS 1.85, matching the previous
+    // ~$0.50 sell price.
     pricing: {
       baseUsd: 0,
       margin: 1,
       referenceImageUsd: 0,
-      creditCostOverride: 50,
+      creditCostOverride: 185,
     },
   },
 ];

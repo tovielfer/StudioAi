@@ -7,6 +7,7 @@ import { CreditTransaction } from '../credits/credit-transaction.entity';
 import { CreditsService } from '../credits/credits.service';
 import { Generation } from '../generations/generation.entity';
 import { GenerationStatus } from '../common/constants';
+import { creditsToIls, getBillingConfig, usdToCredits } from '../config/billing';
 import { User } from '../users/user.entity';
 import { UpdatePricingRuleDto } from './dto/update-pricing-rule.dto';
 
@@ -322,12 +323,23 @@ export class AdminService {
         byRuleId.get(rule.id),
         rule.isModelDefault ? undefined : byCombo.get(this.comboKey(rule)),
       );
+      const calculatedUsd = this.calculateRuleUsd(rule, false);
+      // Under-pricing alert: the measured provider cost exceeds what we sell
+      // for (sell price in USD). Surfaced prominently in the admin UI so the
+      // operator can raise the price before losing money at scale.
+      const underpriced =
+        metrics.avgActualCostUsd > 0 && metrics.avgActualCostUsd > calculatedUsd;
       return {
         ...rule,
-        calculatedUsd: this.calculateRuleUsd(rule, false),
+        calculatedUsd,
         calculatedCredits: this.calculateRuleCredits(rule, false),
+        calculatedIls: creditsToIls(this.calculateRuleCredits(rule, false)),
         referenceCalculatedUsd: this.calculateRuleUsd(rule, true),
         referenceCalculatedCredits: this.calculateRuleCredits(rule, true),
+        referenceCalculatedIls: creditsToIls(
+          this.calculateRuleCredits(rule, true),
+        ),
+        underpriced,
         metrics,
       };
     });
@@ -573,6 +585,10 @@ export class AdminService {
       if (!key) continue;
       const totalCredits = Number(row['totalCredits']);
       const totalActualCostUsd = Number(row['totalActualCostUsd']);
+      // Credits are an ILS-denominated unit now (credit = creditValueIls), so
+      // gross revenue in USD = credits * creditValueIls / usdIls.
+      const { usdIls, creditValueIls } = getBillingConfig();
+      const grossUsd = (totalCredits * creditValueIls) / usdIls;
       map.set(key, {
         generationCount: Number(row['generationCount']),
         doneCount: Number(row['doneCount']),
@@ -581,9 +597,9 @@ export class AdminService {
         avgCredits: Number(row['avgCredits']),
         totalActualCostUsd,
         avgActualCostUsd: Number(row['avgActualCostUsd']),
-        estimatedGrossUsd: Math.round((totalCredits / 100) * 10000) / 10000,
+        estimatedGrossUsd: Math.round(grossUsd * 10000) / 10000,
         estimatedMarginUsd:
-          Math.round((totalCredits / 100 - totalActualCostUsd) * 10000) / 10000,
+          Math.round((grossUsd - totalActualCostUsd) * 10000) / 10000,
         totalInputTokens: Number(row['totalInputTokens']),
         totalOutputTokens: Number(row['totalOutputTokens']),
         totalInputImageTokens: Number(row['totalInputImageTokens']),
@@ -653,6 +669,6 @@ export class AdminService {
 
   private calculateRuleCredits(rule: AiPricingRule, hasReference: boolean) {
     if (rule.creditCostOverride !== null) return rule.creditCostOverride;
-    return Math.ceil(this.calculateRuleUsd(rule, hasReference) * 100);
+    return usdToCredits(this.calculateRuleUsd(rule, hasReference));
   }
 }

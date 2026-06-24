@@ -1,13 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { CreditTransaction } from '../credits/credit-transaction.entity';
 import { User } from './user.entity';
+
+/** Credits granted to a new account on signup. */
+export const SIGNUP_BONUS_CREDITS = 150;
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepo: Repository<User>,
+    @InjectRepository(CreditTransaction)
+    private readonly creditTxRepo: Repository<CreditTransaction>,
   ) {}
 
   findByEmail(email: string) {
@@ -26,7 +32,7 @@ export class UsersService {
     return this.usersRepo.findOne({ where: { resetPasswordToken: token } });
   }
 
-  create(
+  async create(
     email: string,
     passwordHash: string,
     opts?: { emailVerificationToken?: string; emailVerificationExpiry?: Date },
@@ -34,12 +40,23 @@ export class UsersService {
     const user = this.usersRepo.create({
       email,
       passwordHash,
-      credits: 25,
+      credits: SIGNUP_BONUS_CREDITS,
       emailVerified: false,
       emailVerificationToken: opts?.emailVerificationToken ?? null,
       emailVerificationExpiry: opts?.emailVerificationExpiry ?? null,
     });
-    return this.usersRepo.save(user);
+    const saved = await this.usersRepo.save(user);
+
+    // Record the signup grant in the ledger so balances are fully auditable.
+    await this.creditTxRepo.save(
+      this.creditTxRepo.create({
+        userId: saved.id,
+        amount: SIGNUP_BONUS_CREDITS,
+        reason: 'signup_bonus',
+      }),
+    );
+
+    return saved;
   }
 
   async markEmailVerified(userId: string) {

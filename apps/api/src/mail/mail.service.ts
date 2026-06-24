@@ -166,6 +166,62 @@ export class MailService {
     this.logger.log(`Sent generation ${generation.id} to ${to}`);
   }
 
+  async sendFeedbackReply({
+    to,
+    feedbackTitle,
+    feedbackMessage,
+    adminReply,
+  }: {
+    to: string;
+    feedbackTitle: string;
+    feedbackMessage: string;
+    adminReply: string;
+  }): Promise<void> {
+    const { resend, from, replyTo } = this.getClient();
+
+    const html = `
+      <div style="background-color: #0f0f13; padding: 0; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">
+        <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px;">
+          <div dir="rtl" style="text-align: right; margin-bottom: 28px;">
+            <span style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">vooka</span><span style="font-size: 22px; font-weight: 700; color: #a78bfa;">Pix</span>
+          </div>
+          <div dir="rtl" style="background: #1a1a24; border: 1px solid #2d2d3d; border-radius: 16px; padding: 28px 24px; text-align: right; line-height: 1.7; color: #e5e7eb;">
+            <h2 style="margin: 0 0 12px; font-size: 20px; color: #ffffff;">קיבלת תגובה לפניה שלך 💬</h2>
+            <p style="margin: 0 0 8px; color: #9ca3af; font-size: 13px;">
+              <strong style="color: #c4b5fd;">הפניה שלך:</strong> ${this.escapeHtml(feedbackTitle || feedbackMessage.slice(0, 80))}
+            </p>
+            <div style="background: #111118; border-right: 3px solid #7c3aed; border-radius: 8px; padding: 14px 16px; margin: 16px 0; color: #e5e7eb;">
+              ${this.escapeHtml(adminReply).replace(/\n/g, '<br>')}
+            </div>
+            <div style="border-top: 1px solid #2d2d3d; padding-top: 16px; margin-top: 8px;">
+              <p style="margin: 0; color: #6b7280; font-size: 13px;">תוכל לראות את כל הפניות שלך ב‑<a href="${this.config.get<string>('APP_URL') ?? ''}/feedback" style="color: #a78bfa; text-decoration: none;">אזור הפניות</a>.</p>
+            </div>
+          </div>
+          <p style="text-align: center; margin-top: 20px; color: #4b5563; font-size: 12px;">
+            © ${new Date().getFullYear()} vookaPix · כל הזכויות שמורות
+          </p>
+        </div>
+      </div>
+    `;
+
+    const text = `קיבלת תגובה לפניה שלך ב-vookaPix.\n\nהפניה: ${feedbackTitle || feedbackMessage.slice(0, 80)}\n\nתגובה:\n${adminReply}`;
+
+    const { error } = await resend.emails.send({
+      from,
+      to,
+      ...(replyTo ? { replyTo } : {}),
+      subject: 'קיבלת תגובה לפניה שלך ב-vookaPix 💬',
+      text,
+      html,
+    });
+
+    if (error) {
+      throw new Error(`Failed to send feedback reply email: ${error.message}`);
+    }
+
+    this.logger.log(`Sent feedback reply email to ${to}`);
+  }
+
   private escapeHtml(value: string): string {
     return value
       .replace(/&/g, '&amp;')
