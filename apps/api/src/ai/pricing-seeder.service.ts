@@ -173,7 +173,19 @@ export class PricingSeederService implements OnApplicationBootstrap {
       base({ baseUsd: pricing.baseUsd, isModelDefault: true }),
     ];
 
-    if (pricing.perSizeQuality) {
+    if (pricing.perSizeResolutionQuality) {
+      // Full measured table: one row per size × resolution × quality, using the
+      // exact cost (no multiplier). Takes precedence over the legacy shapes.
+      for (const [size, byResolution] of Object.entries(
+        pricing.perSizeResolutionQuality,
+      )) {
+        for (const [resolution, byQuality] of Object.entries(byResolution)) {
+          for (const [quality, baseUsd] of Object.entries(byQuality)) {
+            rules.push(base({ size, quality, resolution, baseUsd }));
+          }
+        }
+      }
+    } else if (pricing.perSizeQuality) {
       const resolutions = pricing.resolutionMultiplier
         ? Object.keys(pricing.resolutionMultiplier)
         : model.resolutions.length

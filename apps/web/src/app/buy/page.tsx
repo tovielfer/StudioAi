@@ -157,10 +157,10 @@ function BuyContent() {
     <div className="max-w-6xl mx-auto px-4 py-10">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">קניית קרדיטים</h1>
-        <p className="text-gray-400 mt-1">
+        {/* <p className="text-gray-400 mt-1">
           משלמים רק על מה שיוצרים — בלי מנוי ובלי תפוגה. ככל שהחבילה גדולה יותר,
           המחיר לקרדיט זול יותר.
-        </p>
+        </p> */}
         <p className="text-sm text-gray-500 mt-2">
           היתרה הנוכחית שלך:{' '}
           <span className="text-brand-400 font-semibold">

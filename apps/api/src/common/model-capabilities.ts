@@ -44,6 +44,18 @@ export interface ModelPricing {
   creditCostOverride?: number | null;
   perSizeQuality?: Record<string, Record<string, number>>;
   resolutionMultiplier?: Record<string, number>;
+  /**
+   * Full measured cost table for models whose cost varies by *all three* of
+   * size, resolution and quality in a way no uniform multiplier can express
+   * (OpenAI gpt-image-2, billed by output tokens). Shape:
+   * `size -> resolution -> quality -> baseUsd`. When present it takes precedence
+   * over `perSizeQuality`/`resolutionMultiplier` and the seeder emits one row per
+   * size×resolution×quality directly from these values.
+   */
+  perSizeResolutionQuality?: Record<
+    string,
+    Record<string, Record<string, number>>
+  >;
 }
 
 export interface ModelCapability {
@@ -133,22 +145,84 @@ const GPT_IMAGE_1_PRICING: ModelPricing = {
   },
 };
 
-// Real OpenAI gpt-image-2 output pricing (1024^2 reference): low $0.006,
-// medium $0.053, high $0.211. The previous ×8 4K multiplier double-counted and
-// produced a fictional ~$1.76 cost; the resolution curve below is realistic and
-// is auto-verified against measured actualCostUsd (see PricingSeederService).
-// `auto` is priced the same as `high` ($0.211): OpenAI renders quality="auto"
-// at high quality, so pricing it like `medium` ($0.053) sold auto generations
-// below cost (same root cause as gpt-image-1). Worst-case pricing avoids loss.
+// Measured OpenAI gpt-image-2 output cost (USD) per aspect ratio × resolution ×
+// quality. gpt-image-2 is billed by output tokens, so — unlike Google — the
+// aspect ratio materially changes cost: narrow ratios (21:9/9:21) are far
+// cheaper than the square. Each number was measured directly from real
+// generations (output_tokens × $30/1M) and matches the official 1:1 1K figures
+// (low $0.006 / medium $0.053 / high $0.211).
+//
+// This replaces the previous flat base × uniform 4K=×4 estimate, which ignored
+// aspect ratio and badly over-charged narrow ratios (e.g. 9:21 4K high really
+// costs $0.2459 but was sold as $0.844 ⇒ 625 credits). margin and the
+// credit conversion still apply on top (see ai-pricing.service.ts).
+//
+// `auto` is priced the same as `high`: OpenAI renders quality="auto" at high
+// quality, so pricing it cheaper would sell auto generations below cost.
+type GptQualityCost = { low: number; medium: number; high: number };
+
+const gpt2ResTable = (
+  oneK: GptQualityCost,
+  twoK: GptQualityCost,
+  fourK: GptQualityCost,
+): Record<string, Record<string, number>> => {
+  const withAuto = (c: GptQualityCost) => ({
+    low: c.low,
+    medium: c.medium,
+    high: c.high,
+    auto: c.high,
+  });
+  return { '1K': withAuto(oneK), '2K': withAuto(twoK), '4K': withAuto(fourK) };
+};
+
+// Paired ratios (e.g. 16:9 / 9:16) share the same pixel count ⇒ same cost.
+const GPT2_COST_SQUARE = gpt2ResTable(
+  { low: 0.0059, medium: 0.0527, high: 0.2107 },
+  { low: 0.0119, medium: 0.107, high: 0.4283 },
+  { low: 0.0198, medium: 0.1779, high: 0.7117 },
+);
+const GPT2_COST_16_9 = gpt2ResTable(
+  { low: 0.00474, medium: 0.0412, high: 0.1646 },
+  { low: 0.00471, medium: 0.0444, high: 0.1696 },
+  { low: 0.0111, medium: 0.1001, high: 0.4003 },
+);
+const GPT2_COST_4_3 = gpt2ResTable(
+  { low: 0.004, medium: 0.0362, high: 0.1447 },
+  { low: 0.0074, medium: 0.0667, high: 0.2668 },
+  { low: 0.0144, medium: 0.1296, high: 0.5184 },
+);
+const GPT2_COST_3_2 = gpt2ResTable(
+  { low: 0.0039, medium: 0.0354, high: 0.1415 },
+  { low: 0.0063, medium: 0.057, high: 0.2279 },
+  { low: 0.0136, medium: 0.1223, high: 0.4892 },
+);
+const GPT2_COST_4_5 = gpt2ResTable(
+  { low: 0.0047, medium: 0.0424, high: 0.1696 },
+  { low: 0.0081, medium: 0.0732, high: 0.2927 },
+  { low: 0.0159, medium: 0.1431, high: 0.5724 },
+);
+const GPT2_COST_21_9 = gpt2ResTable(
+  { low: 0.0023, medium: 0.0205, high: 0.0819 },
+  { low: 0.0032, medium: 0.0289, high: 0.1156 },
+  { low: 0.0068, medium: 0.0615, high: 0.2459 },
+);
+
 const GPT_IMAGE_2_PRICING: ModelPricing = {
-  baseUsd: 0.211,
-  perSizeQuality: Object.fromEntries(
-    OPENAI_IMAGE_2_SIZES.map((size) => [
-      size.id,
-      { low: 0.006, medium: 0.053, high: 0.211, auto: 0.211 },
-    ]),
-  ) as Record<string, Record<string, number>>,
-  resolutionMultiplier: { '1K': 1, '2K': 2, '4K': 4 },
+  // Safety-net default for any unmeasured size (1:1 1K high).
+  baseUsd: 0.2107,
+  perSizeResolutionQuality: {
+    '1:1': GPT2_COST_SQUARE,
+    '16:9': GPT2_COST_16_9,
+    '9:16': GPT2_COST_16_9,
+    '4:3': GPT2_COST_4_3,
+    '3:4': GPT2_COST_4_3,
+    '3:2': GPT2_COST_3_2,
+    '2:3': GPT2_COST_3_2,
+    '4:5': GPT2_COST_4_5,
+    '5:4': GPT2_COST_4_5,
+    '21:9': GPT2_COST_21_9,
+    '9:21': GPT2_COST_21_9,
+  },
 };
 
 export const MODEL_REGISTRY: ModelCapability[] = [
