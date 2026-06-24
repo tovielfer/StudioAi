@@ -182,8 +182,11 @@ const GPT2_COST_SQUARE = gpt2ResTable(
   { low: 0.0198, medium: 0.1779, high: 0.7117 },
 );
 const GPT2_COST_16_9 = gpt2ResTable(
-  { low: 0.00474, medium: 0.0412, high: 0.1646 },
-  { low: 0.00471, medium: 0.0444, high: 0.1696 },
+  // 1K/2K medium measured directly ($0.0285 / $0.0426); low & high derived via
+  // the quality rule (low = medium/9, high = medium×4). This corrects the old
+  // anomaly where 1K and 2K were near-identical (2K low was even cheaper).
+  { low: 0.00317, medium: 0.0285, high: 0.114 },
+  { low: 0.00473, medium: 0.0426, high: 0.1704 },
   { low: 0.0111, medium: 0.1001, high: 0.4003 },
 );
 const GPT2_COST_4_3 = gpt2ResTable(
