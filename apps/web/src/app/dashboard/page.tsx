@@ -99,9 +99,9 @@ function DashboardContent() {
             <p className="text-lg font-semibold mt-1">
               קנה חבילה — ככל שגדולה יותר, זול יותר לקרדיט
             </p>
-            <p className="text-xs text-gray-500 mt-1">
+            {/* <p className="text-xs text-gray-500 mt-1">
               בלי מנוי, בלי תפוגה. משלמים רק על מה שיוצרים.
-            </p>
+            </p> */}
           </div>
           <Link href="/buy" className="btn-primary whitespace-nowrap">
             קניית קרדיטים
