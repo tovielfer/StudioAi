@@ -109,10 +109,10 @@ const OPENAI_IMAGE_2_SIZES: AttrOption[] = [
 ];
 
 const OPENAI_QUALITIES: AttrOption[] = [
-  { id: 'auto', label: 'Auto' },
   { id: 'low', label: 'Low' },
   { id: 'medium', label: 'Medium' },
   { id: 'high', label: 'High' },
+  { id: 'auto', label: 'Auto' },
 ];
 
 const RESOLUTION_TIERS: AttrOption[] = [
@@ -227,20 +227,6 @@ const GPT_IMAGE_2_PRICING: ModelPricing = {
 
 export const MODEL_REGISTRY: ModelCapability[] = [
   {
-    id: 'gpt-image-1',
-    name: 'gpt 1',
-    provider: AiProvider.OPENAI,
-    type: GenerationType.IMAGE,
-    sizes: [
-      { id: '1:1', label: '1024×1024 (ריבוע)' },
-      { id: '16:9', label: '1536×1024 (לרוחב)' },
-      { id: '9:16', label: '1024×1536 (לאורך)' },
-    ],
-    qualities: OPENAI_QUALITIES,
-    resolutions: FIXED_ONE_K,
-    pricing: GPT_IMAGE_1_PRICING,
-  },
-  {
     id: 'gpt-image-2',
     name: 'gpt 2',
     provider: AiProvider.OPENAI,
@@ -249,6 +235,21 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     qualities: OPENAI_QUALITIES,
     resolutions: RESOLUTION_TIERS,
     pricing: GPT_IMAGE_2_PRICING,
+  },
+  {
+    id: 'gemini-3.1-flash-image',
+    name: 'Nano Banana 2',
+    provider: AiProvider.GOOGLE,
+    type: GenerationType.IMAGE,
+    sizes: GOOGLE_FLASH_2_SIZES,
+    qualities: [],
+    resolutions: GOOGLE_FLASH_RESOLUTION_TIERS,
+    // Priced by resolution (Google charges more for 2K/4K). Previously flat,
+    // which sold 2K/4K below cost ($0.101 / $0.151 charged as $0.067).
+    pricing: {
+      baseUsd: 0.0672,
+      resolutionMultiplier: { '512': 0.67, '1K': 1, '2K': 1.5, '4K': 2.25 },
+    },
   },
   {
     id: 'gemini-3-pro-image',
@@ -266,19 +267,18 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     },
   },
   {
-    id: 'gemini-3.1-flash-image',
-    name: 'Nano Banana 2',
-    provider: AiProvider.GOOGLE,
+    id: 'gpt-image-1',
+    name: 'gpt 1',
+    provider: AiProvider.OPENAI,
     type: GenerationType.IMAGE,
-    sizes: GOOGLE_FLASH_2_SIZES,
-    qualities: [],
-    resolutions: GOOGLE_FLASH_RESOLUTION_TIERS,
-    // Priced by resolution (Google charges more for 2K/4K). Previously flat,
-    // which sold 2K/4K below cost ($0.101 / $0.151 charged as $0.067).
-    pricing: {
-      baseUsd: 0.0672,
-      resolutionMultiplier: { '512': 0.67, '1K': 1, '2K': 1.5, '4K': 2.25 },
-    },
+    sizes: [
+      { id: '1:1', label: '1024×1024 (ריבוע)' },
+      { id: '16:9', label: '1536×1024 (לרוחב)' },
+      { id: '9:16', label: '1024×1536 (לאורך)' },
+    ],
+    qualities: OPENAI_QUALITIES,
+    resolutions: FIXED_ONE_K,
+    pricing: GPT_IMAGE_1_PRICING,
   },
   {
     id: 'gemini-2.5-flash-image',

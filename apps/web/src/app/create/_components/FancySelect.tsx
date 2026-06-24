@@ -110,14 +110,13 @@ export function FancySelect({
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`group flex w-full items-center justify-between gap-3 rounded-lg border bg-surface-card px-4 py-2.5 text-right text-white transition-colors focus:outline-none ${
+        className={`group flex w-full items-center justify-between gap-2 rounded-lg border bg-surface-card px-3 py-2.5 text-right text-sm text-white transition-colors focus:outline-none ${
           open
             ? 'border-transparent ring-2 ring-brand-500'
             : 'border-surface-border hover:border-brand-500/60'
         }`}
       >
-        <span className={`flex items-center gap-2 truncate whitespace-nowrap ${selected ? '' : 'text-gray-500'}`}>
-          {selected?.icon}
+        <span className={`flex min-w-0 items-center gap-2 truncate whitespace-nowrap ${selected ? '' : 'text-gray-500'}`}>
           <span className="truncate">
             {selected ? selected.shortLabel ?? selected.label : placeholder}
           </span>

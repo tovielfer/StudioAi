@@ -29,7 +29,7 @@ export function CreateWorkspace({
 
   const initialModel = models[0];
   const initialQuality =
-    initialModel.qualities.find((q) => q.id === 'auto')?.id ??
+    initialModel.qualities.find((q) => q.id === 'medium')?.id ??
     initialModel.qualities[0]?.id ??
     'auto';
   const [prompt, setPrompt] = useState('');
@@ -244,7 +244,7 @@ export function CreateWorkspace({
       const qualOptions = def.qualities;
       if (qualOptions.length === 0) setQuality('auto');
       else if (!qualOptions.find((q) => q.id === quality)) {
-        setQuality(qualOptions.find((q) => q.id === 'auto')?.id ?? qualOptions[0].id);
+        setQuality(qualOptions.find((q) => q.id === 'medium')?.id ?? qualOptions[0].id);
       }
     }
     if (def) {
