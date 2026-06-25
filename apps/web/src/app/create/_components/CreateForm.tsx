@@ -352,6 +352,19 @@ export function CreateForm({
               />
             </div>
           )}
+          {selectedModel.resolutions.length > 1 && (
+            <div className="w-28">
+              <FancySelect
+                value={resolution}
+                onChange={setResolution}
+                options={selectedModel.resolutions.map((r) => ({
+                  value: r.id,
+                  label: r.label,
+                  shortLabel: r.id,
+                }))}
+              />
+            </div>
+          )}
           {(selectedModel.durations?.length ?? 0) > 1 && (
             <div className="w-24">
               <FancySelect

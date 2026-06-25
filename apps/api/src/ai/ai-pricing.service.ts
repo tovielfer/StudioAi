@@ -5,7 +5,7 @@ import { GenerationType } from '../common/constants';
 import { creditsToIls, getBillingConfig, usdToCredits } from '../config/billing';
 import {
   computeVideoSellUsd,
-  getModelCapability,
+  modelHasVideoPricing,
   normalizeVideoDuration,
 } from '../common/model-capabilities';
 import { AiPricingRule } from './ai-pricing-rule.entity';
@@ -102,8 +102,7 @@ export class AiPricingService {
   private async getVideoCost(
     params: PricingParams,
   ): Promise<PricingResult | null> {
-    const capability = getModelCapability(params.model);
-    if (!capability?.pricing.videoPerSecondUsd) return null;
+    if (!modelHasVideoPricing(params.model)) return null;
 
     const modelDefault = await this.pricingRepo
       .createQueryBuilder('rule')
@@ -141,6 +140,7 @@ export class AiPricingService {
       duration,
       Boolean(params.generateAudio),
       margin,
+      params.resolution,
     );
     if (sellUsd === null) return null;
 

@@ -302,7 +302,12 @@ export function CreateWorkspace({
     if (def) {
       const resOptions = def.resolutions;
       if (resOptions.length === 0) setResolution('1K');
-      else if (!resOptions.find((r) => r.id === resolution)) setResolution(resOptions[0].id);
+      else if (!resOptions.find((r) => r.id === resolution)) {
+        // Prefer a balanced default (720p) when the model exposes it.
+        setResolution(
+          resOptions.find((r) => r.id === '720p')?.id ?? resOptions[0].id,
+        );
+      }
     }
     if (def) {
       const durOptions = def.durations ?? [];
@@ -310,6 +315,8 @@ export function CreateWorkspace({
         setDuration(durOptions[0].id);
       }
       if (!def.supportsAudio) setGenerateAudio(false);
+      // Seedance 2.0 generates audio at no extra cost, so default it on.
+      else if (newModel === 'seedance-v2') setGenerateAudio(true);
     }
   };
 

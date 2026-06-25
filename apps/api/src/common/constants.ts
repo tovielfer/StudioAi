@@ -41,6 +41,12 @@ export enum ImageResolution {
   ONE_K = '1K',
   TWO_K = '2K',
   FOUR_K = '4K',
+  // Video resolution tiers (Seedance). Stored as plain strings; kept here so
+  // the create DTO's @IsEnum validation accepts them.
+  P_480 = '480p',
+  P_720 = '720p',
+  P_1080 = '1080p',
+  P_4K = '4k',
 }
 
 export enum AiProvider {

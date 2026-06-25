@@ -62,6 +62,16 @@ export interface ModelPricing {
    * `perSecond * durationSeconds * margin` — see {@link computeVideoSellUsd}.
    */
   videoPerSecondUsd?: { audioOff: number; audioOn: number };
+  /**
+   * Per-second provider cost (USD) keyed by resolution, for video models whose
+   * cost varies materially by resolution (Seedance). Same per-second billing as
+   * {@link videoPerSecondUsd}, but the rate is chosen by the selected resolution.
+   * Takes precedence over `videoPerSecondUsd` when present.
+   */
+  videoPerSecondUsdByResolution?: Record<
+    string,
+    { audioOff: number; audioOn: number }
+  >;
 }
 
 export interface ModelCapability {
@@ -162,6 +172,48 @@ const KLING_V21_DURATIONS: AttrOption[] = [
   { id: '5', label: '5 שניות' },
   { id: '10', label: '10 שניות' },
 ];
+
+// Aspect ratios honoured by Seedance (text-to-video). For image-to-video the
+// ratio is inferred from the start image and this field is omitted.
+const SEEDANCE_SIZES: AttrOption[] = [
+  { id: '16:9', label: '16:9 לרוחב' },
+  { id: '9:16', label: '9:16 לאורך' },
+  { id: '1:1', label: '1:1 ריבוע' },
+  { id: '21:9', label: '21:9 סינמטי' },
+  { id: '4:3', label: '4:3 סטנדרטי' },
+  { id: '3:4', label: '3:4 פורטרט' },
+];
+
+// Seedance video resolution tiers. Stored/sent as fal's own ids (480p/720p/…).
+const SEEDANCE_RESOLUTIONS: AttrOption[] = [
+  { id: '480p', label: '480p – מהיר' },
+  { id: '720p', label: '720p – מאוזן' },
+  { id: '1080p', label: '1080p – איכותי' },
+];
+
+// Seedance 2.0 additionally supports 4k (very expensive).
+const SEEDANCE_2_RESOLUTIONS: AttrOption[] = [
+  ...SEEDANCE_RESOLUTIONS,
+  { id: '4k', label: '4K – מקסימלי' },
+];
+
+// Seedance 1.0 Pro accepts any whole number of seconds from 2 to 12.
+const SEEDANCE_V1_DURATIONS: AttrOption[] = Array.from(
+  { length: 11 },
+  (_, i) => {
+    const sec = i + 2;
+    return { id: String(sec), label: `${sec} שניות` };
+  },
+);
+
+// Seedance 2.0 accepts 4 to 15 seconds.
+const SEEDANCE_V2_DURATIONS: AttrOption[] = Array.from(
+  { length: 12 },
+  (_, i) => {
+    const sec = i + 4;
+    return { id: String(sec), label: `${sec} שניות` };
+  },
+);
 
 // Default base USD prices, mirroring the seed migrations so a fresh DB
 // reproduces today's pricing. Admin edits in the DB take precedence at runtime.
@@ -412,6 +464,56 @@ export const MODEL_REGISTRY: ModelCapability[] = [
       videoPerSecondUsd: { audioOff: 0.05, audioOn: 0.05 },
     },
   },
+  {
+    id: 'seedance-v1-pro',
+    name: 'Seedance 1.0 Pro',
+    provider: AiProvider.FAL,
+    type: GenerationType.VIDEO,
+    sizes: SEEDANCE_SIZES,
+    qualities: [],
+    resolutions: SEEDANCE_RESOLUTIONS,
+    durations: SEEDANCE_V1_DURATIONS,
+    // Seedance 1.0 has no native audio.
+    supportsAudio: false,
+    // fal bills per second; cost varies by resolution (no audio). Derived from
+    // fal's formula: tokens = h×w×24×duration/1024, $2.5 / 1M tokens, using the
+    // 16:9 pixel counts (854×480 / 1280×720 / 1920×1080).
+    pricing: {
+      baseUsd: 0,
+      referenceImageUsd: 0,
+      videoPerSecondUsdByResolution: {
+        '480p': { audioOff: 0.024, audioOn: 0.024 },
+        '720p': { audioOff: 0.054, audioOn: 0.054 },
+        '1080p': { audioOff: 0.1215, audioOn: 0.1215 },
+      },
+    },
+  },
+  {
+    id: 'seedance-v2',
+    name: 'Seedance 2.0',
+    provider: AiProvider.FAL,
+    type: GenerationType.VIDEO,
+    sizes: SEEDANCE_SIZES,
+    qualities: [],
+    resolutions: SEEDANCE_2_RESOLUTIONS,
+    durations: SEEDANCE_V2_DURATIONS,
+    // Seedance 2.0 generates synchronised audio; fal charges the same with or
+    // without it, so audioOff and audioOn are equal.
+    supportsAudio: true,
+    // fal bills per second; cost varies by resolution. Derived from fal's
+    // formula: tokens = h×w×24×duration/1024, $0.014 / 1K tokens for
+    // 480p/720p/1080p and $0.008 / 1K tokens for 4k (16:9 pixel counts).
+    pricing: {
+      baseUsd: 0,
+      referenceImageUsd: 0,
+      videoPerSecondUsdByResolution: {
+        '480p': { audioOff: 0.1406, audioOn: 0.1406 },
+        '720p': { audioOff: 0.3024, audioOn: 0.3024 },
+        '1080p': { audioOff: 0.6804, audioOn: 0.6804 },
+        '4k': { audioOff: 1.5552, audioOn: 1.5552 },
+      },
+    },
+  },
 ];
 
 export function getModelCapability(
@@ -495,8 +597,39 @@ export function modelSupportsAudio(modelId?: string | null): boolean {
 }
 
 /**
+ * Resolves the per-second audio-on/audio-off rates for a video model, honouring
+ * resolution-keyed pricing (Seedance) when present and falling back to the flat
+ * per-second rate (Kling). Returns `null` for models without per-second pricing.
+ */
+function resolveVideoRates(
+  capability: ModelCapability | undefined,
+  resolution: string | null | undefined,
+): { audioOff: number; audioOn: number } | null {
+  const pricing = capability?.pricing;
+  if (!pricing) return null;
+  const byResolution = pricing.videoPerSecondUsdByResolution;
+  if (byResolution) {
+    return (
+      (resolution ? byResolution[resolution] : undefined) ??
+      Object.values(byResolution)[0] ??
+      null
+    );
+  }
+  return pricing.videoPerSecondUsd ?? null;
+}
+
+/** Whether a model is priced per second of video (vs the rule table). */
+export function modelHasVideoPricing(modelId?: string | null): boolean {
+  const pricing = getModelCapability(modelId)?.pricing;
+  return Boolean(
+    pricing?.videoPerSecondUsd || pricing?.videoPerSecondUsdByResolution,
+  );
+}
+
+/**
  * Sell price (USD) for a video generation: per-second provider cost × duration
- * × margin. Audio is only billed at the higher rate when the model supports it.
+ * × margin. The per-second rate may vary by resolution (Seedance). Audio is
+ * only billed at the higher rate when the model supports it.
  * Returns `null` for non-video models, which price via the rule table instead.
  */
 export function computeVideoSellUsd(
@@ -504,9 +637,10 @@ export function computeVideoSellUsd(
   durationSeconds: number,
   generateAudio: boolean,
   margin: number,
+  resolution?: string | null,
 ): number | null {
   const capability = getModelCapability(modelId);
-  const rates = capability?.pricing.videoPerSecondUsd;
+  const rates = resolveVideoRates(capability, resolution);
   if (!rates) return null;
   const audio = generateAudio && Boolean(capability?.supportsAudio);
   const perSecond = audio ? rates.audioOn : rates.audioOff;
