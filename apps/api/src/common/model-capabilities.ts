@@ -385,6 +385,67 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     pricing: { baseUsd: 0.039 },
   },
   {
+    id: 'seedance-v2',
+    name: 'Seedance 2.0',
+    provider: AiProvider.REPLICATE,
+    type: GenerationType.VIDEO,
+    sizes: SEEDANCE_SIZES,
+    qualities: [],
+    resolutions: SEEDANCE_2_RESOLUTIONS,
+    durations: SEEDANCE_V2_DURATIONS,
+    // Seedance 2.0 generates synchronised audio; Replicate includes it in the
+    // per-second rate, so audioOff and audioOn are equal.
+    supportsAudio: true,
+    // Replicate per-second rates (verified from the model page). Rates use the
+    // text-to-video base; the 2.0× sell margin covers the slightly higher
+    // image/video-input rate. ~40% cheaper than the previous fal route.
+    pricing: {
+      baseUsd: 0,
+      referenceImageUsd: 0,
+      videoPerSecondUsdByResolution: SEEDANCE_V2_PER_SECOND,
+    },
+  },
+  {
+    id: 'seedance-v2-fast',
+    name: 'Seedance 2.0 Fast',
+    provider: AiProvider.REPLICATE,
+    type: GenerationType.VIDEO,
+    sizes: SEEDANCE_SIZES,
+    qualities: [],
+    resolutions: SEEDANCE_2_LITE_RESOLUTIONS,
+    durations: SEEDANCE_V2_DURATIONS,
+    supportsAudio: true,
+    // Faster mid-tier variant; up to 720p. Replicate verified rates.
+    pricing: {
+      baseUsd: 0,
+      referenceImageUsd: 0,
+      videoPerSecondUsdByResolution: {
+        '480p': { audioOff: 0.07, audioOn: 0.07 },
+        '720p': { audioOff: 0.15, audioOn: 0.15 },
+      },
+    },
+  },
+  {
+    id: 'seedance-v2-mini',
+    name: 'Seedance 2.0 Mini',
+    provider: AiProvider.REPLICATE,
+    type: GenerationType.VIDEO,
+    sizes: SEEDANCE_SIZES,
+    qualities: [],
+    resolutions: SEEDANCE_2_LITE_RESOLUTIONS,
+    durations: SEEDANCE_V2_DURATIONS,
+    supportsAudio: true,
+    // Lowest-cost variant (~half of standard); up to 720p. Replicate verified rates.
+    pricing: {
+      baseUsd: 0,
+      referenceImageUsd: 0,
+      videoPerSecondUsdByResolution: {
+        '480p': { audioOff: 0.04, audioOn: 0.04 },
+        '720p': { audioOff: 0.09, audioOn: 0.09 },
+      },
+    },
+  },
+  {
     id: 'kling-v3-standard',
     name: 'Kling Video v3 Standard',
     provider: AiProvider.FAL,
@@ -468,67 +529,6 @@ export const MODEL_REGISTRY: ModelCapability[] = [
       baseUsd: 0,
       referenceImageUsd: 0,
       videoPerSecondUsd: { audioOff: 0.05, audioOn: 0.05 },
-    },
-  },
-  {
-    id: 'seedance-v2',
-    name: 'Seedance 2.0',
-    provider: AiProvider.REPLICATE,
-    type: GenerationType.VIDEO,
-    sizes: SEEDANCE_SIZES,
-    qualities: [],
-    resolutions: SEEDANCE_2_RESOLUTIONS,
-    durations: SEEDANCE_V2_DURATIONS,
-    // Seedance 2.0 generates synchronised audio; Replicate includes it in the
-    // per-second rate, so audioOff and audioOn are equal.
-    supportsAudio: true,
-    // Replicate per-second rates (verified from the model page). Rates use the
-    // text-to-video base; the 2.0× sell margin covers the slightly higher
-    // image/video-input rate. ~40% cheaper than the previous fal route.
-    pricing: {
-      baseUsd: 0,
-      referenceImageUsd: 0,
-      videoPerSecondUsdByResolution: SEEDANCE_V2_PER_SECOND,
-    },
-  },
-  {
-    id: 'seedance-v2-fast',
-    name: 'Seedance 2.0 Fast',
-    provider: AiProvider.REPLICATE,
-    type: GenerationType.VIDEO,
-    sizes: SEEDANCE_SIZES,
-    qualities: [],
-    resolutions: SEEDANCE_2_LITE_RESOLUTIONS,
-    durations: SEEDANCE_V2_DURATIONS,
-    supportsAudio: true,
-    // Faster mid-tier variant; up to 720p. Replicate verified rates.
-    pricing: {
-      baseUsd: 0,
-      referenceImageUsd: 0,
-      videoPerSecondUsdByResolution: {
-        '480p': { audioOff: 0.07, audioOn: 0.07 },
-        '720p': { audioOff: 0.15, audioOn: 0.15 },
-      },
-    },
-  },
-  {
-    id: 'seedance-v2-mini',
-    name: 'Seedance 2.0 Mini',
-    provider: AiProvider.REPLICATE,
-    type: GenerationType.VIDEO,
-    sizes: SEEDANCE_SIZES,
-    qualities: [],
-    resolutions: SEEDANCE_2_LITE_RESOLUTIONS,
-    durations: SEEDANCE_V2_DURATIONS,
-    supportsAudio: true,
-    // Lowest-cost variant (~half of standard); up to 720p. Replicate verified rates.
-    pricing: {
-      baseUsd: 0,
-      referenceImageUsd: 0,
-      videoPerSecondUsdByResolution: {
-        '480p': { audioOff: 0.04, audioOn: 0.04 },
-        '720p': { audioOff: 0.09, audioOn: 0.09 },
-      },
     },
   },
   {
