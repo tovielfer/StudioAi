@@ -18,6 +18,25 @@ type FalResultFile = {
   url?: string;
 };
 
+type FalErrorPayload = {
+  detail?:
+    | string
+    | Array<{
+        msg?: string;
+        type?: string;
+      }>;
+};
+
+class FalProviderError extends Error {
+  constructor(
+    message: string,
+    readonly providerErrorRaw: string,
+  ) {
+    super(message);
+    this.name = 'FalProviderError';
+  }
+}
+
 type FalGenerationResponse = {
   images?: FalResultFile[];
   image?: FalResultFile;
@@ -50,8 +69,7 @@ export class FalProvider extends BaseImageProvider {
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Fal.ai error: ${err}`);
+      throw this.toProviderError(await response.text());
     }
 
     const data = (await response.json()) as { images?: { url: string }[] };
@@ -159,8 +177,7 @@ export class FalProvider extends BaseImageProvider {
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Fal.ai error: ${err}`);
+      throw this.toProviderError(await response.text());
     }
 
     return response.json() as Promise<T>;
@@ -225,6 +242,24 @@ export class FalProvider extends BaseImageProvider {
     if (size === '9:16') return '9:16';
     if (size === '1:1') return '1:1';
     return '16:9';
+  }
+
+  // Translates a Fal error body into a coded error the frontend can localise.
+  // The raw body is preserved on `providerErrorRaw` for admin debugging.
+  private toProviderError(raw: string): FalProviderError {
+    let payload: FalErrorPayload | null = null;
+    try {
+      payload = JSON.parse(raw) as FalErrorPayload;
+    } catch {
+      // Some failures are plain text; fall back to the raw body below.
+    }
+
+    const details = Array.isArray(payload?.detail) ? payload.detail : [];
+    if (details.some((d) => d?.type === 'image_aspect_ratio_error')) {
+      return new FalProviderError('FAL_INVALID_IMAGE_ASPECT_RATIO', raw);
+    }
+
+    return new FalProviderError(`Fal.ai error: ${raw}`, raw);
   }
 
   private delay(ms: number): Promise<void> {

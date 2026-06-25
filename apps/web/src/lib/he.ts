@@ -42,6 +42,10 @@ export function translateError(
     return `אי אפשר להשתמש בתמונת ההשראה ${referenceImageLabel(imageNumber)}: הקובץ לא תקין או בפורמט תמונה ש-OpenAI לא תומך בו. כדאי להעלות אותה מחדש כ-JPG או PNG רגיל (RGB).`;
   }
 
+  if (message.includes('FAL_INVALID_IMAGE_ASPECT_RATIO')) {
+    return 'יחס הממדים של תמונת ההשראה חורג מהטווח הנתמך (בין 0.4 ל-2.5). כדאי לחתוך או להעלות תמונה פחות מוארכת/רחבה ולנסות שוב.';
+  }
+
   if (
     message.includes('invalid_image_file') ||
     message.includes('Invalid image file or mode')
