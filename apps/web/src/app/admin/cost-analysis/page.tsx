@@ -469,7 +469,7 @@ function CostAnalysisContent() {
         </section>
 
         <p className="text-sm text-gray-500">
-          לחצי על שורת סיכום כדי לראות את היצירות ששייכות אליה.
+          לחץ על שורת סיכום כדי לראות את היצירות ששייכות אליה.
         </p>
       </div>
 

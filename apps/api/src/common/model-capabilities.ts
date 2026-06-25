@@ -184,27 +184,19 @@ const SEEDANCE_SIZES: AttrOption[] = [
   { id: '3:4', label: '3:4 פורטרט' },
 ];
 
-// Seedance video resolution tiers. Stored/sent as fal's own ids (480p/720p/…).
-const SEEDANCE_RESOLUTIONS: AttrOption[] = [
+// Seedance 2.0 (standard) on Replicate supports the full tier range.
+const SEEDANCE_2_RESOLUTIONS: AttrOption[] = [
   { id: '480p', label: '480p – מהיר' },
   { id: '720p', label: '720p – מאוזן' },
   { id: '1080p', label: '1080p – איכותי' },
-];
-
-// Seedance 2.0 additionally supports 4k (very expensive).
-const SEEDANCE_2_RESOLUTIONS: AttrOption[] = [
-  ...SEEDANCE_RESOLUTIONS,
   { id: '4k', label: '4K – מקסימלי' },
 ];
 
-// Seedance 1.0 Pro accepts any whole number of seconds from 2 to 12.
-const SEEDANCE_V1_DURATIONS: AttrOption[] = Array.from(
-  { length: 11 },
-  (_, i) => {
-    const sec = i + 2;
-    return { id: String(sec), label: `${sec} שניות` };
-  },
-);
+// Seedance 2.0 Fast/Mini on Replicate output up to 720p only.
+const SEEDANCE_2_LITE_RESOLUTIONS: AttrOption[] = [
+  { id: '480p', label: '480p – מהיר' },
+  { id: '720p', label: '720p – מאוזן' },
+];
 
 // Seedance 2.0 accepts 4 to 15 seconds.
 const SEEDANCE_V2_DURATIONS: AttrOption[] = Array.from(
@@ -214,6 +206,20 @@ const SEEDANCE_V2_DURATIONS: AttrOption[] = Array.from(
     return { id: String(sec), label: `${sec} שניות` };
   },
 );
+
+// Seedance 2.0 (standard) per-second provider cost (USD) by resolution, via
+// Replicate. Audio is included in the rate, so audioOff and audioOn are equal.
+// Shared by the standard text/image model and the reference-to-video model
+// (image references only — the ×0.6 video-input discount doesn't apply here).
+const SEEDANCE_V2_PER_SECOND: Record<
+  string,
+  { audioOff: number; audioOn: number }
+> = {
+  '480p': { audioOff: 0.08, audioOn: 0.08 },
+  '720p': { audioOff: 0.18, audioOn: 0.18 },
+  '1080p': { audioOff: 0.45, audioOn: 0.45 },
+  '4k': { audioOff: 1.25, audioOn: 1.25 },
+};
 
 // Default base USD prices, mirroring the seed migrations so a fresh DB
 // reproduces today's pricing. Admin edits in the DB take precedence at runtime.
@@ -465,53 +471,83 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     },
   },
   {
-    id: 'seedance-v1-pro',
-    name: 'Seedance 1.0 Pro',
-    provider: AiProvider.FAL,
-    type: GenerationType.VIDEO,
-    sizes: SEEDANCE_SIZES,
-    qualities: [],
-    resolutions: SEEDANCE_RESOLUTIONS,
-    durations: SEEDANCE_V1_DURATIONS,
-    // Seedance 1.0 has no native audio.
-    supportsAudio: false,
-    // fal bills per second; cost varies by resolution (no audio). Derived from
-    // fal's formula: tokens = h×w×24×duration/1024, $2.5 / 1M tokens, using the
-    // 16:9 pixel counts (854×480 / 1280×720 / 1920×1080).
-    pricing: {
-      baseUsd: 0,
-      referenceImageUsd: 0,
-      videoPerSecondUsdByResolution: {
-        '480p': { audioOff: 0.024, audioOn: 0.024 },
-        '720p': { audioOff: 0.054, audioOn: 0.054 },
-        '1080p': { audioOff: 0.1215, audioOn: 0.1215 },
-      },
-    },
-  },
-  {
     id: 'seedance-v2',
     name: 'Seedance 2.0',
-    provider: AiProvider.FAL,
+    provider: AiProvider.REPLICATE,
     type: GenerationType.VIDEO,
     sizes: SEEDANCE_SIZES,
     qualities: [],
     resolutions: SEEDANCE_2_RESOLUTIONS,
     durations: SEEDANCE_V2_DURATIONS,
-    // Seedance 2.0 generates synchronised audio; fal charges the same with or
-    // without it, so audioOff and audioOn are equal.
+    // Seedance 2.0 generates synchronised audio; Replicate includes it in the
+    // per-second rate, so audioOff and audioOn are equal.
     supportsAudio: true,
-    // fal bills per second; cost varies by resolution. Derived from fal's
-    // formula: tokens = h×w×24×duration/1024, $0.014 / 1K tokens for
-    // 480p/720p/1080p and $0.008 / 1K tokens for 4k (16:9 pixel counts).
+    // Replicate per-second rates (verified from the model page). Rates use the
+    // text-to-video base; the 2.0× sell margin covers the slightly higher
+    // image/video-input rate. ~40% cheaper than the previous fal route.
+    pricing: {
+      baseUsd: 0,
+      referenceImageUsd: 0,
+      videoPerSecondUsdByResolution: SEEDANCE_V2_PER_SECOND,
+    },
+  },
+  {
+    id: 'seedance-v2-fast',
+    name: 'Seedance 2.0 Fast',
+    provider: AiProvider.REPLICATE,
+    type: GenerationType.VIDEO,
+    sizes: SEEDANCE_SIZES,
+    qualities: [],
+    resolutions: SEEDANCE_2_LITE_RESOLUTIONS,
+    durations: SEEDANCE_V2_DURATIONS,
+    supportsAudio: true,
+    // Faster mid-tier variant; up to 720p. Replicate verified rates.
     pricing: {
       baseUsd: 0,
       referenceImageUsd: 0,
       videoPerSecondUsdByResolution: {
-        '480p': { audioOff: 0.1406, audioOn: 0.1406 },
-        '720p': { audioOff: 0.3024, audioOn: 0.3024 },
-        '1080p': { audioOff: 0.6804, audioOn: 0.6804 },
-        '4k': { audioOff: 1.5552, audioOn: 1.5552 },
+        '480p': { audioOff: 0.07, audioOn: 0.07 },
+        '720p': { audioOff: 0.15, audioOn: 0.15 },
       },
+    },
+  },
+  {
+    id: 'seedance-v2-mini',
+    name: 'Seedance 2.0 Mini',
+    provider: AiProvider.REPLICATE,
+    type: GenerationType.VIDEO,
+    sizes: SEEDANCE_SIZES,
+    qualities: [],
+    resolutions: SEEDANCE_2_LITE_RESOLUTIONS,
+    durations: SEEDANCE_V2_DURATIONS,
+    supportsAudio: true,
+    // Lowest-cost variant (~half of standard); up to 720p. Replicate verified rates.
+    pricing: {
+      baseUsd: 0,
+      referenceImageUsd: 0,
+      videoPerSecondUsdByResolution: {
+        '480p': { audioOff: 0.04, audioOn: 0.04 },
+        '720p': { audioOff: 0.09, audioOn: 0.09 },
+      },
+    },
+  },
+  {
+    id: 'seedance-v2-ref',
+    name: 'Seedance 2.0 — ייחוס',
+    provider: AiProvider.REPLICATE,
+    type: GenerationType.VIDEO,
+    sizes: SEEDANCE_SIZES,
+    qualities: [],
+    resolutions: SEEDANCE_2_RESOLUTIONS,
+    durations: SEEDANCE_V2_DURATIONS,
+    supportsAudio: true,
+    // Reference-to-video via Replicate's bytedance/seedance-2.0 with up to 9
+    // reference images (referenced in the prompt as [Image1]…). Images-only, so
+    // it's billed identically to the standard model (no video-input discount).
+    pricing: {
+      baseUsd: 0,
+      referenceImageUsd: 0,
+      videoPerSecondUsdByResolution: SEEDANCE_V2_PER_SECOND,
     },
   },
 ];

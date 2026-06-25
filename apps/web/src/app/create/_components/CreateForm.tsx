@@ -200,6 +200,9 @@ export function CreateForm({
 }) {
   const [isPromptExpanded, setIsPromptExpanded] = useState(false);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  // Seedance reference-to-video takes multiple reference images (referenced in
+  // the prompt as [Image1]…) rather than ordered start/end frames.
+  const isReferenceMode = selectedModel.id === 'seedance-v2-ref';
 
   useEffect(() => {
     setPortalTarget(document.body);
@@ -397,9 +400,9 @@ export function CreateForm({
         </div>
       )}
 
-      {/* Reference images. Video uses two ordered slots (start/end frame);
-          images use a multi-image inspiration drop zone. */}
-      {isVideo ? (
+      {/* Reference images. Standard video uses two ordered slots (start/end
+          frame); reference-to-video and images use a multi-image drop zone. */}
+      {isVideo && !isReferenceMode ? (
         <div className="flex flex-nowrap gap-3 lg:shrink-0">
           <VideoFrameSlot
             label="תמונת התחלה"
@@ -418,9 +421,14 @@ export function CreateForm({
       ) : (
         <div className="lg:shrink-0">
           <label className="mb-1.5 block text-sm text-gray-400">
-            תמונות השראה
+            {isReferenceMode ? 'תמונות ייחוס' : 'תמונות השראה'}
             <span className="text-gray-600"> · אופציונלי</span>
           </label>
+          {isReferenceMode && (
+            <p className="mb-1.5 text-[11px] leading-snug text-gray-500">
+              הוסיפו עד {MAX_REFERENCES} תמונות והפנו אליהן בפרומפט עם ‎[Image1]‎,‏ ‎[Image2]‎ וכך הלאה.
+            </p>
+          )}
           <div
             onDragOver={(e) => { e.preventDefault(); if (!isDragOver) setIsDragOver(true); }}
             onDragLeave={() => setIsDragOver(false)}

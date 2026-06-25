@@ -75,7 +75,16 @@ export class ReplicateProvider extends BaseImageProvider {
       generate_audio: Boolean(params.generateAudio),
     };
 
-    if (startImage) {
+    if (params.model === 'seedance-v2-ref') {
+      // Reference-to-video: pass every uploaded image as a reference. They're
+      // referenced in the prompt as [Image1], [Image2], … and are mutually
+      // exclusive with first/last frame images, so we never send `image` here.
+      const referenceImages = this.resolveReferenceImages(params);
+      if (referenceImages.length) {
+        input.reference_images = referenceImages;
+      }
+      input.aspect_ratio = this.aspectRatio(params.size);
+    } else if (startImage) {
       // Image-to-video: the aspect ratio is derived from the first frame, so we
       // let the model adapt rather than forcing a (possibly conflicting) ratio.
       input.image = startImage;
@@ -85,10 +94,13 @@ export class ReplicateProvider extends BaseImageProvider {
       input.aspect_ratio = this.aspectRatio(params.size);
     }
 
+    // Official models are run via their model-specific endpoint, which uses the
+    // latest version automatically — the generic /v1/predictions endpoint
+    // requires a pinned `version` and rejects a top-level `model` field.
     const submit = await this.fetchJson<ReplicatePrediction>(
-      'https://api.replicate.com/v1/predictions',
+      `https://api.replicate.com/v1/models/${model}/predictions`,
       token,
-      { method: 'POST', body: JSON.stringify({ model, input }) },
+      { method: 'POST', body: JSON.stringify({ input }) },
     );
 
     const statusUrl =
@@ -124,6 +136,9 @@ export class ReplicateProvider extends BaseImageProvider {
     if (model.includes('/')) return model;
     const map: Record<string, string> = {
       'seedance-v2': 'bytedance/seedance-2.0',
+      'seedance-v2-ref': 'bytedance/seedance-2.0',
+      'seedance-v2-fast': 'bytedance/seedance-2.0-fast',
+      'seedance-v2-mini': 'bytedance/seedance-2.0-mini',
     };
     return map[model] ?? 'bytedance/seedance-2.0';
   }

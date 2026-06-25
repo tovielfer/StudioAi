@@ -315,8 +315,8 @@ export function CreateWorkspace({
         setDuration(durOptions[0].id);
       }
       if (!def.supportsAudio) setGenerateAudio(false);
-      // Seedance 2.0 generates audio at no extra cost, so default it on.
-      else if (newModel === 'seedance-v2') setGenerateAudio(true);
+      // Seedance 2.0 (all variants) generates audio at no extra cost, default on.
+      else if (newModel.startsWith('seedance-v2')) setGenerateAudio(true);
     }
   };
 

@@ -47,7 +47,7 @@ export function RecentCreations({
         </div>
       ) : generations.length === 0 ? (
         <div className="text-center py-16 text-gray-500 text-sm">
-          עדיין אין יצירות — לחצי על &quot;יצירה&quot; כדי להתחיל
+          עדיין אין יצירות — לחץ על &quot;יצירה&quot; כדי להתחיל
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">

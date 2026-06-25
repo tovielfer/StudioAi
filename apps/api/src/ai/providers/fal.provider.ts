@@ -31,10 +31,6 @@ export class FalProvider extends BaseImageProvider {
     const key = this.config.get('FAL_KEY');
     if (!key) throw new Error('FAL_KEY is not configured');
 
-    if (params.model.startsWith('seedance')) {
-      return this.generateSeedanceVideo(params, key);
-    }
-
     if (params.type === 'video' || params.model.includes('kling-video')) {
       return this.generateVideo(params, key);
     }
@@ -112,71 +108,6 @@ export class FalProvider extends BaseImageProvider {
 
     if (!videoUrl) throw new Error('Fal.ai returned no video');
     return { imageUrl: videoUrl, provider: AiProvider.FAL };
-  }
-
-  private async generateSeedanceVideo(
-    params: GenerateImageParams,
-    key: string,
-  ): Promise<GenerateImageResult> {
-    const refs = this.resolveReferenceImages(params);
-    const startImage = refs[0];
-    const endImage = refs[1];
-    const isImageToVideo = Boolean(startImage);
-    const isV2 = params.model === 'seedance-v2';
-    const endpointId = this.resolveSeedanceEndpoint(
-      params.model,
-      isImageToVideo,
-    );
-    const duration = normalizeVideoDuration(params.model, params.durationSeconds);
-
-    const input: Record<string, unknown> = {
-      prompt: params.prompt,
-      duration: String(duration),
-      resolution: params.resolution ?? '720p',
-    };
-
-    if (isImageToVideo) {
-      // The aspect ratio is inferred from the start image; only the frame URLs
-      // are sent (end_image_url is optional).
-      input.image_url = startImage;
-      if (endImage) input.end_image_url = endImage;
-    } else {
-      input.aspect_ratio = this.seedanceAspectRatio(params.size);
-    }
-
-    // Only Seedance 2.0 supports native audio; send the flag so "off" stays
-    // silent. 1.0 has no audio support, so the flag is omitted.
-    if (isV2) {
-      input.generate_audio = Boolean(params.generateAudio);
-    }
-
-    const result = await this.runQueued(endpointId, key, input);
-
-    const videoUrl =
-      result.video?.url ??
-      result.videos?.[0]?.url ??
-      result.data?.video?.url ??
-      result.data?.videos?.[0]?.url;
-
-    if (!videoUrl) throw new Error('Fal.ai returned no video');
-    return { imageUrl: videoUrl, provider: AiProvider.FAL };
-  }
-
-  private resolveSeedanceEndpoint(
-    model: string,
-    isImageToVideo: boolean,
-  ): string {
-    const mode = isImageToVideo ? 'image-to-video' : 'text-to-video';
-    if (model === 'seedance-v2') {
-      return `bytedance/seedance-2.0/${mode}`;
-    }
-    return `fal-ai/bytedance/seedance/v1/pro/${mode}`;
-  }
-
-  // Seedance accepts a fixed set of aspect ratios for text-to-video.
-  private seedanceAspectRatio(size: string): string {
-    const allowed = new Set(['21:9', '16:9', '4:3', '1:1', '3:4', '9:16']);
-    return allowed.has(size) ? size : '16:9';
   }
 
   private async runQueued(

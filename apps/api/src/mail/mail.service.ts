@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import { Generation } from '../generations/generation.entity';
@@ -99,6 +103,13 @@ export class MailService {
 
     const response = await fetch(generation.resultUrl);
     if (!response.ok) {
+      // 418 here is returned by the NetFree content filter when it blocks the
+      // outbound request to the asset URL. Surface a clear message so the user
+      // understands it's their network filter, not a bug in the app.
+      if (response.status === 418) {
+        throw new ServiceUnavailableException(
+'הסרטון לא נבדק ע"י נטפרי, פתח בכרטיסיה ושלח לבדיקה'        );
+      }
       throw new Error(
         `Failed to download asset (${response.status} ${response.statusText})`,
       );
