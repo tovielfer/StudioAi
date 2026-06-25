@@ -441,6 +441,13 @@ class ApiClient {
     );
   }
 
+  sendAdminGenerationByEmail(id: string) {
+    return this.request<{ success: boolean }>(
+      `/admin/generations/${id}/send-email`,
+      { method: 'POST' },
+    );
+  }
+
   addAdminCredits(userId: string, amount: number, reason?: string) {
     return this.request<{ credits: number }>(`/admin/users/${userId}/credits`, {
       method: 'POST',

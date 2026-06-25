@@ -6,6 +6,7 @@ import { AdminGuard } from '../auth/admin.guard';
 import { CreditTransaction } from '../credits/credit-transaction.entity';
 import { CreditsModule } from '../credits/credits.module';
 import { Generation } from '../generations/generation.entity';
+import { MailModule } from '../mail/mail.module';
 import { User } from '../users/user.entity';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
@@ -20,6 +21,7 @@ import { AdminService } from './admin.service';
       AiPricingRuleAuditLog,
     ]),
     CreditsModule,
+    MailModule,
   ],
   controllers: [AdminController],
   providers: [AdminGuard, AdminService],

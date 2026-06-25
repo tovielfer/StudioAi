@@ -102,6 +102,14 @@ export class AdminController {
     });
   }
 
+  @Post('generations/:id/send-email')
+  sendGenerationEmail(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: { user: { email: string } },
+  ) {
+    return this.adminService.sendGenerationEmail(id, req.user.email);
+  }
+
   @Get('cost-stats')
   getCostStats() {
     return this.adminService.getCostStats();

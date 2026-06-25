@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository, SelectQueryBuilder } from 'typeorm';
 import { AiPricingRuleAuditLog } from '../ai/ai-pricing-rule-audit-log.entity';
@@ -7,6 +11,7 @@ import { CreditTransaction } from '../credits/credit-transaction.entity';
 import { CreditsService } from '../credits/credits.service';
 import { Generation } from '../generations/generation.entity';
 import { GenerationStatus } from '../common/constants';
+import { MailService } from '../mail/mail.service';
 import { creditsToIls, getBillingConfig, usdToCredits } from '../config/billing';
 import { User } from '../users/user.entity';
 import { UpdatePricingRuleDto } from './dto/update-pricing-rule.dto';
@@ -57,7 +62,26 @@ export class AdminService {
     @InjectRepository(AiPricingRuleAuditLog)
     private readonly pricingAuditRepo: Repository<AiPricingRuleAuditLog>,
     private readonly creditsService: CreditsService,
+    private readonly mailService: MailService,
   ) {}
+
+  // Emails a finished generation's asset to the given recipient (the admin's
+  // own address). Unlike the user-facing flow this isn't restricted to the
+  // generation owner, so an admin can pull any user's result into their inbox.
+  async sendGenerationEmail(id: string, to: string) {
+    const generation = await this.generationsRepo.findOne({ where: { id } });
+    if (!generation) {
+      throw new NotFoundException('Generation not found');
+    }
+
+    if (generation.status !== GenerationStatus.DONE || !generation.resultUrl) {
+      throw new BadRequestException('Generation is not ready to be sent');
+    }
+
+    await this.mailService.sendGenerationImage({ to, generation });
+
+    return { success: true };
+  }
 
   async getStats() {
     const [usersTotal, generationsTotal, creditTotals, statusRows] =

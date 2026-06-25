@@ -1,7 +1,9 @@
 'use client';
 
-import { AdminGeneration } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { AdminGeneration, api } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
+import { EnvelopeIcon, SpinnerIcon } from '@/components/SendEmail';
 import { STATUS_LABELS, translateError } from '@/lib/he';
 
 function formatDateTime(value: string) {
@@ -24,6 +26,34 @@ export function AdminGenerationModal({
 }) {
   const hasImage = Boolean(generation.resultUrl && generation.status === 'done');
   const tokens = generation.tokensUsed;
+  const [sending, setSending] = useState(false);
+  const [emailToast, setEmailToast] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!emailToast) return;
+    const timer = setTimeout(() => setEmailToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [emailToast]);
+
+  const handleSendEmail = async () => {
+    if (sending) return;
+    setSending(true);
+    setEmailToast(null);
+    try {
+      await api.sendAdminGenerationByEmail(generation.id);
+      setEmailToast({ type: 'success', message: 'נשלח למייל שלך' });
+    } catch (err) {
+      setEmailToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'שליחת המייל נכשלה',
+      });
+    } finally {
+      setSending(false);
+    }
+  };
   const displayStatus =
     generation.status === 'failed' && generation.errorMessage
       ? translateError(generation.errorMessage, { includeRequestId: true })
@@ -122,7 +152,28 @@ export function AdminGenerationModal({
                 >
                   פתיחה
                 </a>
+                <button
+                  type="button"
+                  onClick={handleSendEmail}
+                  disabled={sending}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
+                >
+                  {sending ? <SpinnerIcon /> : <EnvelopeIcon />}
+                  {sending ? 'שולח...' : 'שלח לי במייל'}
+                </button>
               </div>
+            )}
+            {emailToast && (
+              <p
+                className={`text-sm font-medium ${
+                  emailToast.type === 'success'
+                    ? 'text-green-600'
+                    : 'text-red-600'
+                }`}
+                role="status"
+              >
+                {emailToast.message}
+              </p>
             )}
           </div>
 
