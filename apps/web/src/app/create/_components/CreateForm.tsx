@@ -287,7 +287,7 @@ export function CreateForm({
         <FancySelect
           value={model}
           onChange={handleModelChange}
-          options={models.map((m) => ({ value: m.id, label: `${m.name} (${m.provider})` }))}
+          options={models.map((m) => ({ value: m.id, label: `${m.name} ` }))}
         />
       </div>
 
