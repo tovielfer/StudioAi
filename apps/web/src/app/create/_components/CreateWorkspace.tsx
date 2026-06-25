@@ -37,6 +37,8 @@ export function CreateWorkspace({
   const [size, setSize] = useState(initialModel.sizes[0]?.id ?? '1:1');
   const [quality, setQuality] = useState(initialQuality);
   const [resolution, setResolution] = useState(initialModel.resolutions[0]?.id ?? '1K');
+  const [duration, setDuration] = useState(initialModel.durations?.[0]?.id ?? '5');
+  const [generateAudio, setGenerateAudio] = useState(false);
   const [references, setReferences] = useState<ReferenceImage[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [currentGen, setCurrentGen] = useState<Generation | null>(null);
@@ -105,6 +107,7 @@ export function CreateWorkspace({
   const recentGenerations = recentItems.filter((g) => g.status !== 'failed');
 
   const selectedModel = models.find((m) => m.id === model) ?? initialModel;
+  const isVideo = generationType === 'video';
   const hasReference = references.length > 0;
 
   const addReferenceUrl = useCallback(
@@ -181,6 +184,55 @@ export function CreateWorkspace({
     setReferences([]);
   }, []);
 
+  // Video uses two ordered slots: index 0 = start frame, index 1 = end frame.
+  const setReferenceSlotFile = useCallback((index: number, file: File) => {
+    const MAX_SIZE = 7 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      setError(`"${file.name}" גדולה מ-7MB ולא נוספה`);
+      return;
+    }
+    setError('');
+    const previewUrl = URL.createObjectURL(file);
+    objectUrlsRef.current.push(previewUrl);
+    setReferences((prev) => {
+      const next = [...prev];
+      const old = next[index];
+      if (old?.objectUrl) {
+        URL.revokeObjectURL(old.previewUrl);
+        objectUrlsRef.current = objectUrlsRef.current.filter(
+          (u) => u !== old.previewUrl,
+        );
+      }
+      next[index] = {
+        id: `slot-${index}-${crypto.randomUUID()}`,
+        previewUrl,
+        file,
+        objectUrl: true,
+      };
+      return next;
+    });
+  }, []);
+
+  const removeReferenceSlot = useCallback((index: number) => {
+    setReferences((prev) => {
+      const next = [...prev];
+      // Removing the start frame also drops the end frame (an end frame is
+      // meaningless without a start), keeping slot order intact.
+      const lastIndex = index === 0 ? next.length - 1 : index;
+      for (let i = lastIndex; i >= index; i--) {
+        const removed = next[i];
+        if (removed?.objectUrl) {
+          URL.revokeObjectURL(removed.previewUrl);
+          objectUrlsRef.current = objectUrlsRef.current.filter(
+            (u) => u !== removed.previewUrl,
+          );
+        }
+        next.splice(i, 1);
+      }
+      return next;
+    });
+  }, []);
+
   const reuseGeneration = useCallback(
     (gen: Generation) => {
       setPrompt(gen.prompt);
@@ -252,6 +304,13 @@ export function CreateWorkspace({
       if (resOptions.length === 0) setResolution('1K');
       else if (!resOptions.find((r) => r.id === resolution)) setResolution(resOptions[0].id);
     }
+    if (def) {
+      const durOptions = def.durations ?? [];
+      if (durOptions.length > 0 && !durOptions.find((d) => d.id === duration)) {
+        setDuration(durOptions[0].id);
+      }
+      if (!def.supportsAudio) setGenerateAudio(false);
+    }
   };
 
   useEffect(() => {
@@ -267,6 +326,12 @@ export function CreateWorkspace({
         resolution,
         hasReference,
         type: generationType,
+        ...(isVideo
+          ? {
+              durationSeconds: Number(duration),
+              generateAudio: selectedModel.supportsAudio ? generateAudio : false,
+            }
+          : {}),
       })
       .then((p) => {
         if (!cancelled) setCost(p.credits);
@@ -283,7 +348,7 @@ export function CreateWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [selectedModel.provider, selectedModel.id, size, quality, resolution, hasReference, generationType]);
+  }, [selectedModel.provider, selectedModel.id, selectedModel.supportsAudio, size, quality, resolution, hasReference, generationType, isVideo, duration, generateAudio]);
 
   const pollGeneration = useCallback(
     async (id: string) => {
@@ -322,14 +387,18 @@ export function CreateWorkspace({
     setCurrentGen(null);
 
     try {
-      const existingUrls = references.map((r) => r.sourceUrl).filter((u): u is string => Boolean(u));
-      const files = references.map((r) => r.file).filter((f): f is File => Boolean(f));
-      let referenceImageUrls = existingUrls.length > 0 ? existingUrls : undefined;
-
-      if (files.length > 0) {
-        const uploads = await Promise.all(files.map((f) => api.uploadReference(f)));
-        referenceImageUrls = [...(referenceImageUrls ?? []), ...uploads.map((u) => u.url)];
-      }
+      // Resolve references in order (slot 0 = start frame, slot 1 = end frame
+      // for video), uploading files as needed so the index mapping is preserved.
+      const orderedRefs = references.filter(Boolean);
+      const resolvedUrls = await Promise.all(
+        orderedRefs.map(async (r) => {
+          if (r.sourceUrl) return r.sourceUrl;
+          if (r.file) return (await api.uploadReference(r.file)).url;
+          return null;
+        }),
+      );
+      const cleanUrls = resolvedUrls.filter((u): u is string => Boolean(u));
+      const referenceImageUrls = cleanUrls.length > 0 ? cleanUrls : undefined;
 
       const gen = await api.createGeneration({
         prompt: prompt.trim(),
@@ -340,6 +409,12 @@ export function CreateWorkspace({
         resolution,
         provider: selectedModel.provider,
         referenceImageUrls,
+        ...(isVideo
+          ? {
+              durationSeconds: Number(duration),
+              generateAudio: selectedModel.supportsAudio ? generateAudio : false,
+            }
+          : {}),
       });
 
       setCurrentGen(gen);
@@ -393,9 +468,16 @@ export function CreateWorkspace({
             setQuality={setQuality}
             resolution={resolution}
             setResolution={setResolution}
+            duration={duration}
+            setDuration={setDuration}
+            generateAudio={generateAudio}
+            setGenerateAudio={setGenerateAudio}
+            isVideo={isVideo}
             selectedModel={selectedModel}
             references={references}
             removeReference={removeReference}
+            setReferenceSlotFile={setReferenceSlotFile}
+            removeReferenceSlot={removeReferenceSlot}
             isDragOver={isDragOver}
             setIsDragOver={setIsDragOver}
             handleReferenceDrop={handleReferenceDrop}

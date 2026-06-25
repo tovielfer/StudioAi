@@ -3,6 +3,10 @@ import {
   IsOptional,
   IsEnum,
   IsArray,
+  IsBoolean,
+  IsInt,
+  Min,
+  Max,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -47,4 +51,16 @@ export class CreateGenerationDto {
   @IsArray()
   @IsString({ each: true })
   referenceImageUrls?: string[];
+
+  // Video only: clip length in seconds (clamped to the model's allowed set).
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(60)
+  durationSeconds?: number;
+
+  // Video only: generate native audio (v3 models).
+  @IsOptional()
+  @IsBoolean()
+  generateAudio?: boolean;
 }

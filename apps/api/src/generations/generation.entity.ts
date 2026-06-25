@@ -58,6 +58,14 @@ export class Generation {
   @Column({ type: 'varchar', default: AiProvider.MOCK })
   provider: AiProvider;
 
+  // Video only: clip length in seconds. Null for images.
+  @Column({ type: 'int', nullable: true })
+  durationSeconds: number | null;
+
+  // Video only: whether native audio was requested (v3 models).
+  @Column({ type: 'boolean', nullable: true })
+  generateAudio: boolean | null;
+
   @Column({ type: 'int', default: 0 })
   creditCost: number;
 

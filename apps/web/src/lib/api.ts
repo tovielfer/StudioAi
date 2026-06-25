@@ -285,6 +285,8 @@ class ApiClient {
     resolution?: string;
     provider?: string;
     referenceImageUrls?: string[];
+    durationSeconds?: number;
+    generateAudio?: boolean;
   }) {
     return this.request<Generation>('/generations/create', {
       method: 'POST',
@@ -334,6 +336,8 @@ class ApiClient {
     resolution?: string;
     hasReference?: boolean;
     type?: string;
+    durationSeconds?: number;
+    generateAudio?: boolean;
   }) {
     const query = new URLSearchParams({
       provider: params.provider,
@@ -344,6 +348,12 @@ class ApiClient {
     });
     if (params.resolution) query.set('resolution', params.resolution);
     if (params.type) query.set('type', params.type);
+    if (params.durationSeconds != null) {
+      query.set('durationSeconds', String(params.durationSeconds));
+    }
+    if (params.generateAudio != null) {
+      query.set('generateAudio', String(params.generateAudio));
+    }
     return this.request<{ credits: number; usd: number; priceIls: number }>(
       `/generations/cost?${query.toString()}`,
     );
@@ -639,6 +649,7 @@ export const api = new ApiClient();
 export interface SizeOption   { id: string; label: string }
 export interface QualityOption { id: string; label: string }
 export interface ResolutionOption { id: string; label: string }
+export interface DurationOption { id: string; label: string }
 export interface ModelOption {
   id: string;
   name: string;
@@ -649,6 +660,11 @@ export interface ModelOption {
   // Resolution tiers (1K/2K/4K). Empty when the model has a single fixed
   // resolution; the UI only renders the selector when there is a choice.
   resolutions: ResolutionOption[];
+  // Video only: selectable clip durations (seconds). Empty/undefined for a
+  // single fixed duration.
+  durations?: DurationOption[];
+  // Video only: whether the model can generate native audio.
+  supportsAudio?: boolean;
 }
 
 /** @deprecated Use api.getGenerationCostPreview() for accurate backend pricing. */

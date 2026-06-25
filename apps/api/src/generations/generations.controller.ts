@@ -60,6 +60,8 @@ export class GenerationsController {
     @Query('resolution') resolution?: string,
     @Query('hasReference') hasReference?: string,
     @Query('type') type?: GenerationType,
+    @Query('durationSeconds') durationSeconds?: string,
+    @Query('generateAudio') generateAudio?: string,
   ) {
     const resolvedProvider = provider ?? AiProvider.MOCK;
     const resolvedModel = model ?? 'gpt-image-1';
@@ -70,6 +72,9 @@ export class GenerationsController {
       quality ?? ImageQuality.AUTO,
       resolution ?? ImageResolution.ONE_K,
     );
+    const parsedDuration = durationSeconds
+      ? parseInt(durationSeconds, 10)
+      : undefined;
     return this.pricingService.getGenerationCost({
       provider: resolvedProvider,
       model: resolvedModel,
@@ -78,6 +83,10 @@ export class GenerationsController {
       resolution: normalized.resolution,
       hasReference: hasReference === 'true',
       type: type ?? GenerationType.IMAGE,
+      durationSeconds: Number.isFinite(parsedDuration as number)
+        ? parsedDuration
+        : undefined,
+      generateAudio: generateAudio === 'true',
     });
   }
 

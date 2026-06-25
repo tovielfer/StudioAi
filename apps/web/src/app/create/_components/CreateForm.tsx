@@ -17,6 +17,118 @@ export type ReferenceImage = {
 
 export const MAX_REFERENCES = 5;
 
+function AudioIcon({ on }: { on: boolean }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M11 5 6 9H2v6h4l5 4V5z" />
+      {on ? (
+        <>
+          <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+          <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+        </>
+      ) : (
+        <path d="m17 9 4 6m0-6-4 6" />
+      )}
+    </svg>
+  );
+}
+
+function VideoFrameSlot({
+  label,
+  reference,
+  disabled = false,
+  onFile,
+  onRemove,
+}: {
+  label: string;
+  reference?: ReferenceImage;
+  disabled?: boolean;
+  onFile: (file: File) => void;
+  onRemove: () => void;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (disabled) return;
+    const file = Array.from(e.dataTransfer.files).find((f) =>
+      f.type.startsWith('image/'),
+    );
+    if (file) onFile(file);
+  };
+
+  return (
+    <div className="flex-1 min-w-0">
+      <label className="mb-1.5 block text-sm text-gray-400">
+        {label}
+        <span className="text-gray-600"> · אופציונלי</span>
+      </label>
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!disabled && !dragOver) setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        className={`relative flex h-24 items-center justify-center rounded-lg border border-dashed transition-colors ${
+          dragOver ? 'border-brand-500 bg-brand-500/10' : 'border-surface-border'
+        } ${disabled ? 'opacity-40' : ''}`}
+      >
+        {reference ? (
+          <>
+            <img
+              src={reference.previewUrl}
+              alt={label}
+              className="h-full w-full rounded-lg object-cover"
+            />
+            <button
+              type="button"
+              onClick={onRemove}
+              className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs leading-none text-white transition-colors hover:bg-red-600"
+              aria-label="הסר תמונה"
+            >
+              ×
+            </button>
+          </>
+        ) : (
+          <label
+            className={`flex h-full w-full flex-col items-center justify-center gap-1 text-gray-500 ${
+              disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:text-brand-300'
+            }`}
+          >
+            <PlusIcon />
+            <span className="text-[11px] leading-none">
+              {disabled ? 'הוסיפו תמונת התחלה' : 'הוספה'}
+            </span>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={disabled}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onFile(file);
+                e.target.value = '';
+              }}
+              className="hidden"
+            />
+          </label>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function CreateForm({
   prompt,
   setPrompt,
@@ -30,9 +142,16 @@ export function CreateForm({
   setQuality,
   resolution,
   setResolution,
+  duration,
+  setDuration,
+  generateAudio,
+  setGenerateAudio,
+  isVideo,
   selectedModel,
   references,
   removeReference,
+  setReferenceSlotFile,
+  removeReferenceSlot,
   isDragOver,
   setIsDragOver,
   handleReferenceDrop,
@@ -57,9 +176,16 @@ export function CreateForm({
   setQuality: (v: string) => void;
   resolution: string;
   setResolution: (v: string) => void;
+  duration: string;
+  setDuration: (v: string) => void;
+  generateAudio: boolean;
+  setGenerateAudio: (v: boolean) => void;
+  isVideo: boolean;
   selectedModel: ModelOption;
   references: ReferenceImage[];
   removeReference: (i: number) => void;
+  setReferenceSlotFile: (index: number, file: File) => void;
+  removeReferenceSlot: (index: number) => void;
   isDragOver: boolean;
   setIsDragOver: (v: boolean) => void;
   handleReferenceDrop: (e: React.DragEvent) => void;
@@ -72,7 +198,6 @@ export function CreateForm({
   onGenerate: () => void;
   error: string;
 }) {
-  const isVideo = selectedModel.type === 'video';
   const [isPromptExpanded, setIsPromptExpanded] = useState(false);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
@@ -166,97 +291,167 @@ export function CreateForm({
         />
       </div>
 
-      <div className="flex flex-nowrap gap-3 lg:shrink-0">
-        {selectedModel.sizes.length > 1 && (
-          <div className="flex-1 min-w-0">
-            <label className="block text-sm text-gray-400 mb-1.5">יחס</label>
-            <FancySelect
-              value={size}
-              onChange={setSize}
-              options={selectedModel.sizes.map((s) => ({
-                value: s.id,
-                label: s.label,
-                shortLabel: s.id,
-                icon: <AspectRatioIcon ratio={s.id} />,
-              }))}
-            />
-          </div>
-        )}
-        {selectedModel.resolutions.length > 1 && (
-          <div className="flex-1 min-w-0">
-            <label className="block text-sm text-gray-400 mb-1.5">רזולציה</label>
-            <FancySelect
-              value={resolution}
-              onChange={setResolution}
-              options={selectedModel.resolutions.map((r) => ({
-                value: r.id,
-                label: r.label,
-                shortLabel: r.id,
-              }))}
-            />
-          </div>
-        )}
-        {selectedModel.qualities.length > 1 && (
-          <div className="flex-1 min-w-0">
-            <label className="block text-sm text-gray-400 mb-1.5">איכות</label>
-            <FancySelect
-              value={quality}
-              onChange={setQuality}
-              options={selectedModel.qualities.map((q) => ({ value: q.id, label: q.label }))}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Reference drop zone — accepts files from disk AND URLs from gallery */}
-      <div className="lg:shrink-0">
-        <label className="mb-1.5 block text-sm text-gray-400">
-          {isVideo ? 'תמונת התחלה' : 'תמונות השראה'}
-          <span className="text-gray-600"> · אופציונלי</span>
-        </label>
-        <div
-          onDragOver={(e) => { e.preventDefault(); if (!isDragOver) setIsDragOver(true); }}
-          onDragLeave={() => setIsDragOver(false)}
-          onDrop={handleReferenceDrop}
-          className={`flex flex-wrap items-center gap-2 rounded-lg border border-dashed p-2 transition-colors ${
-            isDragOver ? 'border-brand-500 bg-brand-500/10' : 'border-surface-border'
-          }`}
-        >
-          {references.map((ref, i) => (
-            <div key={ref.id} className="relative group">
-              <img
-                src={ref.previewUrl}
-                alt={`תמונת השראה ${i + 1}`}
-                className="h-16 w-16 rounded-md border border-surface-border object-cover"
+      {!isVideo && (
+        <div className="flex flex-nowrap gap-3 lg:shrink-0">
+          {selectedModel.sizes.length > 1 && (
+            <div className="flex-1 min-w-0">
+              <label className="block text-sm text-gray-400 mb-1.5">יחס</label>
+              <FancySelect
+                value={size}
+                onChange={setSize}
+                options={selectedModel.sizes.map((s) => ({
+                  value: s.id,
+                  label: s.label,
+                  shortLabel: s.id,
+                  icon: <AspectRatioIcon ratio={s.id} />,
+                }))}
               />
-              <button
-                type="button"
-                onClick={() => removeReference(i)}
-                className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs leading-none text-white transition-colors hover:bg-red-600"
-                aria-label="הסר תמונה"
-              >
-                ×
-              </button>
             </div>
-          ))}
-          {references.length < MAX_REFERENCES && (
-            <label className="flex h-16 w-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-surface-border text-gray-500 transition-colors hover:border-brand-500/60 hover:text-brand-300">
-              <PlusIcon />
-              <span className="text-[11px] leading-none">הוספה</span>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                multiple
-                onChange={handleReferenceChange}
-                className="hidden"
-              />
-            </label>
           )}
-          {references.length === 0 && (
-            <span className="px-1 text-xs text-gray-500">גררו תמונה לכאן או לחצו על +</span>
+          {selectedModel.resolutions.length > 1 && (
+            <div className="flex-1 min-w-0">
+              <label className="block text-sm text-gray-400 mb-1.5">רזולציה</label>
+              <FancySelect
+                value={resolution}
+                onChange={setResolution}
+                options={selectedModel.resolutions.map((r) => ({
+                  value: r.id,
+                  label: r.label,
+                  shortLabel: r.id,
+                }))}
+              />
+            </div>
+          )}
+          {selectedModel.qualities.length > 1 && (
+            <div className="flex-1 min-w-0">
+              <label className="block text-sm text-gray-400 mb-1.5">איכות</label>
+              <FancySelect
+                value={quality}
+                onChange={setQuality}
+                options={selectedModel.qualities.map((q) => ({ value: q.id, label: q.label }))}
+              />
+            </div>
           )}
         </div>
-      </div>
+      )}
+
+      {/* Video controls — compact row: aspect, clip length and audio toggle. */}
+      {isVideo && (
+        <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+          {selectedModel.sizes.length > 1 && (
+            <div className="w-28">
+              <FancySelect
+                value={size}
+                onChange={setSize}
+                options={selectedModel.sizes.map((s) => ({
+                  value: s.id,
+                  label: s.label,
+                  shortLabel: s.id,
+                  icon: <AspectRatioIcon ratio={s.id} />,
+                }))}
+              />
+            </div>
+          )}
+          {(selectedModel.durations?.length ?? 0) > 1 && (
+            <div className="w-24">
+              <FancySelect
+                value={duration}
+                onChange={setDuration}
+                options={(selectedModel.durations ?? []).map((d) => ({
+                  value: d.id,
+                  label: d.label,
+                  shortLabel: `${d.id} ש׳`,
+                }))}
+              />
+            </div>
+          )}
+          {selectedModel.supportsAudio && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={generateAudio}
+              title={generateAudio ? 'אודיו פעיל — לחצו לכיבוי' : 'אודיו כבוי — לחצו להפעלה'}
+              onClick={() => setGenerateAudio(!generateAudio)}
+              className={`inline-flex h-[42px] items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${
+                generateAudio
+                  ? 'border-brand-500 bg-brand-500 text-white'
+                  : 'border-surface-border bg-surface-card text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              <AudioIcon on={generateAudio} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Reference images. Video uses two ordered slots (start/end frame);
+          images use a multi-image inspiration drop zone. */}
+      {isVideo ? (
+        <div className="flex flex-nowrap gap-3 lg:shrink-0">
+          <VideoFrameSlot
+            label="תמונת התחלה"
+            reference={references[0]}
+            onFile={(file) => setReferenceSlotFile(0, file)}
+            onRemove={() => removeReferenceSlot(0)}
+          />
+          <VideoFrameSlot
+            label="תמונת סיום"
+            reference={references[1]}
+            disabled={!references[0]}
+            onFile={(file) => setReferenceSlotFile(1, file)}
+            onRemove={() => removeReferenceSlot(1)}
+          />
+        </div>
+      ) : (
+        <div className="lg:shrink-0">
+          <label className="mb-1.5 block text-sm text-gray-400">
+            תמונות השראה
+            <span className="text-gray-600"> · אופציונלי</span>
+          </label>
+          <div
+            onDragOver={(e) => { e.preventDefault(); if (!isDragOver) setIsDragOver(true); }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={handleReferenceDrop}
+            className={`flex flex-wrap items-center gap-2 rounded-lg border border-dashed p-2 transition-colors ${
+              isDragOver ? 'border-brand-500 bg-brand-500/10' : 'border-surface-border'
+            }`}
+          >
+            {references.map((ref, i) => (
+              <div key={ref.id} className="relative group">
+                <img
+                  src={ref.previewUrl}
+                  alt={`תמונת השראה ${i + 1}`}
+                  className="h-16 w-16 rounded-md border border-surface-border object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeReference(i)}
+                  className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs leading-none text-white transition-colors hover:bg-red-600"
+                  aria-label="הסר תמונה"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            {references.length < MAX_REFERENCES && (
+              <label className="flex h-16 w-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-surface-border text-gray-500 transition-colors hover:border-brand-500/60 hover:text-brand-300">
+                <PlusIcon />
+                <span className="text-[11px] leading-none">הוספה</span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  multiple
+                  onChange={handleReferenceChange}
+                  className="hidden"
+                />
+              </label>
+            )}
+            {references.length === 0 && (
+              <span className="px-1 text-xs text-gray-500">גררו תמונה לכאן או לחצו על +</span>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between pt-2 lg:shrink-0">
         <div className="text-sm text-gray-400">
@@ -287,7 +482,7 @@ export function CreateForm({
           disabled={prompt.trim().length === 0 || submitting || cost === null || (user?.credits ?? 0) < (cost ?? 0)}
           className="btn-primary"
         >
-          {submitting ? 'שולחת...' : isVideo ? 'יצירת וידאו' : 'יצירה'}
+          {submitting ? 'שולח...' : isVideo ? 'צור' : 'יצירה'}
         </button>
       </div>
     </div>

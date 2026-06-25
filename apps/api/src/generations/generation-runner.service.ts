@@ -55,6 +55,8 @@ export class GenerationRunnerService {
         resolution: generation.resolution,
         referenceImages: generation.referenceImageUrls ?? undefined,
         provider: generation.provider,
+        durationSeconds: generation.durationSeconds,
+        generateAudio: generation.generateAudio,
       });
 
       let resultUrl = result.imageUrl;

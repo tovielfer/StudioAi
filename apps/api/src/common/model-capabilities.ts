@@ -56,6 +56,12 @@ export interface ModelPricing {
     string,
     Record<string, Record<string, number>>
   >;
+  /**
+   * Per-second provider cost (USD) for video models, split by whether native
+   * audio is generated. Video is billed by duration, so the sell price is
+   * `perSecond * durationSeconds * margin` — see {@link computeVideoSellUsd}.
+   */
+  videoPerSecondUsd?: { audioOff: number; audioOn: number };
 }
 
 export interface ModelCapability {
@@ -67,6 +73,13 @@ export interface ModelCapability {
   qualities: AttrOption[];
   resolutions: AttrOption[];
   pricing: ModelPricing;
+  /**
+   * Selectable clip durations (seconds) for video models. `[]`/undefined means
+   * the model has a single fixed duration and no selector is rendered.
+   */
+  durations?: AttrOption[];
+  /** Whether the model can generate native audio (renders an on/off toggle). */
+  supportsAudio?: boolean;
 }
 
 // Standard aspect ratios honoured by all Google image models
@@ -129,6 +142,26 @@ const GOOGLE_FLASH_RESOLUTION_TIERS: AttrOption[] = [
 // OpenAI gpt-image-1 has a single fixed resolution: it is still sent and priced
 // as 1K, so it is encoded as one honoured value (no selector is rendered).
 const FIXED_ONE_K: AttrOption[] = [{ id: '1K', label: '1K' }];
+
+// Aspect ratios honoured by Kling video. For image-to-video the ratio is
+// derived from the start image and ignored, but for text-to-video it is sent.
+const KLING_SIZES: AttrOption[] = [
+  { id: '16:9', label: '16:9 לרוחב' },
+  { id: '9:16', label: '9:16 לאורך' },
+  { id: '1:1', label: '1:1 ריבוע' },
+];
+
+// Kling v3 supports any whole number of seconds from 3 to 15.
+const KLING_V3_DURATIONS: AttrOption[] = Array.from({ length: 13 }, (_, i) => {
+  const sec = i + 3;
+  return { id: String(sec), label: `${sec} שניות` };
+});
+
+// Kling v2.1 only accepts 5 or 10 seconds.
+const KLING_V21_DURATIONS: AttrOption[] = [
+  { id: '5', label: '5 שניות' },
+  { id: '10', label: '10 שניות' },
+];
 
 // Default base USD prices, mirroring the seed migrations so a fresh DB
 // reproduces today's pricing. Admin edits in the DB take precedence at runtime.
@@ -298,21 +331,85 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     name: 'Kling Video v3 Standard',
     provider: AiProvider.FAL,
     type: GenerationType.VIDEO,
-    sizes: [
-      { id: '16:9', label: '16:9 לרוחב' },
-      { id: '9:16', label: '9:16 לאורך' },
-      { id: '1:1', label: '1:1 ריבוע' },
-    ],
+    sizes: KLING_SIZES,
     qualities: [],
     resolutions: [],
-    // Flat credit cost (margin/baseUsd unused). Rescaled to the new credit unit
-    // (credit = ILS 0.01): 185 credits = ILS 1.85, matching the previous
-    // ~$0.50 sell price.
+    durations: KLING_V3_DURATIONS,
+    supportsAudio: true,
+    // Video is billed per second (see computeVideoSellUsd). fal cost: $0.084/s
+    // silent, $0.126/s with audio. baseUsd is only the safety-net seed row.
     pricing: {
       baseUsd: 0,
-      margin: 1,
       referenceImageUsd: 0,
-      creditCostOverride: 185,
+      videoPerSecondUsd: { audioOff: 0.084, audioOn: 0.126 },
+    },
+  },
+  {
+    id: 'kling-v3-pro',
+    name: 'Kling Video v3 Pro',
+    provider: AiProvider.FAL,
+    type: GenerationType.VIDEO,
+    sizes: KLING_SIZES,
+    qualities: [],
+    resolutions: [],
+    durations: KLING_V3_DURATIONS,
+    supportsAudio: true,
+    // fal cost: $0.112/s silent, $0.168/s with audio.
+    pricing: {
+      baseUsd: 0,
+      referenceImageUsd: 0,
+      videoPerSecondUsd: { audioOff: 0.112, audioOn: 0.168 },
+    },
+  },
+  {
+    id: 'kling-v2.1-master',
+    name: 'Kling Video v2.1 Master',
+    provider: AiProvider.FAL,
+    type: GenerationType.VIDEO,
+    sizes: KLING_SIZES,
+    qualities: [],
+    resolutions: [],
+    durations: KLING_V21_DURATIONS,
+    supportsAudio: false,
+    // fal cost: flat $0.28/s (no audio option on v2.1).
+    pricing: {
+      baseUsd: 0,
+      referenceImageUsd: 0,
+      videoPerSecondUsd: { audioOff: 0.28, audioOn: 0.28 },
+    },
+  },
+  {
+    id: 'kling-v2.1-pro',
+    name: 'Kling Video v2.1 Pro',
+    provider: AiProvider.FAL,
+    type: GenerationType.VIDEO,
+    sizes: KLING_SIZES,
+    qualities: [],
+    resolutions: [],
+    durations: KLING_V21_DURATIONS,
+    supportsAudio: false,
+    // fal cost: flat $0.09/s. Image-to-video only (requires a start image).
+    pricing: {
+      baseUsd: 0,
+      referenceImageUsd: 0,
+      videoPerSecondUsd: { audioOff: 0.09, audioOn: 0.09 },
+    },
+  },
+  {
+    id: 'kling-v2.1-standard',
+    name: 'Kling Video v2.1 Standard',
+    provider: AiProvider.FAL,
+    type: GenerationType.VIDEO,
+    sizes: KLING_SIZES,
+    qualities: [],
+    resolutions: [],
+    durations: KLING_V21_DURATIONS,
+    supportsAudio: false,
+    // fal cost: flat $0.05/s. Image-to-video only (requires a start image).
+    pricing: {
+      baseUsd: 0,
+      referenceImageUsd: 0,
+      videoPerSecondUsd: { audioOff: 0.05, audioOn: 0.05 },
     },
   },
 ];
@@ -372,4 +469,46 @@ export function normalizeAttrs(
     quality: pickAttr(capability.qualities, quality),
     resolution: pickAttr(capability.resolutions, resolution),
   };
+}
+
+/**
+ * Clamps a requested clip duration to a value the model actually supports.
+ * Falls back to the model's first listed duration (or 5s) when unset/invalid,
+ * so the provider never receives a duration the endpoint would reject.
+ */
+export function normalizeVideoDuration(
+  modelId: string | null | undefined,
+  durationSeconds: number | null | undefined,
+): number {
+  const allowed =
+    getModelCapability(modelId)?.durations?.map((d) => Number(d.id)) ?? [];
+  if (allowed.length === 0) return durationSeconds ?? 5;
+  if (durationSeconds != null && allowed.includes(durationSeconds)) {
+    return durationSeconds;
+  }
+  return allowed[0];
+}
+
+/** Whether the model has native-audio support (renders/sends the audio flag). */
+export function modelSupportsAudio(modelId?: string | null): boolean {
+  return Boolean(getModelCapability(modelId)?.supportsAudio);
+}
+
+/**
+ * Sell price (USD) for a video generation: per-second provider cost × duration
+ * × margin. Audio is only billed at the higher rate when the model supports it.
+ * Returns `null` for non-video models, which price via the rule table instead.
+ */
+export function computeVideoSellUsd(
+  modelId: string | null | undefined,
+  durationSeconds: number,
+  generateAudio: boolean,
+  margin: number,
+): number | null {
+  const capability = getModelCapability(modelId);
+  const rates = capability?.pricing.videoPerSecondUsd;
+  if (!rates) return null;
+  const audio = generateAudio && Boolean(capability?.supportsAudio);
+  const perSecond = audio ? rates.audioOn : rates.audioOff;
+  return perSecond * durationSeconds * margin;
 }

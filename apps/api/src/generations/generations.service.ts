@@ -23,7 +23,11 @@ import {
   AiProvider,
 } from '../common/constants';
 import { moderatePrompt } from '../common/moderation';
-import { normalizeAttrs } from '../common/model-capabilities';
+import {
+  normalizeAttrs,
+  normalizeVideoDuration,
+  modelSupportsAudio,
+} from '../common/model-capabilities';
 import { AiPricingService } from '../ai/ai-pricing.service';
 
 export const GENERATION_QUEUE = 'generation';
@@ -62,6 +66,18 @@ export class GenerationsService {
 
     const allReferenceUrls = dto.referenceImageUrls ?? [];
     const hasReference = allReferenceUrls.length > 0;
+
+    // Video-only controls: clamp the duration to what the model supports and
+    // drop audio for models that don't support it, so the persisted/priced/sent
+    // values all agree.
+    const isVideo = type === GenerationType.VIDEO;
+    const durationSeconds = isVideo
+      ? normalizeVideoDuration(dto.model, dto.durationSeconds)
+      : null;
+    const generateAudio = isVideo
+      ? modelSupportsAudio(dto.model) && Boolean(dto.generateAudio)
+      : null;
+
     const { credits: creditCost, ruleId } =
       await this.pricingService.getGenerationCost({
       provider,
@@ -71,6 +87,8 @@ export class GenerationsService {
       resolution,
       hasReference,
       type,
+      durationSeconds,
+      generateAudio,
     });
 
     const generation = this.genRepo.create({
@@ -83,6 +101,8 @@ export class GenerationsService {
       resolution: resolution as ImageResolution | null,
       provider,
       referenceImageUrls: allReferenceUrls.length > 0 ? allReferenceUrls : null,
+      durationSeconds,
+      generateAudio,
       status: GenerationStatus.PENDING,
       creditCost,
       pricingRuleId: ruleId,

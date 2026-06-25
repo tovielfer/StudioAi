@@ -44,12 +44,22 @@ export function GenerationCard({
               aria-label="פתח פרטי יצירה"
             >
               {isVideo ? (
-                <video
-                  src={gen.resultUrl!}
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                />
+                <>
+                  <video
+                    src={gen.resultUrl!}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                  />
+                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm transition-transform group-hover:scale-110">
+                      <svg className="h-6 w-6 translate-x-0.5 text-white" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </span>
+                  </span>
+                </>
               ) : (
                 <img
                   src={gen.resultUrl!}

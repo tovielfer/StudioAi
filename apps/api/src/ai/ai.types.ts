@@ -7,6 +7,10 @@ export interface GenerateImageParams {
   resolution?: string | null;
   referenceImages?: string[] | null;
   provider: string;
+  /** Video only: clip length in seconds. */
+  durationSeconds?: number | null;
+  /** Video only: whether to generate native audio (v3 models). */
+  generateAudio?: boolean | null;
 }
 
 export interface GenerateTextParams {
