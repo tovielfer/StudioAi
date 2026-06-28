@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Tooltip } from '@/components/Tooltip';
+import { VideoPreview } from '@/components/VideoPreview';
 import {
   useSendGenerationEmail,
   EmailToast,
@@ -103,9 +104,9 @@ function DashboardContent() {
         </div>
         <div className="card-interactive md:col-span-2 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-sm text-gray-400">נגמרים הקרדיטים?</p>
+            <p className="text-sm text-gray-400">צריכים עוד קרדיטים?</p>
             <p className="text-lg font-semibold mt-1">
-              קנו חבילה — ככל שגדולה יותר, זול יותר לקרדיט
+              בחרו חבילה והמשיכו ליצור בלי הפסקה
             </p>
           </div>
           <Link href="/buy" className="btn-primary whitespace-nowrap">
@@ -137,96 +138,98 @@ function DashboardContent() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {recent.map((gen) => {
               const canUseImage = Boolean(gen.resultUrl && gen.status === 'done');
+              const isVideo = gen.type === 'video';
+
+              const actions = (
+                <div className="absolute left-2 top-2 flex flex-wrap gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
+                  <Tooltip label="פרטים">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedGeneration(gen)}
+                      className="icon-button h-8 w-8 bg-black/40"
+                      aria-label="פרטים"
+                    >
+                      <InfoIcon />
+                    </button>
+                  </Tooltip>
+                  <Tooltip label="עריכה">
+                    <Link
+                      href={getEditHref(gen)}
+                      className="icon-button h-8 w-8 bg-brand-600 text-white hover:bg-brand-500"
+                      aria-label="עריכה"
+                    >
+                      <EditIcon />
+                    </Link>
+                  </Tooltip>
+                  <Tooltip label="הורדה">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadImage(
+                          gen.resultUrl!,
+                          `generation-${gen.id}.${isVideo ? 'mp4' : 'png'}`,
+                        )
+                      }
+                      className="icon-button h-8 w-8 bg-black/40"
+                      aria-label="הורדה"
+                    >
+                      <DownloadIcon />
+                    </button>
+                  </Tooltip>
+                  <Tooltip label="פתיחה">
+                    <a
+                      href={gen.resultUrl!}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="icon-button h-8 w-8 bg-black/40"
+                      aria-label="פתיחה בטאב חדש"
+                    >
+                      <OpenIcon />
+                    </a>
+                  </Tooltip>
+                  <Tooltip label="שלח לי במייל">
+                    <button
+                      type="button"
+                      onClick={() => sendEmail(gen)}
+                      disabled={sendingId === gen.id}
+                      className="icon-button h-8 w-8 bg-black/40 disabled:opacity-60"
+                      aria-label="שלח לי במייל"
+                    >
+                      {sendingId === gen.id ? <SpinnerIcon /> : <EnvelopeIcon />}
+                    </button>
+                  </Tooltip>
+                </div>
+              );
 
               return (
                 <div key={gen.id} className="card p-3 group">
                   <div className="aspect-square bg-surface rounded-lg overflow-hidden mb-3 relative">
                     {canUseImage ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedGeneration(gen)}
-                          className="block w-full h-full"
-                          aria-label="פתח פרטי יצירה"
-                        >
-                          {gen.type === 'video' ? (
-                            <video
-                              src={gen.resultUrl!}
-                              muted
-                              playsInline
-                              className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                            />
-                          ) : (
+                      isVideo ? (
+                        <VideoPreview
+                          src={gen.resultUrl!}
+                          withPlayBadge
+                          onOpen={() => setSelectedGeneration(gen)}
+                          overlay={actions}
+                          className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                        />
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGeneration(gen)}
+                            className="block w-full h-full"
+                            aria-label="פתח פרטי יצירה"
+                          >
                             <img
                               src={gen.resultUrl!}
                               alt={gen.prompt}
                               className="w-full h-full object-cover transition-transform group-hover:scale-105"
                             />
-                          )}
-                        </button>
-                        <div className="absolute left-2 top-2 flex flex-wrap gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
-                          <Tooltip label="פרטים">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedGeneration(gen)}
-                              className="icon-button h-8 w-8 bg-black/40"
-                              aria-label="פרטים"
-                            >
-                              <InfoIcon />
-                            </button>
-                          </Tooltip>
-                          <Tooltip label="עריכה">
-                            <Link
-                              href={getEditHref(gen)}
-                              className="icon-button h-8 w-8 bg-brand-600 text-white hover:bg-brand-500"
-                              aria-label="עריכה"
-                            >
-                              <EditIcon />
-                            </Link>
-                          </Tooltip>
-                          <Tooltip label="הורדה">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                downloadImage(
-                                  gen.resultUrl!,
-                                  `generation-${gen.id}.${gen.type === 'video' ? 'mp4' : 'png'}`,
-                                )
-                              }
-                              className="icon-button h-8 w-8 bg-black/40"
-                              aria-label="הורדה"
-                            >
-                              <DownloadIcon />
-                            </button>
-                          </Tooltip>
-                          <Tooltip label="פתיחה">
-                            <a
-                              href={gen.resultUrl!}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="icon-button h-8 w-8 bg-black/40"
-                              aria-label="פתיחה בטאב חדש"
-                            >
-                              <OpenIcon />
-                            </a>
-                          </Tooltip>
-                          <Tooltip label="שלח לי במייל">
-                            <button
-                              type="button"
-                              onClick={() => sendEmail(gen)}
-                              disabled={sendingId === gen.id}
-                              className="icon-button h-8 w-8 bg-black/40 disabled:opacity-60"
-                              aria-label="שלח לי במייל"
-                            >
-                              {sendingId === gen.id ? (
-                                <SpinnerIcon />
-                              ) : (
-                                <EnvelopeIcon />
-                              )}
-                            </button>
-                          </Tooltip>
-                        </div>
-                      </>
+                          </button>
+                          {actions}
+                        </>
+                      )
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-600">
                         {gen.status === 'processing' || gen.status === 'pending' ? (
@@ -327,10 +330,10 @@ function GenerationDetailsModal({
             <div className="aspect-square bg-surface rounded-xl overflow-hidden flex items-center justify-center">
               {hasAsset ? (
                 isVideo ? (
-                  <video
+                  <VideoPreview
                     src={generation.resultUrl!}
                     controls
-                    playsInline
+                    fallbackVariant="full"
                     className="w-full h-full object-contain"
                   />
                 ) : (

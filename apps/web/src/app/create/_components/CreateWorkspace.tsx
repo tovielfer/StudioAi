@@ -7,6 +7,7 @@ import { api, Generation, ModelOption } from '@/lib/api';
 import { useInfiniteList } from '@/lib/use-infinite-list';
 import { translateError } from '@/lib/he';
 
+import { Tooltip } from '@/components/Tooltip';
 import { CreateForm, ReferenceImage, MAX_REFERENCES } from './CreateForm';
 import { RecentCreations } from './RecentCreations';
 import { PanelLeftIcon, PanelRightIcon } from './icons';
@@ -450,14 +451,18 @@ export function CreateWorkspace({
     <div className="max-w-[1920px] mx-auto px-6 sm:px-8 py-10 lg:flex lg:h-[calc(100vh-4rem)] lg:flex-col lg:overflow-hidden">
       <div className="flex items-center justify-between mb-8 lg:shrink-0">
         <h1 className="text-3xl font-bold">{title}</h1>
-        <button
-          onClick={toggleFormSide}
-          title={formOnLeft ? 'העבר טופס לימין' : 'העבר טופס לשמאל'}
-          className="hidden lg:flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-white transition-colors"
+        <Tooltip
+          label={formOnLeft ? 'העבר טופס לימין' : 'העבר טופס לשמאל'}
+          className="hidden lg:inline-flex"
         >
-          {formOnLeft ? <PanelRightIcon /> : <PanelLeftIcon />}
-          <span>{formOnLeft ? 'טופס לימין' : 'טופס לשמאל'}</span>
-        </button>
+          <button
+            onClick={toggleFormSide}
+            aria-label={formOnLeft ? 'העבר טופס לימין' : 'העבר טופס לשמאל'}
+            className="icon-button"
+          >
+            {formOnLeft ? <PanelRightIcon /> : <PanelLeftIcon />}
+          </button>
+        </Tooltip>
       </div>
 
       <div className={`flex flex-col gap-6 lg:min-h-0 lg:flex-1 lg:items-stretch ${formOnLeft ? 'lg:flex-row-reverse' : 'lg:flex-row'}`}>

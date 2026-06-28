@@ -105,7 +105,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 py-20">
           <h2 className="text-3xl font-bold text-center mb-3">תמחור פשוט והוגן</h2>
           <p className="text-center text-gray-400 mb-12">
-            חבילות קרדיטים לפי שימוש. ככל שהחבילה גדולה יותר — זול יותר לקרדיט.
+            חבילות קרדיטים לפי שימוש — בלי מנוי ובלי תפוגה.
           </p>
           <PricingTiers />
         </div>

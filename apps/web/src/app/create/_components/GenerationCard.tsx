@@ -4,6 +4,7 @@ import { Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
 import { STATUS_LABELS, translateError } from '@/lib/he';
 import { Tooltip } from '@/components/Tooltip';
+import { VideoPreview } from '@/components/VideoPreview';
 import { EnvelopeIcon, SpinnerIcon } from '@/components/SendEmail';
 import { InfoIcon, PlusIcon, DownloadIcon, OpenIcon, RefreshIcon } from './icons';
 
@@ -32,35 +33,95 @@ export function GenerationCard({
       ? translateError(gen.errorMessage)
       : STATUS_LABELS[gen.status] ?? gen.status;
 
+  const actions = (
+    <div className="absolute left-2 top-2 flex flex-wrap gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
+      <Tooltip label="פרטים">
+        <button
+          type="button"
+          onClick={() => onSelect(gen)}
+          className="icon-button h-8 w-8 bg-black/40"
+          aria-label="פרטים"
+        >
+          <InfoIcon />
+        </button>
+      </Tooltip>
+      <Tooltip label="צור מחדש">
+        <button
+          type="button"
+          onClick={() => onReuse(gen)}
+          className="icon-button h-8 w-8 bg-black/40"
+          aria-label="צור מחדש"
+        >
+          <RefreshIcon />
+        </button>
+      </Tooltip>
+      {!isVideo && (
+        <Tooltip label="הוסף כרפרנס">
+          <button
+            type="button"
+            onClick={() => onUseReference(gen.resultUrl!)}
+            className="icon-button h-8 w-8 bg-brand-600 text-white hover:bg-brand-500"
+            aria-label="הוסף כתמונת השראה"
+          >
+            <PlusIcon />
+          </button>
+        </Tooltip>
+      )}
+      <Tooltip label="הורדה">
+        <button
+          type="button"
+          onClick={() => downloadImage(gen.resultUrl!, `generation-${gen.id}.${isVideo ? 'mp4' : 'png'}`)}
+          className="icon-button h-8 w-8 bg-black/40"
+          aria-label="הורדה"
+        >
+          <DownloadIcon />
+        </button>
+      </Tooltip>
+      <Tooltip label="פתיחה">
+        <a
+          href={gen.resultUrl!}
+          target="_blank"
+          rel="noreferrer"
+          className="icon-button h-8 w-8 bg-black/40"
+          aria-label="פתיחה בטאב חדש"
+        >
+          <OpenIcon />
+        </a>
+      </Tooltip>
+      <Tooltip label="שלח לי במייל">
+        <button
+          type="button"
+          onClick={() => onSendEmail(gen)}
+          disabled={sendingEmail}
+          className="icon-button h-8 w-8 bg-black/40 disabled:opacity-60"
+          aria-label="שלח לי במייל"
+        >
+          {sendingEmail ? <SpinnerIcon /> : <EnvelopeIcon />}
+        </button>
+      </Tooltip>
+    </div>
+  );
+
   return (
     <div className={`card p-3 group ${isActive && isProcessing ? 'ring-2 ring-brand-500' : ''}`}>
       <div className="aspect-square bg-surface rounded-lg overflow-hidden mb-3 relative">
         {canUse ? (
-          <>
-            <button
-              type="button"
-              onClick={() => onSelect(gen)}
-              className="block w-full h-full"
-              aria-label="פתח פרטי יצירה"
-            >
-              {isVideo ? (
-                <>
-                  <video
-                    src={gen.resultUrl!}
-                    muted
-                    playsInline
-                    preload="metadata"
-                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                  />
-                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm transition-transform group-hover:scale-110">
-                      <svg className="h-6 w-6 translate-x-0.5 text-white" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    </span>
-                  </span>
-                </>
-              ) : (
+          isVideo ? (
+            <VideoPreview
+              src={gen.resultUrl!}
+              withPlayBadge
+              onOpen={() => onSelect(gen)}
+              overlay={actions}
+              className="w-full h-full object-cover transition-transform group-hover:scale-105"
+            />
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => onSelect(gen)}
+                className="block w-full h-full"
+                aria-label="פתח פרטי יצירה"
+              >
                 <img
                   src={gen.resultUrl!}
                   alt={gen.prompt}
@@ -72,75 +133,10 @@ export function GenerationCard({
                   }}
                   className="w-full h-full object-cover transition-transform group-hover:scale-105 cursor-grab active:cursor-grabbing"
                 />
-              )}
-            </button>
-            <div className="absolute left-2 top-2 flex flex-wrap gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
-              <Tooltip label="פרטים">
-                <button
-                  type="button"
-                  onClick={() => onSelect(gen)}
-                  className="icon-button h-8 w-8 bg-black/40"
-                  aria-label="פרטים"
-                >
-                  <InfoIcon />
-                </button>
-              </Tooltip>
-              <Tooltip label="צור מחדש">
-                <button
-                  type="button"
-                  onClick={() => onReuse(gen)}
-                  className="icon-button h-8 w-8 bg-black/40"
-                  aria-label="צור מחדש"
-                >
-                  <RefreshIcon />
-                </button>
-              </Tooltip>
-              {!isVideo && (
-                <Tooltip label="הוסף כרפרנס">
-                  <button
-                    type="button"
-                    onClick={() => onUseReference(gen.resultUrl!)}
-                    className="icon-button h-8 w-8 bg-brand-600 text-white hover:bg-brand-500"
-                    aria-label="הוסף כתמונת השראה"
-                  >
-                    <PlusIcon />
-                  </button>
-                </Tooltip>
-              )}
-              <Tooltip label="הורדה">
-                <button
-                  type="button"
-                  onClick={() => downloadImage(gen.resultUrl!, `generation-${gen.id}.${isVideo ? 'mp4' : 'png'}`)}
-                  className="icon-button h-8 w-8 bg-black/40"
-                  aria-label="הורדה"
-                >
-                  <DownloadIcon />
-                </button>
-              </Tooltip>
-              <Tooltip label="פתיחה">
-                <a
-                  href={gen.resultUrl!}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="icon-button h-8 w-8 bg-black/40"
-                  aria-label="פתיחה בטאב חדש"
-                >
-                  <OpenIcon />
-                </a>
-              </Tooltip>
-              <Tooltip label="שלח לי במייל">
-                <button
-                  type="button"
-                  onClick={() => onSendEmail(gen)}
-                  disabled={sendingEmail}
-                  className="icon-button h-8 w-8 bg-black/40 disabled:opacity-60"
-                  aria-label="שלח לי במייל"
-                >
-                  {sendingEmail ? <SpinnerIcon /> : <EnvelopeIcon />}
-                </button>
-              </Tooltip>
-            </div>
-          </>
+              </button>
+              {actions}
+            </>
+          )
         ) : isProcessing ? (
           <div className="w-full h-full flex flex-col items-center justify-center gap-2">
             <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />

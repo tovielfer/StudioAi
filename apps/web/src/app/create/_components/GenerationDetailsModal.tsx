@@ -3,6 +3,7 @@
 import { Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
 import { STATUS_LABELS, translateError } from '@/lib/he';
+import { VideoPreview } from '@/components/VideoPreview';
 import { PlusIcon, DownloadIcon, OpenIcon, CloseIcon, RefreshIcon } from './icons';
 import { EnvelopeIcon, SpinnerIcon } from '@/components/SendEmail';
 import { CopyButton } from './CopyButton';
@@ -70,10 +71,10 @@ export function GenerationDetailsModal({
             <div className="aspect-square bg-surface rounded-xl overflow-hidden flex items-center justify-center">
               {hasAsset ? (
                 isVideo ? (
-                  <video
+                  <VideoPreview
                     src={generation.resultUrl!}
                     controls
-                    playsInline
+                    fallbackVariant="full"
                     className="w-full h-full object-contain"
                   />
                 ) : (

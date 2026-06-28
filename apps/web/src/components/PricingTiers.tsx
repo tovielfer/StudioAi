@@ -21,7 +21,6 @@ export function PricingTiers() {
   return (
     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
       {packages.map((pkg) => {
-        const perCredit = pkg.credits > 0 ? pkg.priceIls / pkg.credits : 0;
         return (
           <div
             key={pkg.id}
@@ -40,9 +39,6 @@ export function PricingTiers() {
             <div className="text-3xl font-bold my-2">₪{pkg.priceIls}</div>
             <p className="text-brand-300 text-sm">
               {pkg.credits.toLocaleString('he-IL')} קרדיטים
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              ₪{perCredit.toFixed(3)} לקרדיט
             </p>
             <Link
               href="/register"

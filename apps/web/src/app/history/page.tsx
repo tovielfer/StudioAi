@@ -4,6 +4,8 @@ import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Tooltip } from '@/components/Tooltip';
+import { VideoPreview } from '@/components/VideoPreview';
+import { FancySelect } from '@/app/create/_components/FancySelect';
 import {
   useSendGenerationEmail,
   EmailToast,
@@ -15,6 +17,13 @@ import { api, Generation } from '@/lib/api';
 import { useInfiniteList } from '@/lib/use-infinite-list';
 import { downloadImage } from '@/lib/download';
 import { STATUS_LABELS, translateError } from '@/lib/he';
+
+const TYPE_FILTER_OPTIONS = [
+  { value: '', label: 'כל הסוגים' },
+  { value: 'image', label: 'תמונות' },
+  { value: 'video', label: 'וידאו' },
+  { value: 'upscale', label: 'הגדלות' },
+];
 
 export default function HistoryPage() {
   return (
@@ -73,16 +82,14 @@ function HistoryContent() {
           <h1 className="text-3xl font-bold">היסטוריה</h1>
           <p className="text-gray-400 mt-1">{total} יצירות בסך הכל</p>
         </div>
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="input-field w-auto"
-        >
-          <option value="">כל הסוגים</option>
-          <option value="image">תמונות</option>
-          <option value="video">וידאו</option>
-          <option value="upscale">הגדלה</option>
-        </select>
+        <div className="w-40">
+          <FancySelect
+            value={filter}
+            options={TYPE_FILTER_OPTIONS}
+            onChange={setFilter}
+            placeholder="כל הסוגים"
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -101,92 +108,98 @@ function HistoryContent() {
               gen.status === 'failed' && gen.errorMessage
                 ? translateError(gen.errorMessage)
                 : STATUS_LABELS[gen.status] ?? gen.status;
+            const isVideo = gen.type === 'video';
+
+            const actions = (
+              <div className="absolute left-2 top-2 flex flex-wrap gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
+                <Tooltip label="פרטים">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedGeneration(gen)}
+                    className="icon-button h-8 w-8 bg-black/40"
+                    aria-label="פרטים"
+                  >
+                    <InfoIcon />
+                  </button>
+                </Tooltip>
+                <Tooltip label="עריכה">
+                  <Link
+                    href={getEditHref(gen)}
+                    className="icon-button h-8 w-8 bg-brand-600 text-white hover:bg-brand-500"
+                    aria-label="עריכה"
+                  >
+                    <EditIcon />
+                  </Link>
+                </Tooltip>
+                <Tooltip label="הורדה">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      downloadImage(
+                        gen.resultUrl!,
+                        `generation-${gen.id}.${isVideo ? 'mp4' : 'png'}`,
+                      )
+                    }
+                    className="icon-button h-8 w-8 bg-black/40"
+                    aria-label="הורדה"
+                  >
+                    <DownloadIcon />
+                  </button>
+                </Tooltip>
+                <Tooltip label="פתיחה">
+                  <a
+                    href={gen.resultUrl!}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="icon-button h-8 w-8 bg-black/40"
+                    aria-label="פתיחה בטאב חדש"
+                  >
+                    <OpenIcon />
+                  </a>
+                </Tooltip>
+                <Tooltip label="שלח לי במייל">
+                  <button
+                    type="button"
+                    onClick={() => sendEmail(gen)}
+                    disabled={sendingId === gen.id}
+                    className="icon-button h-8 w-8 bg-black/40 disabled:opacity-60"
+                    aria-label="שלח לי במייל"
+                  >
+                    {sendingId === gen.id ? <SpinnerIcon /> : <EnvelopeIcon />}
+                  </button>
+                </Tooltip>
+              </div>
+            );
 
             return (
               <div key={gen.id} className="card p-3 group">
                 <div className="aspect-square bg-surface rounded-lg overflow-hidden mb-3 relative">
                   {canUseImage ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedGeneration(gen)}
-                        className="block w-full h-full"
-                        aria-label="פתח פרטי יצירה"
-                      >
-                        {gen.type === 'video' ? (
-                          <video
-                            src={gen.resultUrl!}
-                            muted
-                            playsInline
-                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                          />
-                        ) : (
+                    isVideo ? (
+                      <VideoPreview
+                        src={gen.resultUrl!}
+                        withPlayBadge
+                        onOpen={() => setSelectedGeneration(gen)}
+                        overlay={actions}
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      />
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedGeneration(gen)}
+                          className="block w-full h-full"
+                          aria-label="פתח פרטי יצירה"
+                        >
                           <img
                             src={gen.resultUrl!}
                             alt={gen.prompt}
                             className="w-full h-full object-cover transition-transform group-hover:scale-105"
                           />
-                        )}
-                      </button>
-                      <div className="absolute left-2 top-2 flex flex-wrap gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
-                        <Tooltip label="פרטים">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedGeneration(gen)}
-                            className="icon-button h-8 w-8 bg-black/40"
-                            aria-label="פרטים"
-                          >
-                            <InfoIcon />
-                          </button>
-                        </Tooltip>
-                        <Tooltip label="עריכה">
-                          <Link
-                            href={getEditHref(gen)}
-                            className="icon-button h-8 w-8 bg-brand-600 text-white hover:bg-brand-500"
-                            aria-label="עריכה"
-                          >
-                            <EditIcon />
-                          </Link>
-                        </Tooltip>
-                        <Tooltip label="הורדה">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              downloadImage(
-                                gen.resultUrl!,
-                                `generation-${gen.id}.${gen.type === 'video' ? 'mp4' : 'png'}`,
-                              )
-                            }
-                            className="icon-button h-8 w-8 bg-black/40"
-                            aria-label="הורדה"
-                          >
-                            <DownloadIcon />
-                          </button>
-                        </Tooltip>
-                        <Tooltip label="פתיחה">
-                          <a
-                            href={gen.resultUrl!}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="icon-button h-8 w-8 bg-black/40"
-                            aria-label="פתיחה בטאב חדש"
-                          >
-                            <OpenIcon />
-                          </a>
-                        </Tooltip>
-                        <Tooltip label="שלח לי במייל">
-                          <button
-                            type="button"
-                            onClick={() => sendEmail(gen)}
-                            disabled={sendingId === gen.id}
-                            className="icon-button h-8 w-8 bg-black/40 disabled:opacity-60"
-                            aria-label="שלח לי במייל"
-                          >
-                            {sendingId === gen.id ? <SpinnerIcon /> : <EnvelopeIcon />}
-                          </button>
-                        </Tooltip>
-                      </div>
-                    </>
+                        </button>
+                        {actions}
+                      </>
+                    )
                   ) : (
                     <div className="w-full h-full flex items-center justify-center px-2 text-center text-gray-600 text-sm">
                       {displayStatus}
@@ -300,10 +313,10 @@ function GenerationDetailsModal({
             <div className="aspect-square bg-surface rounded-xl overflow-hidden flex items-center justify-center">
               {hasAsset ? (
                 isVideo ? (
-                  <video
+                  <VideoPreview
                     src={generation.resultUrl!}
                     controls
-                    playsInline
+                    fallbackVariant="full"
                     className="w-full h-full object-contain"
                   />
                 ) : (
