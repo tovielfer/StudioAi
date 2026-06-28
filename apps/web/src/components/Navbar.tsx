@@ -105,10 +105,10 @@ export function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`relative text-sm transition-colors ${
+              className={`relative text-sm transition-colors after:absolute after:-bottom-1.5 after:right-0 after:h-0.5 after:rounded-full after:bg-gradient-to-l after:from-brand-400 after:to-accent-400 after:transition-all ${
                 pathname === link.href
-                  ? 'text-brand-400'
-                  : 'text-gray-400 hover:text-white'
+                  ? 'text-white after:w-full'
+                  : 'text-gray-400 hover:text-white after:w-0 hover:after:w-full'
               }`}
             >
               {link.label}
@@ -125,7 +125,8 @@ export function Navbar() {
 
           {user ? (
             <div className="flex items-center gap-4">
-              <span className="text-sm bg-surface-card border border-surface-border px-3 py-1 rounded-full">
+              <span className="inline-flex items-center gap-1.5 text-sm bg-brand-900/30 border border-brand-700/40 text-brand-200 px-3 py-1 rounded-full">
+                <span className="h-1.5 w-1.5 rounded-full bg-accent-400" />
                 {user.credits} קרדיטים
               </span>
               <button
