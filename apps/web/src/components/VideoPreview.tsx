@@ -3,11 +3,12 @@
 import { useState, type ReactNode } from 'react';
 
 /**
- * When the user is behind the NetFree content filter, blocked asset URLs come
- * back with HTTP 418 and the <video> element fails to load (its `error` event
- * fires). In that case we don't have a real preview to show, so we replace it
- * with a clear "blocked by NetFree" notice plus a link that opens the asset in
- * a new tab — where NetFree shows its block page and the user can request a
+ * When the user is behind the NetFree content filter, an asset URL that hasn't
+ * been categorised yet comes back with HTTP 418 and the <video> element fails
+ * to load (its `error` event fires). This does NOT mean the asset was blocked —
+ * it means NetFree hasn't reviewed it yet. So we surface a "pending review"
+ * notice (not "blocked", which would discourage users from sending it) plus a
+ * link that opens the asset in a new tab, where NetFree lets them request a
  * review.
  */
 export function NetfreeBlockedNotice({
@@ -20,12 +21,12 @@ export function NetfreeBlockedNotice({
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-surface px-3 text-center">
       <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
-        <ShieldIcon />
+        <ClockIcon />
       </span>
-      <p className="text-xs font-semibold text-gray-200">נחסם ע&quot;י נטפרי</p>
+      <p className="text-xs font-semibold text-gray-200">ממתין לבדיקת נטפרי</p>
       {variant === 'full' && (
-        <p className="max-w-[240px] text-[11px] leading-4 text-gray-500">
-          הסרטון לא נבדק ע&quot;י נטפרי. פתחו בכרטיסייה חדשה ושלחו לבדיקה.
+        <p className="max-w-[250px] text-[11px] leading-4 text-gray-500">
+          הסרטון עדיין לא נבדק ע&quot;י נטפרי. פתחו בכרטיסייה חדשה ושלחו אותו לבדיקה כדי לצפות.
         </p>
       )}
       <a
@@ -35,7 +36,7 @@ export function NetfreeBlockedNotice({
         onClick={(e) => e.stopPropagation()}
         className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-500"
       >
-        שליחה לבדיקה
+        פתיחה ושליחה לבדיקה
         <ExternalIcon />
       </a>
     </div>
@@ -124,11 +125,11 @@ export function VideoPreview({
   );
 }
 
-function ShieldIcon() {
+function ClockIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3 4 6v6c0 4.5 3.2 7.8 8 9 4.8-1.2 8-4.5 8-9V6l-8-3Z" />
-      <path d="m9.5 12 2 2 3.5-4" />
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
     </svg>
   );
 }
