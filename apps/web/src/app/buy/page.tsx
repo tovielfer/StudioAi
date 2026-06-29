@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/lib/auth-context';
-import { api, CreditPackage, Order, OrderStatus, SavedCard } from '@/lib/api';
+import { api, CreditPackage, Order, OrderStatus } from '@/lib/api';
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   pending: 'ממתין לתשלום',
@@ -88,7 +88,6 @@ function BuyContent() {
   const { user, refreshCredits } = useAuth();
   const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [savedCard, setSavedCard] = useState<SavedCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -97,33 +96,16 @@ function BuyContent() {
 
   const load = async () => {
     try {
-      const [pkgs, myOrders, card] = await Promise.all([
+      const [pkgs, myOrders] = await Promise.all([
         api.getPackages(),
         api.getMyOrders(),
-        // A saved-card lookup must never block buying — swallow its errors.
-        SUMIT_CONFIGURED
-          ? api.getSavedCard().catch(() => null)
-          : Promise.resolve(null),
       ]);
       setPackages(pkgs);
       setOrders(myOrders);
-      setSavedCard(card);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'שגיאה בטעינה');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const removeSavedCard = async () => {
-    setMessage(null);
-    setError(null);
-    try {
-      await api.deleteSavedCard();
-      setSavedCard(null);
-      setMessage('הכרטיס השמור הוסר.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'הסרת הכרטיס נכשלה');
     }
   };
 
@@ -185,23 +167,6 @@ function BuyContent() {
             {user?.credits ?? 0} קרדיטים
           </span>
         </p>
-        {savedCard && (
-          <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-            <span>
-              כרטיס שמור:{' '}
-              <span className="text-gray-300 font-medium">
-                {savedCard.brand ? `${savedCard.brand} ` : ''}•••• {savedCard.last4 ?? '----'}
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={removeSavedCard}
-              className="text-red-400 hover:text-red-300 underline underline-offset-2"
-            >
-              הסר
-            </button>
-          </p>
-        )}
       </div>
 
       {message && (
@@ -301,7 +266,6 @@ function BuyContent() {
       {payPkg && (
         <PaymentModal
           pkg={payPkg}
-          savedCard={savedCard}
           onClose={() => setPayPkg(null)}
           onPaid={onPaid}
         />
@@ -312,12 +276,10 @@ function BuyContent() {
 
 function PaymentModal({
   pkg,
-  savedCard,
   onClose,
   onPaid,
 }: {
   pkg: CreditPackage;
-  savedCard: SavedCard | null;
   onClose: () => void;
   onPaid: () => void;
 }) {
@@ -327,36 +289,9 @@ function PaymentModal({
   // The order is created lazily on the first charge attempt and reused on
   // retries, so opening the form creates nothing and retries never duplicate it.
   const orderIdRef = useRef<string | null>(null);
-  const saveCardRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [saveCard, setSaveCard] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // When a saved card exists, the form is only shown if the user opts to use a
-  // different card; otherwise the one-click button is the primary action.
-  const [useNewCard, setUseNewCard] = useState(!savedCard);
-
-  const ensureOrderId = async (): Promise<string> => {
-    if (!orderIdRef.current) {
-      const order = await api.createOrder(pkg.id);
-      orderIdRef.current = order.id;
-    }
-    return orderIdRef.current;
-  };
-
-  const payWithSaved = async () => {
-    setError(null);
-    setProcessing(true);
-    try {
-      const orderId = await ensureOrderId();
-      await api.payOrderWithSavedCard(orderId);
-      onPaid();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'התשלום נכשל. נסה שוב.');
-      setProcessing(false);
-    }
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -365,8 +300,11 @@ function PaymentModal({
       if (chargingRef.current) return;
       chargingRef.current = true;
       try {
-        const orderId = await ensureOrderId();
-        await api.payOrder(orderId, token, saveCardRef.current);
+        if (!orderIdRef.current) {
+          const order = await api.createOrder(pkg.id);
+          orderIdRef.current = order.id;
+        }
+        await api.payOrder(orderIdRef.current, token);
         onPaid();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'התשלום נכשל. נסה שוב.');
@@ -427,10 +365,6 @@ function PaymentModal({
       form?.removeEventListener('submit', onSubmit);
     };
   }, [pkg.id, onPaid]);
-
-  useEffect(() => {
-    saveCardRef.current = saveCard;
-  }, [saveCard]);
 
   const inputClass =
     'w-full rounded-lg bg-surface border border-surface-border px-3.5 py-2.5 text-base font-medium text-white tracking-wide placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-colors';
@@ -493,57 +427,15 @@ function PaymentModal({
           </div>
         )}
 
-        {/* One-click pay with the saved card (shown unless the user opts to
-            enter a different card). */}
-        {savedCard && !useNewCard && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-xl border border-surface-border bg-surface px-4 py-3">
-              <span className="text-sm text-gray-300">
-                {savedCard.brand ? `${savedCard.brand} ` : ''}•••• {savedCard.last4 ?? '----'}
-              </span>
-              {(savedCard.expMonth || savedCard.expYear) && (
-                <span className="text-xs text-gray-500">
-                  {savedCard.expMonth}/{savedCard.expYear}
-                </span>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={payWithSaved}
-              disabled={processing}
-              className="btn-primary w-full disabled:opacity-50"
-            >
-              {processing ? (
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                  מעבד תשלום...
-                </span>
-              ) : (
-                `שלם ₪${pkg.priceIls} עם הכרטיס השמור`
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setUseNewCard(true)}
-              disabled={processing}
-              className="w-full text-sm text-brand-400 hover:text-brand-300 disabled:opacity-50"
-            >
-              שלם עם כרטיס אחר
-            </button>
-          </div>
-        )}
-
         {/* action/target route any native submit into a throwaway iframe — a
-            safety net so the SPA never navigates if binding ever fails. The
-            form stays mounted (just hidden) when a saved card is used, so the
-            payments.js binding set up on open stays valid. */}
+            safety net so the SPA never navigates if binding ever fails. */}
         <form
           id="og-pay-form"
           ref={formRef}
           data-og="form"
           action="about:blank"
           target="og-payment-sink"
-          className={`space-y-3 ${savedCard && !useNewCard ? 'hidden' : ''}`}
+          className="space-y-3"
         >
           <div>
             <label className="block text-xs text-gray-400 mb-1">
@@ -609,16 +501,6 @@ function PaymentModal({
 
           <input type="hidden" name="og-token" id="og-token" />
           <div className="og-errors text-sm text-red-300" />
-
-          <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={saveCard}
-              onChange={(e) => setSaveCard(e.target.checked)}
-              className="h-4 w-4 rounded border-surface-border bg-surface text-brand-600 focus:ring-brand-500"
-            />
-            שמור את הכרטיס לרכישה מהירה בפעם הבאה
-          </label>
 
           <button
             type="submit"

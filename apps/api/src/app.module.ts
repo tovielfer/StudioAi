@@ -23,7 +23,6 @@ import { AiPricingRule } from './ai/ai-pricing-rule.entity';
 import { AiPricingRuleAuditLog } from './ai/ai-pricing-rule-audit-log.entity';
 import { CreditPackage } from './billing/credit-package.entity';
 import { Order } from './billing/order.entity';
-import { SavedPaymentMethod } from './billing/saved-payment-method.entity';
 import { isSyncQueue } from './config/env.loader';
 
 @Module({})
@@ -57,7 +56,6 @@ export class AppModule implements NestModule {
             AiPricingRuleAuditLog,
             CreditPackage,
             Order,
-            SavedPaymentMethod,
           ],
           migrations: [join(__dirname, 'database/migrations/*.{ts,js}')],
           migrationsRun: true,

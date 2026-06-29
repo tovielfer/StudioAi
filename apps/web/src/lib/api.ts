@@ -173,13 +173,6 @@ export interface Order {
   createdAt: string;
 }
 
-export interface SavedCard {
-  last4: string | null;
-  brand: string | null;
-  expMonth: string | null;
-  expYear: string | null;
-}
-
 export interface PricingRuleAuditLog {
   id: string;
   ruleId: string;
@@ -239,24 +232,12 @@ class ApiClient {
 
     const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 
-    // Read the raw text first: some endpoints (e.g. an empty/204 response, or a
-    // handler that returns null) send no body, and res.json() on an empty body
-    // throws "Unexpected end of JSON input".
-    const raw = await res.text();
-
     if (!res.ok) {
-      let message = res.statusText;
-      if (raw) {
-        try {
-          message = (JSON.parse(raw) as { message?: string }).message || message;
-        } catch {
-          // Non-JSON error body — fall back to the status text.
-        }
-      }
-      throw new Error(message || `Request failed: ${res.status}`);
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(err.message || `Request failed: ${res.status}`);
     }
 
-    return (raw ? JSON.parse(raw) : null) as T;
+    return res.json();
   }
 
   register(email: string, password: string) {
@@ -395,31 +376,14 @@ class ApiClient {
     return this.request<Order[]>('/orders');
   }
 
-  payOrder(orderId: string, singleUseToken: string, saveCard = false) {
+  payOrder(orderId: string, singleUseToken: string) {
     return this.request<{ order: Order; credits: number }>(
       `/orders/${orderId}/pay`,
       {
         method: 'POST',
-        body: JSON.stringify({ singleUseToken, saveCard }),
+        body: JSON.stringify({ singleUseToken }),
       },
     );
-  }
-
-  payOrderWithSavedCard(orderId: string) {
-    return this.request<{ order: Order; credits: number }>(
-      `/orders/${orderId}/pay-saved`,
-      { method: 'POST' },
-    );
-  }
-
-  getSavedCard() {
-    return this.request<SavedCard | null>('/payment-method');
-  }
-
-  deleteSavedCard() {
-    return this.request<{ ok: boolean }>('/payment-method', {
-      method: 'DELETE',
-    });
   }
 
   getModels(type?: 'image' | 'video') {

@@ -10,12 +10,11 @@ import {
 import { BillingService } from './billing.service';
 import { CreditPackage } from './credit-package.entity';
 import { Order } from './order.entity';
-import { SavedPaymentMethod } from './saved-payment-method.entity';
 import { SumitService } from './sumit.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CreditPackage, Order, SavedPaymentMethod]),
+    TypeOrmModule.forFeature([CreditPackage, Order]),
     CreditsModule,
     UsersModule,
   ],
