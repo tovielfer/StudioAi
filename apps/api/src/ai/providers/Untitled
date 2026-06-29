@@ -1,0 +1,2 @@
+C:\Users\HP\Desktop\…\src\lib\api.ts:233 
+ GET http://localhost:3001/auth/verify-email?token=8a1fb67… net::ERR_CONNECTION_REFUSED

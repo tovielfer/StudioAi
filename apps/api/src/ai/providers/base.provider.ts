@@ -1,7 +1,10 @@
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GenerateImageParams, GenerateImageResult } from '../ai.types';
 
 export abstract class BaseImageProvider {
+  private readonly baseLogger = new Logger('ReferenceImageFetch');
+
   constructor(protected readonly config: ConfigService) {}
 
   abstract generate(params: GenerateImageParams): Promise<GenerateImageResult>;
@@ -56,6 +59,10 @@ export abstract class BaseImageProvider {
       if (buffer.byteLength > BaseImageProvider.REFERENCE_IMAGE_MAX_BYTES) {
         throw new Error('Reference image exceeds maximum allowed size');
       }
+      const rawHeader = response.headers.get('content-type') ?? '';
+      const firstBytes = Array.from(new Uint8Array(buffer).slice(0, 4))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join(' ');
       // Trust the actual bytes over the header/extension: files are often stored
       // with a mismatched extension/content-type (e.g. a JPEG saved as .png),
       // which makes providers reject them with "invalid image file".
@@ -64,14 +71,16 @@ export abstract class BaseImageProvider {
       if (sniffed) {
         contentType = sniffed;
       } else {
-        const raw = response.headers.get('content-type') ?? '';
         // R2 (and some CDNs) may return application/octet-stream — fall back to URL extension
-        contentType = raw.startsWith('image/')
-          ? raw.split(';')[0].trim()
+        contentType = rawHeader.startsWith('image/')
+          ? rawHeader.split(';')[0].trim()
           : this.contentTypeFromUrl(url);
       }
       const blob = new Blob([buffer], { type: contentType });
       const filename = this.filenameFromContentType(contentType);
+      this.baseLogger.log(
+        `fetched ref: bytes=${buffer.byteLength}, header-content-type="${rawHeader}", magic=[${firstBytes}], sniffed=${sniffed ?? 'null'}, final-content-type="${contentType}", filename="${filename}" (url=${url})`,
+      );
       return { blob, filename };
     } finally {
       clearTimeout(timeout);

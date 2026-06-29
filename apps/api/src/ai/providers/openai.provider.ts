@@ -67,6 +67,10 @@ export class OpenAIProvider extends BaseImageProvider {
     const quality = this.mapQuality(params.quality);
     const refs = this.resolveReferenceImages(params);
 
+    this.logger.log(
+      `OpenAI generate() — model=${model}, refs=${refs.length}, route=${refs.length > 0 ? 'EDIT' : 'CREATE'}, size=${size}, quality=${quality}, refUrls=${JSON.stringify(refs)}`,
+    );
+
     if (refs.length > 0) {
       return this.edit(params, model, size, quality, refs);
     }
@@ -90,8 +94,15 @@ export class OpenAIProvider extends BaseImageProvider {
     const imageKey = refs.length > 1 ? 'image[]' : 'image';
     for (const refUrl of refs) {
       const { blob, filename } = await this.fetchReferenceImage(refUrl);
+      this.logger.log(
+        `OpenAI edit() — appending ref as key="${imageKey}", filename="${filename}", blob.type="${blob.type}", blob.size=${blob.size} bytes (from ${refUrl})`,
+      );
       form.append(imageKey, blob, filename);
     }
+
+    this.logger.log(
+      `OpenAI edit() — POST /images/edits model=${model}, size=${size}, quality=${quality}, images=${refs.length}`,
+    );
 
     const key = this.config.get('OPENAI_API_KEY');
     const response = await fetch('https://api.openai.com/v1/images/edits', {

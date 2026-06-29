@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
       <div className="card auth-card-in">
         <h1 className="text-2xl font-bold mb-2">שכחתי סיסמה</h1>
         <p className="text-gray-400 text-sm mb-6">
-          הזיני את כתובת המייל שלך ונשלח לך קישור לאיפוס הסיסמה
+          הזן את כתובת המייל שלך ונשלח לך קישור לאיפוס הסיסמה
         </p>
 
         {error && (
@@ -56,7 +56,7 @@ export default function ForgotPasswordPage() {
 
         {sent ? (
           <div className="bg-green-500/10 border border-green-500/30 text-green-400 text-sm rounded-lg px-4 py-4 text-center">
-            <div className="text-base font-semibold mb-1">בדקי את תיבת המייל 📬</div>
+            <div className="text-base font-semibold mb-1">בדוק את תיבת המייל 📬</div>
             <div>אם הכתובת קיימת במערכת, שלחנו לך קישור לאיפוס הסיסמה.</div>
           </div>
         ) : (
