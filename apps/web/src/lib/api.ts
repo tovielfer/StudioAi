@@ -173,6 +173,13 @@ export interface Order {
   createdAt: string;
 }
 
+export interface SavedCard {
+  last4: string | null;
+  brand: string | null;
+  expMonth: string | null;
+  expYear: string | null;
+}
+
 export interface PricingRuleAuditLog {
   id: string;
   ruleId: string;
@@ -376,14 +383,31 @@ class ApiClient {
     return this.request<Order[]>('/orders');
   }
 
-  payOrder(orderId: string, singleUseToken: string) {
+  payOrder(orderId: string, singleUseToken: string, saveCard = false) {
     return this.request<{ order: Order; credits: number }>(
       `/orders/${orderId}/pay`,
       {
         method: 'POST',
-        body: JSON.stringify({ singleUseToken }),
+        body: JSON.stringify({ singleUseToken, saveCard }),
       },
     );
+  }
+
+  payOrderWithSavedCard(orderId: string) {
+    return this.request<{ order: Order; credits: number }>(
+      `/orders/${orderId}/pay-saved`,
+      { method: 'POST' },
+    );
+  }
+
+  getSavedCard() {
+    return this.request<SavedCard | null>('/payment-method');
+  }
+
+  deleteSavedCard() {
+    return this.request<{ ok: boolean }>('/payment-method', {
+      method: 'DELETE',
+    });
   }
 
   getModels(type?: 'image' | 'video') {

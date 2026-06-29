@@ -9,6 +9,7 @@ import { AiPricingRule } from '../ai/ai-pricing-rule.entity';
 import { AiPricingRuleAuditLog } from '../ai/ai-pricing-rule-audit-log.entity';
 import { CreditPackage } from '../billing/credit-package.entity';
 import { Order } from '../billing/order.entity';
+import { SavedPaymentMethod } from '../billing/saved-payment-method.entity';
 
 export default new DataSource({
   type: 'postgres',
@@ -22,6 +23,7 @@ export default new DataSource({
     AiPricingRuleAuditLog,
     CreditPackage,
     Order,
+    SavedPaymentMethod,
   ],
   migrations: [join(__dirname, 'migrations/*.{ts,js}')],
 });

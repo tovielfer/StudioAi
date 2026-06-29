@@ -32,9 +32,6 @@ export function FeedbackWidget() {
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 px-4 py-6 backdrop-blur-sm md:items-center">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-surface-border bg-surface-card shadow-2xl">
             <div className="flex items-center justify-between gap-4 border-b border-surface-border px-5 py-3.5">
-              <h2 className="text-base font-semibold text-white">
-                שליחת הודעה מהירה
-              </h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}

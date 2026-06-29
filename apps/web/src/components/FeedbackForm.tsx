@@ -115,8 +115,7 @@ export function FeedbackForm({
 
       <div>
         <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-300">
-          כותרת
-          <span className="text-xs font-normal text-gray-500">(לא חובה)</span>
+          נושא
         </label>
         <input
           value={title}

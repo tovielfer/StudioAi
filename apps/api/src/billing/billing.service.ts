@@ -12,7 +12,8 @@ import { UsersService } from '../users/users.service';
 import { CreditPackage } from './credit-package.entity';
 import { CreatePackageDto, UpdatePackageDto } from './dto/package.dto';
 import { Order, OrderStatus } from './order.entity';
-import { SumitService } from './sumit.service';
+import { SavedPaymentMethod } from './saved-payment-method.entity';
+import { SumitChargeResult, SumitService } from './sumit.service';
 
 /**
  * Default packs. The largest pack is the target rate (100 credits / ILS, i.e.
@@ -42,6 +43,8 @@ export class BillingService implements OnApplicationBootstrap {
     private readonly packageRepo: Repository<CreditPackage>,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
+    @InjectRepository(SavedPaymentMethod)
+    private readonly savedCardRepo: Repository<SavedPaymentMethod>,
     private readonly creditsService: CreditsService,
     private readonly usersService: UsersService,
     private readonly sumitService: SumitService,
@@ -136,19 +139,18 @@ export class BillingService implements OnApplicationBootstrap {
    *
    * The amount and credit grant are always taken from the persisted order, never
    * from the client, so a tampered request cannot change what is charged.
+   *
+   * When `saveCard` is true the user has explicitly opted to store the card for
+   * faster future purchases; after a successful charge we persist SUMIT's
+   * vaulted token (never the raw card).
    */
-  async payOrder(userId: string, orderId: string, singleUseToken: string) {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('Order not found');
-    if (order.userId !== userId) {
-      throw new NotFoundException('Order not found');
-    }
-    if (order.status !== OrderStatus.PENDING) {
-      throw new BadRequestException('Order is not pending');
-    }
-
-    const user = await this.usersService.findById(userId);
-    if (!user) throw new NotFoundException('User not found');
+  async payOrder(
+    userId: string,
+    orderId: string,
+    singleUseToken: string,
+    saveCard = false,
+  ) {
+    const { order, user } = await this.loadPayableOrder(userId, orderId);
 
     const result = await this.sumitService.charge({
       singleUseToken,
@@ -158,6 +160,85 @@ export class BillingService implements OnApplicationBootstrap {
       uniqueIdentifier: `order-${order.id}`,
     });
 
+    const settled = await this.settlePaidOrder(order, user.credits, result);
+
+    if (saveCard && result.customerId) {
+      await this.persistSavedCard(userId, result.customerId);
+    }
+
+    return settled;
+  }
+
+  /**
+   * Charges a pending order against the user's previously saved card — no
+   * card details from the client. The saved token belongs to the user and the
+   * citizen id comes from the stored record, so the request cannot be tampered.
+   */
+  async payOrderWithSavedCard(userId: string, orderId: string) {
+    const saved = await this.savedCardRepo.findOne({ where: { userId } });
+    if (!saved) {
+      throw new BadRequestException('אין כרטיס שמור. הזיני פרטי כרטיס.');
+    }
+
+    const { order, user } = await this.loadPayableOrder(userId, orderId);
+
+    const result = await this.sumitService.chargeSavedCard({
+      savedCard: {
+        cardToken: saved.cardToken,
+        citizenId: saved.citizenId,
+        expMonth: saved.expMonth,
+        expYear: saved.expYear,
+      },
+      amountIls: order.priceIls,
+      description: order.packageName,
+      customer: { name: user.email, email: user.email, externalId: user.id },
+      uniqueIdentifier: `order-${order.id}`,
+    });
+
+    return this.settlePaidOrder(order, user.credits, result);
+  }
+
+  /** The card the user has saved for one-click purchases, if any. */
+  async getSavedCard(userId: string) {
+    const saved = await this.savedCardRepo.findOne({ where: { userId } });
+    if (!saved) return null;
+    return {
+      last4: saved.last4,
+      brand: saved.brand,
+      expMonth: saved.expMonth,
+      expYear: saved.expYear,
+    };
+  }
+
+  /** Forgets the saved card both locally and in SUMIT's vault. */
+  async deleteSavedCard(userId: string) {
+    const saved = await this.savedCardRepo.findOne({ where: { userId } });
+    if (!saved) return { ok: true };
+    await this.sumitService.removeSavedCard(saved.sumitCustomerId);
+    await this.savedCardRepo.delete({ userId });
+    return { ok: true };
+  }
+
+  private async loadPayableOrder(userId: string, orderId: string) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order || order.userId !== userId) {
+      throw new NotFoundException('Order not found');
+    }
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException('Order is not pending');
+    }
+
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    return { order, user };
+  }
+
+  private async settlePaidOrder(
+    order: Order,
+    currentCredits: number,
+    result: SumitChargeResult,
+  ) {
     if (!result.ok) {
       throw new BadRequestException(
         result.errorMessage || 'התשלום נדחה. נסי שוב.',
@@ -176,7 +257,40 @@ export class BillingService implements OnApplicationBootstrap {
     order.decidedAt = new Date();
     await this.orderRepo.save(order);
 
-    return { order, credits: user.credits + order.credits };
+    return { order, credits: currentCredits + order.credits };
+  }
+
+  /**
+   * Fetches the freshly vaulted card from SUMIT and upserts it for the user.
+   * Best-effort: a failure here never fails the purchase the user already paid.
+   */
+  private async persistSavedCard(userId: string, sumitCustomerId: string) {
+    try {
+      const card = await this.sumitService.getSavedCard(sumitCustomerId);
+      if (!card) {
+        this.logger.warn(
+          `Card save requested but SUMIT returned no vaulted method (user=${userId})`,
+        );
+        return;
+      }
+
+      const existing = await this.savedCardRepo.findOne({ where: { userId } });
+      const entity = existing ?? this.savedCardRepo.create({ userId });
+      entity.sumitCustomerId = sumitCustomerId;
+      entity.cardToken = card.cardToken;
+      entity.last4 = card.last4;
+      entity.brand = card.brand;
+      entity.expMonth = card.expMonth;
+      entity.expYear = card.expYear;
+      entity.citizenId = card.citizenId;
+      await this.savedCardRepo.save(entity);
+    } catch (err) {
+      this.logger.error(
+        `Failed to persist saved card (user=${userId}): ${
+          err instanceof Error ? err.message : err
+        }`,
+      );
+    }
   }
 
   // --- Orders (admin) ---
