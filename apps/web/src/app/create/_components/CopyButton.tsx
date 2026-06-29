@@ -5,7 +5,7 @@ import { CopyIcon, CheckIcon } from './icons';
 
 export function CopyButton({
   text,
-  label = 'העתק פרומפט',
+  label = '',
   copiedLabel = 'הועתק!',
   className = 'btn-secondary inline-flex items-center gap-2 text-sm',
 }: {
