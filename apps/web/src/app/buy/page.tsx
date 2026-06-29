@@ -100,7 +100,10 @@ function BuyContent() {
       const [pkgs, myOrders, card] = await Promise.all([
         api.getPackages(),
         api.getMyOrders(),
-        SUMIT_CONFIGURED ? api.getSavedCard() : Promise.resolve(null),
+        // A saved-card lookup must never block buying — swallow its errors.
+        SUMIT_CONFIGURED
+          ? api.getSavedCard().catch(() => null)
+          : Promise.resolve(null),
       ]);
       setPackages(pkgs);
       setOrders(myOrders);

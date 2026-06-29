@@ -239,12 +239,24 @@ class ApiClient {
 
     const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 
+    // Read the raw text first: some endpoints (e.g. an empty/204 response, or a
+    // handler that returns null) send no body, and res.json() on an empty body
+    // throws "Unexpected end of JSON input".
+    const raw = await res.text();
+
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ message: res.statusText }));
-      throw new Error(err.message || `Request failed: ${res.status}`);
+      let message = res.statusText;
+      if (raw) {
+        try {
+          message = (JSON.parse(raw) as { message?: string }).message || message;
+        } catch {
+          // Non-JSON error body — fall back to the status text.
+        }
+      }
+      throw new Error(message || `Request failed: ${res.status}`);
     }
 
-    return res.json();
+    return (raw ? JSON.parse(raw) : null) as T;
   }
 
   register(email: string, password: string) {
