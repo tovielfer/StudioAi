@@ -144,18 +144,6 @@ export abstract class BaseImageProvider {
     return null;
   }
 
-  private contentTypeFromUrl(url: string): string {
-    const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
-    const map: Record<string, string> = {
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      png: 'image/png',
-      webp: 'image/webp',
-      gif: 'image/gif',
-    };
-    return map[ext ?? ''] ?? 'image/png';
-  }
-
   private filenameFromContentType(contentType: string): string {
     return `reference.${this.extensionFromContentType(contentType)}`;
   }
