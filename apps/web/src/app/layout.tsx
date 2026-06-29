@@ -3,6 +3,7 @@ import { Heebo } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 import { Navbar } from '@/components/Navbar';
+import { Footer } from '@/components/Footer';
 import { FeedbackWidget } from '@/components/FeedbackWidget';
 
 const heebo = Heebo({ subsets: ['hebrew', 'latin'], variable: '--font-heebo' });
@@ -46,7 +47,8 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <AuthProvider>
           <Navbar />
-          <main>{children}</main>
+          <main className="min-h-[calc(100vh-4rem)]">{children}</main>
+          <Footer />
           <FeedbackWidget />
         </AuthProvider>
       </body>
