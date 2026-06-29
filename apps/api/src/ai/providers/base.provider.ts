@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import sharp from 'sharp';
 import { GenerateImageParams, GenerateImageResult } from '../ai.types';
 
 export abstract class BaseImageProvider {
@@ -67,24 +68,32 @@ export abstract class BaseImageProvider {
       // with a mismatched extension/content-type (e.g. a JPEG saved as .png),
       // which makes providers reject them with "invalid image file".
       const sniffed = this.detectImageContentType(buffer);
-      let contentType: string;
-      if (sniffed) {
-        contentType = sniffed;
-      } else {
-        // R2 (and some CDNs) may return application/octet-stream — fall back to URL extension
-        contentType = rawHeader.startsWith('image/')
-          ? rawHeader.split(';')[0].trim()
-          : this.contentTypeFromUrl(url);
-      }
-      const blob = new Blob([buffer], { type: contentType });
-      const filename = this.filenameFromContentType(contentType);
+      const normalized = await this.normalizeReferenceImage(buffer);
+      const normalizedBytes = new Uint8Array(normalized);
+      const normalizedContentType = 'image/png';
+      const blob = new Blob([normalizedBytes], { type: normalizedContentType });
+      const filename = this.filenameFromContentType(normalizedContentType);
       this.baseLogger.log(
-        `fetched ref: bytes=${buffer.byteLength}, header-content-type="${rawHeader}", magic=[${firstBytes}], sniffed=${sniffed ?? 'null'}, final-content-type="${contentType}", filename="${filename}" (url=${url})`,
+        `fetched ref: bytes=${buffer.byteLength}, normalized-bytes=${normalized.byteLength}, header-content-type="${rawHeader}", magic=[${firstBytes}], sniffed=${sniffed ?? 'null'}, final-content-type="${normalizedContentType}", filename="${filename}" (url=${url})`,
       );
       return { blob, filename };
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private async normalizeReferenceImage(buffer: ArrayBuffer): Promise<Buffer> {
+    const normalized = await sharp(Buffer.from(buffer), { failOn: 'none' })
+      .rotate()
+      .toColorspace('srgb')
+      .png()
+      .toBuffer();
+
+    if (normalized.byteLength > BaseImageProvider.REFERENCE_IMAGE_MAX_BYTES) {
+      throw new Error('Reference image exceeds maximum allowed size after normalization');
+    }
+
+    return normalized;
   }
 
   // Identify the real image format from the file's magic bytes. Returns null
