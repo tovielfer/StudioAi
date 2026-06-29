@@ -68,9 +68,9 @@ export abstract class BaseImageProvider {
       // with a mismatched extension/content-type (e.g. a JPEG saved as .png),
       // which makes providers reject them with "invalid image file".
       const sniffed = this.detectImageContentType(buffer);
-      const normalized = await this.normalizeReferenceImage(buffer);
+      const { data: normalized, contentType: normalizedContentType } =
+        await this.normalizeReferenceImage(buffer);
       const normalizedBytes = new Uint8Array(normalized);
-      const normalizedContentType = 'image/png';
       const blob = new Blob([normalizedBytes], { type: normalizedContentType });
       const filename = this.filenameFromContentType(normalizedContentType);
       this.baseLogger.log(
@@ -82,18 +82,59 @@ export abstract class BaseImageProvider {
     }
   }
 
-  private async normalizeReferenceImage(buffer: ArrayBuffer): Promise<Buffer> {
-    const normalized = await sharp(Buffer.from(buffer), { failOn: 'none' })
+  // Normalize a reference image to a format/size every provider accepts while
+  // guaranteeing the result stays under the inline size cap. Re-encoding a photo
+  // to lossless PNG often balloons well past the limit, so we fall back to JPEG
+  // and progressively downscale + lower quality until it fits, instead of
+  // failing the whole generation.
+  private async normalizeReferenceImage(
+    buffer: ArrayBuffer,
+  ): Promise<{ data: Buffer; contentType: string }> {
+    const max = BaseImageProvider.REFERENCE_IMAGE_MAX_BYTES;
+    const input = Buffer.from(buffer);
+
+    // Preferred: lossless PNG (keeps transparency and exact pixels).
+    const png = await sharp(input, { failOn: 'none' })
       .rotate()
       .toColorspace('srgb')
       .png()
       .toBuffer();
-
-    if (normalized.byteLength > BaseImageProvider.REFERENCE_IMAGE_MAX_BYTES) {
-      throw new Error('Reference image exceeds maximum allowed size after normalization');
+    if (png.byteLength <= max) {
+      return { data: png, contentType: 'image/png' };
     }
 
-    return normalized;
+    // PNG too large (typical for high-res photos): re-encode as JPEG, shrinking
+    // dimensions and quality step by step until the payload fits under the cap.
+    const dimensionSteps = [4096, 3072, 2048, 1536, 1024];
+    const qualitySteps = [85, 75, 65, 55];
+    let smallest: Buffer | null = null;
+    for (const dimension of dimensionSteps) {
+      for (const quality of qualitySteps) {
+        const jpeg = await sharp(input, { failOn: 'none' })
+          .rotate()
+          .toColorspace('srgb')
+          .resize({
+            width: dimension,
+            height: dimension,
+            fit: 'inside',
+            withoutEnlargement: true,
+          })
+          .flatten({ background: '#ffffff' })
+          .jpeg({ quality, mozjpeg: true })
+          .toBuffer();
+        if (!smallest || jpeg.byteLength < smallest.byteLength) {
+          smallest = jpeg;
+        }
+        if (jpeg.byteLength <= max) {
+          return { data: jpeg, contentType: 'image/jpeg' };
+        }
+      }
+    }
+
+    if (smallest && smallest.byteLength <= max) {
+      return { data: smallest, contentType: 'image/jpeg' };
+    }
+    throw new Error('Reference image exceeds maximum allowed size after normalization');
   }
 
   // Identify the real image format from the file's magic bytes. Returns null
