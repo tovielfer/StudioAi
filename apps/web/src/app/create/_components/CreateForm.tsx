@@ -478,7 +478,16 @@ export function CreateForm({
         <div className="text-sm text-gray-400">
           עלות:{' '}
           <span className="text-brand-400 font-medium">
-            {costLoading ? 'מחשב...' : cost !== null ? `${cost} קרדיטים` : costError || 'לא זמין'}
+            {costLoading ? (
+              <span className="inline-flex items-center align-middle">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                <span className="sr-only">מחשב עלות</span>
+              </span>
+            ) : cost !== null ? (
+              `${cost} קרדיטים`
+            ) : (
+              costError || 'לא זמין'
+            )}
           </span>
           {' · '}יתרה: {user?.credits ?? 0}
           <Link
