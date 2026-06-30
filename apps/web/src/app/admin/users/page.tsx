@@ -343,8 +343,9 @@ function AdminUsersContent() {
               ))}
             </select>
             <input
-              type="number"
-              step={1}
+              type="text"
+              inputMode="numeric"
+              pattern="-?[0-9]*"
               value={creditAmount}
               onChange={(e) => setCreditAmount(e.target.value)}
               className="admin-field"
@@ -470,8 +471,9 @@ function AdminUsersContent() {
                     {quickAddId === user.id ? (
                       <div className="flex items-center gap-1.5">
                         <input
-                          type="number"
-                          step={1}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="-?[0-9]*"
                           autoFocus
                           value={quickAmount}
                           onChange={(e) => setQuickAmount(e.target.value)}
