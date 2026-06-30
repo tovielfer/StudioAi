@@ -14,9 +14,9 @@ const legalLinks = [
 
 /**
  * נתיבים של אפליקציה עם גלילה אינסופית / תוכן ארוך, שבהם הפוטר
- * "בורח" כלפי מטה ולא ניתן להגיע אליו — לכן מסתירים אותו שם.
+ * "בורח" כלפי מטה — לכן מצמידים אותו לתחתית המסך (sticky).
  */
-const HIDDEN_PREFIXES = [
+const STICKY_PREFIXES = [
   '/history',
   '/dashboard',
   '/create',
@@ -27,15 +27,20 @@ const HIDDEN_PREFIXES = [
 export function Footer() {
   const pathname = usePathname();
 
-  const isHidden = HIDDEN_PREFIXES.some(
+  const isSticky = STICKY_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
-  if (isHidden) return null;
 
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-surface-border bg-surface/60 mt-12">
+    <footer
+      className={`border-t border-surface-border ${
+        isSticky
+          ? 'sticky bottom-0 z-30 bg-surface/95 backdrop-blur-md'
+          : 'mt-12 bg-surface/60'
+      }`}
+    >
       <div className="max-w-6xl mx-auto px-4 py-5">
         <div className="flex flex-col items-center gap-3 text-center md:flex-row md:justify-between md:text-right">
           <span className="text-sm text-gray-500">

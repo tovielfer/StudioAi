@@ -44,10 +44,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="he" dir="rtl" className={heebo.variable}>
-      <body className="font-sans antialiased">
+      <body className="font-sans antialiased flex min-h-screen flex-col">
         <AuthProvider>
           <Navbar />
-          <main className="min-h-[calc(100vh-4rem)]">{children}</main>
+          <main className="flex-1">{children}</main>
           <Footer />
           <FeedbackWidget />
         </AuthProvider>
