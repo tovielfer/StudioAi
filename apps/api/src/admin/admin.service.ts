@@ -169,6 +169,7 @@ export class AdminService {
       .addSelect('u.nickname', 'nickname')
       .addSelect('u.credits', 'credits')
       .addSelect('u.role', 'role')
+      .addSelect('u."emailVerified"', 'emailVerified')
       .addSelect('u."createdAt"', 'createdAt')
       .addSelect('COUNT(g.id)::int', 'generationsCount')
       .groupBy('u.id');
@@ -206,6 +207,7 @@ export class AdminService {
       nickname: (r.nickname as string | null) ?? null,
       credits: Number(r.credits),
       role: r.role as string,
+      emailVerified: Boolean(r.emailVerified),
       createdAt: r.createdAt as Date,
       generationsCount: Number(r.generationsCount),
     }));
@@ -229,6 +231,7 @@ export class AdminService {
       nickname: user.nickname,
       credits: user.credits,
       role: user.role,
+      emailVerified: user.emailVerified,
       createdAt: user.createdAt,
     };
   }

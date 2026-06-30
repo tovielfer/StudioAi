@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react';
 import { AdminGuard } from '@/components/AdminGuard';
-import { api, AdminUsersSort, User } from '@/lib/api';
+import { AdminCreditTransaction, AdminUsersSort, api, User } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { AdminShell } from '../admin-shell';
 
@@ -39,6 +39,16 @@ function initials(user: User) {
 function parseCreditAmount(value: string) {
   const amount = Number(value);
   return Number.isInteger(amount) && amount !== 0 ? amount : null;
+}
+
+function formatReason(reason: string) {
+  if (reason === 'admin_add') return 'הוספה ידנית';
+  if (reason === 'admin_deduct') return 'הורדה ידנית';
+  if (reason.startsWith('purchase:order:')) return 'רכישת קרדיטים';
+  if (reason.startsWith('generation:')) return 'חיוב על יצירה';
+  if (reason.startsWith('refund:failed:')) return 'החזר על יצירה שנכשלה';
+  if (reason.startsWith('refund:cancelled:')) return 'החזר על יצירה שבוטלה';
+  return reason;
 }
 
 export default function AdminUsersPage() {
@@ -74,6 +84,14 @@ function AdminUsersContent() {
   const [quickAddId, setQuickAddId] = useState<string | null>(null);
   const [quickAmount, setQuickAmount] = useState('25');
   const [quickSaving, setQuickSaving] = useState(false);
+
+  const [transactionsUser, setTransactionsUser] = useState<User | null>(null);
+  const [transactions, setTransactions] = useState<AdminCreditTransaction[]>([]);
+  const [transactionsTotal, setTransactionsTotal] = useState(0);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [transactionsMessage, setTransactionsMessage] = useState<string | null>(
+    null,
+  );
 
   const usersRef = useRef<User[]>([]);
   usersRef.current = users;
@@ -249,6 +267,37 @@ function AdminUsersContent() {
     }
   }
 
+  async function openTransactions(user: User) {
+    setTransactionsUser(user);
+    setTransactions([]);
+    setTransactionsTotal(0);
+    setTransactionsMessage(null);
+    setTransactionsLoading(true);
+
+    try {
+      const res = await api.getAdminCreditTransactions({
+        userId: user.id,
+        limit: 50,
+        offset: 0,
+      });
+      setTransactions(res.items);
+      setTransactionsTotal(res.total);
+    } catch (err) {
+      setTransactionsMessage(
+        err instanceof Error ? err.message : 'טעינת התנועות נכשלה',
+      );
+    } finally {
+      setTransactionsLoading(false);
+    }
+  }
+
+  function closeTransactions() {
+    setTransactionsUser(null);
+    setTransactions([]);
+    setTransactionsTotal(0);
+    setTransactionsMessage(null);
+  }
+
   const creditAmountValue = parseCreditAmount(creditAmount);
   const quickAmountValue = parseCreditAmount(quickAmount);
 
@@ -375,14 +424,24 @@ function AdminUsersContent() {
               לא נמצאו משתמשים
             </div>
           ) : view === 'cards' ? (
-            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {users.map((user) => (
                 <div
                   key={user.id}
-                  className="rounded-lg border border-gray-200 p-3 hover:border-brand-300 hover:shadow-sm transition-all"
+                  className={`rounded-lg border p-2.5 transition-all hover:shadow-sm ${
+                    user.emailVerified === false
+                      ? 'border-amber-300 bg-amber-50/70 hover:border-amber-400'
+                      : 'border-gray-200 hover:border-brand-300'
+                  }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
+                    <div
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+                        user.emailVerified === false
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-brand-100 text-brand-700'
+                      }`}
+                    >
                       {initials(user)}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -440,6 +499,11 @@ function AdminUsersContent() {
                       >
                         {user.email}
                       </p>
+                      {user.emailVerified === false && (
+                        <span className="mt-1 inline-flex rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                          מייל לא אומת
+                        </span>
+                      )}
                     </div>
                     <span
                       className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
@@ -452,14 +516,14 @@ function AdminUsersContent() {
                     </span>
                   </div>
 
-                  <div className="mt-2.5 grid grid-cols-2 gap-2 text-center">
-                    <div className="rounded-md bg-gray-50 py-1.5">
+                  <div className="mt-2 grid grid-cols-2 gap-1.5 text-center">
+                    <div className="rounded-md bg-white/70 py-1">
                       <div className="text-sm font-semibold text-gray-950">
                         {(user.generationsCount ?? 0).toLocaleString('he-IL')}
                       </div>
                       <div className="text-[10px] text-gray-500">יצירות</div>
                     </div>
-                    <div className="rounded-md bg-gray-50 py-1.5">
+                    <div className="rounded-md bg-white/70 py-1">
                       <div className="text-sm font-semibold text-gray-950">
                         {user.credits.toLocaleString('he-IL')}
                       </div>
@@ -467,9 +531,9 @@ function AdminUsersContent() {
                     </div>
                   </div>
 
-                  <div className="mt-2.5">
+                  <div className="mt-2 flex gap-1.5">
                     {quickAddId === user.id ? (
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex min-w-0 flex-1 items-center gap-1.5">
                         <input
                           type="text"
                           inputMode="numeric"
@@ -503,11 +567,18 @@ function AdminUsersContent() {
                       <button
                         type="button"
                         onClick={() => openQuickAdd(user)}
-                        className="w-full rounded-md border border-dashed border-gray-300 py-1 text-xs text-gray-600 hover:border-brand-400 hover:text-brand-700 transition-colors"
+                        className="min-w-0 flex-1 rounded-md border border-dashed border-gray-300 py-1 text-xs text-gray-600 transition-colors hover:border-brand-400 hover:text-brand-700"
                       >
                         עדכון קרדיטים
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => void openTransactions(user)}
+                      className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 transition-colors hover:border-brand-300 hover:text-brand-700"
+                    >
+                      תנועות
+                    </button>
                   </div>
                 </div>
               ))}
@@ -519,6 +590,7 @@ function AdminUsersContent() {
                   <tr>
                     <th className="text-right py-3">כינוי</th>
                     <th className="text-right py-3">אימייל</th>
+                    <th className="text-right py-3">אימות</th>
                     <th className="text-right py-3">תפקיד</th>
                     <th className="text-right py-3">יצירות</th>
                     <th className="text-right py-3">קרדיטים</th>
@@ -528,7 +600,12 @@ function AdminUsersContent() {
                 </thead>
                 <tbody>
                   {users.map((user) => (
-                    <tr key={user.id} className="border-b border-gray-100">
+                    <tr
+                      key={user.id}
+                      className={`border-b border-gray-100 ${
+                        user.emailVerified === false ? 'bg-amber-50/60' : ''
+                      }`}
+                    >
                       <td className="py-3 font-medium text-gray-950">
                         {editingId === user.id ? (
                           <div className="flex items-center gap-2">
@@ -566,6 +643,17 @@ function AdminUsersContent() {
                         )}
                       </td>
                       <td className="py-3 text-gray-950">{user.email}</td>
+                      <td className="py-3">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            user.emailVerified === false
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-green-100 text-green-800'
+                          }`}
+                        >
+                          {user.emailVerified === false ? 'לא אומת' : 'אומת'}
+                        </span>
+                      </td>
                       <td className="py-3 text-gray-600">
                         {user.role === 'admin' ? 'מנהל' : 'משתמש'}
                       </td>
@@ -577,15 +665,24 @@ function AdminUsersContent() {
                         {user.createdAt ? formatDate(user.createdAt) : '-'}
                       </td>
                       <td className="py-3">
-                        {editingId !== user.id && (
+                        <div className="flex flex-wrap items-center gap-3">
+                          {editingId !== user.id && (
+                            <button
+                              type="button"
+                              onClick={() => startEdit(user)}
+                              className="text-xs text-brand-600 hover:text-brand-800"
+                            >
+                              עריכת כינוי
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => startEdit(user)}
+                            onClick={() => void openTransactions(user)}
                             className="text-xs text-brand-600 hover:text-brand-800"
                           >
-                            עריכת כינוי
+                            תנועות
                           </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -608,6 +705,102 @@ function AdminUsersContent() {
             </p>
           )}
         </section>
+
+        {transactionsUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="max-h-[85vh] w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-start justify-between gap-4 border-b border-gray-100 p-5">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold text-gray-950">
+                    תנועות קרדיטים
+                  </h3>
+                  <p className="mt-1 truncate text-sm text-gray-500">
+                    {transactionsUser.nickname || transactionsUser.email} ·{' '}
+                    {transactionsTotal.toLocaleString('he-IL')} תנועות
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeTransactions}
+                  className="rounded-full border border-gray-200 px-3 py-1 text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                >
+                  סגירה
+                </button>
+              </div>
+
+              <div className="max-h-[65vh] overflow-y-auto p-5">
+                {transactionsMessage && (
+                  <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                    {transactionsMessage}
+                  </div>
+                )}
+
+                {transactionsLoading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="h-7 w-7 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                  </div>
+                ) : transactions.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-gray-500">
+                    אין תנועות קרדיטים למשתמש הזה
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[640px] text-sm">
+                      <thead className="border-b border-gray-200 text-gray-500">
+                        <tr>
+                          <th className="py-2 pe-3 text-right">תאריך</th>
+                          <th className="py-2 pe-3 text-right">סוג</th>
+                          <th className="py-2 pe-3 text-right">כמות</th>
+                          <th className="py-2 text-right">סיבה</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {transactions.map((tx) => {
+                          const isCredit = tx.amount > 0;
+                          return (
+                            <tr key={tx.id} className="border-b border-gray-100">
+                              <td className="py-3 pe-3 text-gray-500">
+                                {formatDate(tx.createdAt)}
+                              </td>
+                              <td className="py-3 pe-3">
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                    isCredit
+                                      ? 'bg-green-100 text-green-800'
+                                      : 'bg-red-100 text-red-800'
+                                  }`}
+                                >
+                                  {isCredit ? 'זיכוי' : 'חיוב'}
+                                </span>
+                              </td>
+                              <td
+                                className={`py-3 pe-3 text-base font-semibold ${
+                                  isCredit ? 'text-green-700' : 'text-red-700'
+                                }`}
+                                dir="ltr"
+                              >
+                                {isCredit ? '+' : ''}
+                                {tx.amount.toLocaleString('he-IL')}
+                              </td>
+                              <td className="py-3 text-gray-800">
+                                <div className="font-medium">
+                                  {formatReason(tx.reason)}
+                                </div>
+                                <div className="mt-1 text-xs text-gray-400">
+                                  {tx.reason}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminShell>
   );

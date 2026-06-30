@@ -6,6 +6,7 @@ export interface User {
   nickname?: string | null;
   credits: number;
   role: 'user' | 'admin';
+  emailVerified?: boolean;
   createdAt?: string;
   generationsCount?: number;
 }
