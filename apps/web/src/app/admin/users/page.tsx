@@ -36,6 +36,11 @@ function initials(user: User) {
   return base.slice(0, 2).toUpperCase();
 }
 
+function parseCreditAmount(value: string) {
+  const amount = Number(value);
+  return Number.isInteger(amount) && amount !== 0 ? amount : null;
+}
+
 export default function AdminUsersPage() {
   return (
     <AdminGuard>
@@ -54,7 +59,7 @@ function AdminUsersContent() {
   const [sort, setSort] = useState<AdminUsersSort>('newest');
 
   const [creditUserId, setCreditUserId] = useState('');
-  const [creditAmount, setCreditAmount] = useState(25);
+  const [creditAmount, setCreditAmount] = useState('25');
   const [creditReason, setCreditReason] = useState('admin_add');
 
   const [loading, setLoading] = useState(true);
@@ -67,7 +72,7 @@ function AdminUsersContent() {
   const [savingNickname, setSavingNickname] = useState(false);
 
   const [quickAddId, setQuickAddId] = useState<string | null>(null);
-  const [quickAmount, setQuickAmount] = useState(25);
+  const [quickAmount, setQuickAmount] = useState('25');
   const [quickSaving, setQuickSaving] = useState(false);
 
   const usersRef = useRef<User[]>([]);
@@ -162,15 +167,16 @@ function AdminUsersContent() {
 
   async function addCredits(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!creditUserId) return;
+    const amount = parseCreditAmount(creditAmount);
+    if (!creditUserId || amount === null) return;
 
     setSavingCredits(true);
     setMessage(null);
     try {
       const credits = await applyCredits(
         creditUserId,
-        creditAmount,
-        creditReason,
+        amount,
+        creditReason || (amount < 0 ? 'admin_deduct' : 'admin_add'),
       );
       setMessage(`הקרדיטים עודכנו. יתרה חדשה: ${credits}`);
     } catch (err) {
@@ -182,7 +188,7 @@ function AdminUsersContent() {
 
   function openQuickAdd(user: User) {
     setQuickAddId(user.id);
-    setQuickAmount(25);
+    setQuickAmount('25');
   }
 
   function cancelQuickAdd() {
@@ -190,13 +196,21 @@ function AdminUsersContent() {
   }
 
   async function quickAddCredits(user: User) {
-    if (!quickAmount || quickAmount < 1) return;
+    const amount = parseCreditAmount(quickAmount);
+    if (amount === null) return;
     setQuickSaving(true);
     setMessage(null);
     try {
-      const credits = await applyCredits(user.id, quickAmount, 'admin_add');
+      const credits = await applyCredits(
+        user.id,
+        amount,
+        amount < 0 ? 'admin_deduct' : 'admin_add',
+      );
       const label = user.nickname || user.email;
-      setMessage(`נוספו ${quickAmount} קרדיטים ל-${label}. יתרה חדשה: ${credits}`);
+      const action = amount > 0 ? 'נוספו' : 'הורדו';
+      setMessage(
+        `${action} ${Math.abs(amount)} קרדיטים ל-${label}. יתרה חדשה: ${credits}`,
+      );
       cancelQuickAdd();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'עדכון הקרדיטים נכשל');
@@ -235,11 +249,14 @@ function AdminUsersContent() {
     }
   }
 
+  const creditAmountValue = parseCreditAmount(creditAmount);
+  const quickAmountValue = parseCreditAmount(quickAmount);
+
   return (
     <AdminShell
       eyebrow="ניהול משתמשים"
       title="משתמשים"
-      description="חיפוש משתמשים, הוספת כינוי, בדיקת יתרות והוספת קרדיטים לחשבון."
+      description="חיפוש משתמשים, הוספת כינוי, בדיקת יתרות ועדכון קרדיטים בחשבון."
     >
       <div className="space-y-6">
         {message && (
@@ -327,11 +344,11 @@ function AdminUsersContent() {
             </select>
             <input
               type="number"
-              min={1}
+              step={1}
               value={creditAmount}
-              onChange={(e) => setCreditAmount(Number(e.target.value))}
+              onChange={(e) => setCreditAmount(e.target.value)}
               className="admin-field"
-              placeholder="כמות קרדיטים"
+              placeholder="כמות קרדיטים, למשל 25 או ‎-25"
             />
             <input
               value={creditReason}
@@ -341,10 +358,10 @@ function AdminUsersContent() {
             />
             <button
               type="submit"
-              disabled={!creditUserId || savingCredits}
+              disabled={!creditUserId || creditAmountValue === null || savingCredits}
               className="btn-primary disabled:opacity-50"
             >
-              {savingCredits ? 'מעדכן...' : 'הוספת קרדיטים'}
+              {savingCredits ? 'מעדכן...' : 'עדכון קרדיטים'}
             </button>
           </form>
 
@@ -454,10 +471,10 @@ function AdminUsersContent() {
                       <div className="flex items-center gap-1.5">
                         <input
                           type="number"
-                          min={1}
+                          step={1}
                           autoFocus
                           value={quickAmount}
-                          onChange={(e) => setQuickAmount(Number(e.target.value))}
+                          onChange={(e) => setQuickAmount(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') void quickAddCredits(user);
                             if (e.key === 'Escape') cancelQuickAdd();
@@ -467,10 +484,10 @@ function AdminUsersContent() {
                         <button
                           type="button"
                           onClick={() => void quickAddCredits(user)}
-                          disabled={quickSaving}
+                          disabled={quickAmountValue === null || quickSaving}
                           className="btn-primary !px-2.5 !py-1 text-xs disabled:opacity-50"
                         >
-                          {quickSaving ? '...' : 'הוסף'}
+                          {quickSaving ? '...' : 'עדכן'}
                         </button>
                         <button
                           type="button"
@@ -486,7 +503,7 @@ function AdminUsersContent() {
                         onClick={() => openQuickAdd(user)}
                         className="w-full rounded-md border border-dashed border-gray-300 py-1 text-xs text-gray-600 hover:border-brand-400 hover:text-brand-700 transition-colors"
                       >
-                        + הוספת קרדיטים
+                        עדכון קרדיטים
                       </button>
                     )}
                   </div>

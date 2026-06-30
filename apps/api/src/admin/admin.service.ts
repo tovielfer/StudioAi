@@ -421,6 +421,15 @@ export class AdminService {
       throw new NotFoundException('User not found');
     }
 
+    if (amount < 0) {
+      await this.creditsService.deductCredits(
+        userId,
+        Math.abs(amount),
+        reason && reason !== 'admin_add' ? reason : 'admin_deduct',
+      );
+      return this.creditsService.getBalance(userId);
+    }
+
     return this.creditsService.addCredits(
       userId,
       amount,
