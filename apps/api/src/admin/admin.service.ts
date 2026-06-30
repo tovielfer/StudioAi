@@ -112,28 +112,69 @@ export class AdminService {
     };
   }
 
-  async listUsers(params: { search?: string; limit: number; offset: number }) {
-    const search = params.search
-      ? ([
+  async listUsers(params: {
+    search?: string;
+    limit: number;
+    offset: number;
+    sort?: 'newest' | 'oldest' | 'generations' | 'credits' | 'email';
+  }) {
+    const where = params.search
+      ? [
           { email: ILike(`%${params.search}%`) },
           { nickname: ILike(`%${params.search}%`) },
-        ] as const)
-      : undefined;
+        ]
+      : {};
 
-    const [items, total] = await this.usersRepo.findAndCount({
-      select: {
-        id: true,
-        email: true,
-        nickname: true,
-        credits: true,
-        role: true,
-        createdAt: true,
-      },
-      where: search ? [...search] : {},
-      order: { createdAt: 'DESC' },
-      take: params.limit,
-      skip: params.offset,
-    });
+    const total = await this.usersRepo.count({ where });
+
+    const qb = this.usersRepo
+      .createQueryBuilder('u')
+      .leftJoin('generations', 'g', 'g."userId" = u.id')
+      .select('u.id', 'id')
+      .addSelect('u.email', 'email')
+      .addSelect('u.nickname', 'nickname')
+      .addSelect('u.credits', 'credits')
+      .addSelect('u.role', 'role')
+      .addSelect('u."createdAt"', 'createdAt')
+      .addSelect('COUNT(g.id)::int', 'generationsCount')
+      .groupBy('u.id');
+
+    if (params.search) {
+      qb.where('(u.email ILIKE :s OR u.nickname ILIKE :s)', {
+        s: `%${params.search}%`,
+      });
+    }
+
+    switch (params.sort) {
+      case 'generations':
+        qb.orderBy('COUNT(g.id)', 'DESC').addOrderBy('u."createdAt"', 'DESC');
+        break;
+      case 'credits':
+        qb.orderBy('u.credits', 'DESC').addOrderBy('u."createdAt"', 'DESC');
+        break;
+      case 'oldest':
+        qb.orderBy('u."createdAt"', 'ASC');
+        break;
+      case 'email':
+        qb.orderBy('LOWER(u.email)', 'ASC');
+        break;
+      case 'newest':
+      default:
+        qb.orderBy('u."createdAt"', 'DESC');
+        break;
+    }
+
+    const rows = await qb.limit(params.limit).offset(params.offset).getRawMany();
+
+    const items = rows.map((r) => ({
+      id: r.id as string,
+      email: r.email as string,
+      nickname: (r.nickname as string | null) ?? null,
+      credits: Number(r.credits),
+      role: r.role as string,
+      createdAt: r.createdAt as Date,
+      generationsCount: Number(r.generationsCount),
+    }));
 
     return { items, total };
   }

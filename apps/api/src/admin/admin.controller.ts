@@ -33,11 +33,25 @@ export class AdminController {
   @Get('users')
   listUsers(
     @Query('search') search?: string,
+    @Query('sort') sort?: string,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
     @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset = 0,
   ) {
+    const allowedSorts = [
+      'newest',
+      'oldest',
+      'generations',
+      'credits',
+      'email',
+    ] as const;
+    type SortOption = (typeof allowedSorts)[number];
+    const sortOption = allowedSorts.includes(sort as SortOption)
+      ? (sort as SortOption)
+      : 'newest';
+
     return this.adminService.listUsers({
       search: search?.trim() || undefined,
+      sort: sortOption,
       limit: Math.min(Math.max(limit, 1), 100),
       offset: Math.max(offset, 0),
     });

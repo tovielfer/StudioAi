@@ -7,7 +7,15 @@ export interface User {
   credits: number;
   role: 'user' | 'admin';
   createdAt?: string;
+  generationsCount?: number;
 }
+
+export type AdminUsersSort =
+  | 'newest'
+  | 'oldest'
+  | 'generations'
+  | 'credits'
+  | 'email';
 
 export interface AuthResponse {
   token: string;
@@ -396,9 +404,15 @@ class ApiClient {
     return this.request<AdminStats>('/admin/stats');
   }
 
-  getAdminUsers(params?: { search?: string; limit?: number; offset?: number }) {
+  getAdminUsers(params?: {
+    search?: string;
+    sort?: AdminUsersSort;
+    limit?: number;
+    offset?: number;
+  }) {
     const query = new URLSearchParams();
     if (params?.search) query.set('search', params.search);
+    if (params?.sort) query.set('sort', params.sort);
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.offset) query.set('offset', String(params.offset));
     const qs = query.toString();

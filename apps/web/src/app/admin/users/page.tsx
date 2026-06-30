@@ -8,13 +8,21 @@ import {
   useState,
 } from 'react';
 import { AdminGuard } from '@/components/AdminGuard';
-import { api, User } from '@/lib/api';
+import { api, AdminUsersSort, User } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { AdminShell } from '../admin-shell';
 
 const PAGE_SIZE = 25;
 
 type ViewMode = 'cards' | 'table';
+
+const SORT_OPTIONS: { value: AdminUsersSort; label: string }[] = [
+  { value: 'newest', label: 'הצטרפו לאחרונה' },
+  { value: 'oldest', label: 'הוותיקים ביותר' },
+  { value: 'generations', label: 'הכי הרבה יצירות' },
+  { value: 'credits', label: 'הכי הרבה קרדיטים' },
+  { value: 'email', label: 'אימייל (א׳–ת׳)' },
+];
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString('he-IL', {
@@ -43,6 +51,7 @@ function AdminUsersContent() {
   const [searchInput, setSearchInput] = useState('');
   const [query, setQuery] = useState('');
   const [view, setView] = useState<ViewMode>('cards');
+  const [sort, setSort] = useState<AdminUsersSort>('newest');
 
   const [creditUserId, setCreditUserId] = useState('');
   const [creditAmount, setCreditAmount] = useState(25);
@@ -56,6 +65,10 @@ function AdminUsersContent() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const [savingNickname, setSavingNickname] = useState(false);
+
+  const [quickAddId, setQuickAddId] = useState<string | null>(null);
+  const [quickAmount, setQuickAmount] = useState(25);
+  const [quickSaving, setQuickSaving] = useState(false);
 
   const usersRef = useRef<User[]>([]);
   usersRef.current = users;
@@ -73,11 +86,12 @@ function AdminUsersContent() {
     async (offset: number) => {
       return api.getAdminUsers({
         search: query || undefined,
+        sort,
         limit: PAGE_SIZE,
         offset,
       });
     },
-    [query],
+    [query, sort],
   );
 
   // Reset and load the first page whenever the search query changes.
@@ -134,6 +148,18 @@ function AdminUsersContent() {
     return () => observer.disconnect();
   }, [hasMore, loading, loadingMore, loadMore]);
 
+  const applyCredits = useCallback(
+    async (userId: string, amount: number, reason?: string) => {
+      const res = await api.addAdminCredits(userId, amount, reason || undefined);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, credits: res.credits } : u)),
+      );
+      await refreshCredits();
+      return res.credits;
+    },
+    [refreshCredits],
+  );
+
   async function addCredits(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!creditUserId) return;
@@ -141,22 +167,41 @@ function AdminUsersContent() {
     setSavingCredits(true);
     setMessage(null);
     try {
-      const res = await api.addAdminCredits(
+      const credits = await applyCredits(
         creditUserId,
         creditAmount,
-        creditReason || undefined,
+        creditReason,
       );
-      setMessage(`הקרדיטים עודכנו. יתרה חדשה: ${res.credits}`);
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === creditUserId ? { ...u, credits: res.credits } : u,
-        ),
-      );
-      await refreshCredits();
+      setMessage(`הקרדיטים עודכנו. יתרה חדשה: ${credits}`);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'עדכון הקרדיטים נכשל');
     } finally {
       setSavingCredits(false);
+    }
+  }
+
+  function openQuickAdd(user: User) {
+    setQuickAddId(user.id);
+    setQuickAmount(25);
+  }
+
+  function cancelQuickAdd() {
+    setQuickAddId(null);
+  }
+
+  async function quickAddCredits(user: User) {
+    if (!quickAmount || quickAmount < 1) return;
+    setQuickSaving(true);
+    setMessage(null);
+    try {
+      const credits = await applyCredits(user.id, quickAmount, 'admin_add');
+      const label = user.nickname || user.email;
+      setMessage(`נוספו ${quickAmount} קרדיטים ל-${label}. יתרה חדשה: ${credits}`);
+      cancelQuickAdd();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'עדכון הקרדיטים נכשל');
+    } finally {
+      setQuickSaving(false);
     }
   }
 
@@ -216,7 +261,22 @@ function AdminUsersContent() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm text-gray-500">
+                  <span className="shrink-0">מיון:</span>
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value as AdminUsersSort)}
+                    className="admin-field !py-1.5 !w-auto"
+                  >
+                    {SORT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
                 <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
                   <button
                     type="button"
@@ -297,19 +357,19 @@ function AdminUsersContent() {
               לא נמצאו משתמשים
             </div>
           ) : view === 'cards' ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {users.map((user) => (
                 <div
                   key={user.id}
-                  className="rounded-xl border border-gray-200 p-4 hover:border-brand-300 hover:shadow-sm transition-all"
+                  className="rounded-lg border border-gray-200 p-3 hover:border-brand-300 hover:shadow-sm transition-all"
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
                       {initials(user)}
                     </div>
                     <div className="min-w-0 flex-1">
                       {editingId === user.id ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <input
                             autoFocus
                             value={editingValue}
@@ -318,7 +378,7 @@ function AdminUsersContent() {
                               if (e.key === 'Enter') void saveNickname(user.id);
                               if (e.key === 'Escape') cancelEdit();
                             }}
-                            className="admin-field !py-1 !px-2 text-sm"
+                            className="admin-field !py-0.5 !px-2 text-xs"
                             placeholder="כינוי"
                           />
                           <button
@@ -327,55 +387,109 @@ function AdminUsersContent() {
                             disabled={savingNickname}
                             className="text-xs text-brand-600 hover:text-brand-800 disabled:opacity-50"
                           >
-                            שמירה
+                            ✓
                           </button>
                           <button
                             type="button"
                             onClick={cancelEdit}
                             className="text-xs text-gray-400 hover:text-gray-600"
                           >
-                            ביטול
+                            ✕
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="truncate font-semibold text-gray-950">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate text-sm font-semibold text-gray-950">
                             {user.nickname || 'ללא כינוי'}
                           </span>
                           <button
                             type="button"
                             onClick={() => startEdit(user)}
+                            title="עריכת כינוי"
                             className="text-xs text-brand-600 hover:text-brand-800 shrink-0"
                           >
-                            עריכה
+                            ✎
                           </button>
                         </div>
                       )}
-                      <p className="truncate text-sm text-gray-500" title={user.email}>
+                      <p
+                        className="truncate text-xs text-gray-500"
+                        title={
+                          user.createdAt
+                            ? `${user.email} · נוצר ${formatDate(user.createdAt)}`
+                            : user.email
+                        }
+                      >
                         {user.email}
                       </p>
                     </div>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between text-xs">
                     <span
-                      className={`rounded-full px-2 py-0.5 font-medium ${
+                      className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
                         user.role === 'admin'
                           ? 'bg-amber-100 text-amber-700'
-                          : 'bg-gray-100 text-gray-600'
+                          : 'bg-gray-100 text-gray-500'
                       }`}
                     >
                       {user.role === 'admin' ? 'מנהל' : 'משתמש'}
                     </span>
-                    <span className="font-semibold text-gray-950">
-                      {user.credits.toLocaleString('he-IL')} קרדיטים
-                    </span>
                   </div>
-                  {user.createdAt && (
-                    <p className="mt-2 text-xs text-gray-400">
-                      נוצר {formatDate(user.createdAt)}
-                    </p>
-                  )}
+
+                  <div className="mt-2.5 grid grid-cols-2 gap-2 text-center">
+                    <div className="rounded-md bg-gray-50 py-1.5">
+                      <div className="text-sm font-semibold text-gray-950">
+                        {(user.generationsCount ?? 0).toLocaleString('he-IL')}
+                      </div>
+                      <div className="text-[10px] text-gray-500">יצירות</div>
+                    </div>
+                    <div className="rounded-md bg-gray-50 py-1.5">
+                      <div className="text-sm font-semibold text-gray-950">
+                        {user.credits.toLocaleString('he-IL')}
+                      </div>
+                      <div className="text-[10px] text-gray-500">קרדיטים</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5">
+                    {quickAddId === user.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min={1}
+                          autoFocus
+                          value={quickAmount}
+                          onChange={(e) => setQuickAmount(Number(e.target.value))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') void quickAddCredits(user);
+                            if (e.key === 'Escape') cancelQuickAdd();
+                          }}
+                          className="admin-field !py-1 !px-2 text-xs w-full"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void quickAddCredits(user)}
+                          disabled={quickSaving}
+                          className="btn-primary !px-2.5 !py-1 text-xs disabled:opacity-50"
+                        >
+                          {quickSaving ? '...' : 'הוסף'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelQuickAdd}
+                          className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
+                        >
+                          ביטול
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openQuickAdd(user)}
+                        className="w-full rounded-md border border-dashed border-gray-300 py-1 text-xs text-gray-600 hover:border-brand-400 hover:text-brand-700 transition-colors"
+                      >
+                        + הוספת קרדיטים
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -387,6 +501,7 @@ function AdminUsersContent() {
                     <th className="text-right py-3">כינוי</th>
                     <th className="text-right py-3">אימייל</th>
                     <th className="text-right py-3">תפקיד</th>
+                    <th className="text-right py-3">יצירות</th>
                     <th className="text-right py-3">קרדיטים</th>
                     <th className="text-right py-3">נוצר</th>
                     <th className="text-right py-3" />
@@ -434,6 +549,9 @@ function AdminUsersContent() {
                       <td className="py-3 text-gray-950">{user.email}</td>
                       <td className="py-3 text-gray-600">
                         {user.role === 'admin' ? 'מנהל' : 'משתמש'}
+                      </td>
+                      <td className="py-3 text-gray-700">
+                        {(user.generationsCount ?? 0).toLocaleString('he-IL')}
                       </td>
                       <td className="py-3 text-gray-950">{user.credits}</td>
                       <td className="py-3 text-gray-500">
