@@ -34,7 +34,7 @@ export default function AdminOrdersPage() {
 
 function AdminOrdersContent() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('pending');
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('');
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);

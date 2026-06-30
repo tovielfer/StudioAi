@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Tooltip } from '@/components/Tooltip';
@@ -59,7 +59,45 @@ function HistoryContent() {
     loadingMore,
     hasMore,
     sentinelRef,
+    reload,
   } = useInfiniteList<Generation>(fetchPage, { pageSize: 24 });
+
+  const [recreatingId, setRecreatingId] = useState<string | null>(null);
+  const [recreateMsg, setRecreateMsg] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  // The recreate action in history only appears on failed/cancelled items, so it
+  // retries immediately (the credits were already refunded).
+  const handleRecreate = useCallback(
+    async (gen: Generation) => {
+      if (recreatingId) return;
+      setRecreatingId(gen.id);
+      setRecreateMsg(null);
+      try {
+        await api.recreateGeneration(gen);
+        setRecreateMsg({ type: 'success', text: 'היצירה נשלחה מחדש' });
+        setSelectedGeneration(null);
+        reload();
+      } catch (err) {
+        setRecreateMsg({
+          type: 'error',
+          text:
+            err instanceof Error ? translateError(err.message) : 'היצירה מחדש נכשלה',
+        });
+      } finally {
+        setRecreatingId(null);
+      }
+    },
+    [recreatingId, reload],
+  );
+
+  useEffect(() => {
+    if (!recreateMsg) return;
+    const timer = setTimeout(() => setRecreateMsg(null), 4000);
+    return () => clearTimeout(timer);
+  }, [recreateMsg]);
 
   const getEditHref = (generation: Generation) => {
     const params = new URLSearchParams({ prompt: generation.prompt });
@@ -104,8 +142,10 @@ function HistoryContent() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {generations.map((gen) => {
             const canUseImage = Boolean(gen.resultUrl && gen.status === 'done');
+            const isErrorState =
+              gen.status === 'failed' || gen.status === 'cancelled';
             const displayStatus =
-              gen.status === 'failed' && gen.errorMessage
+              isErrorState && gen.errorMessage
                 ? translateError(gen.errorMessage)
                 : STATUS_LABELS[gen.status] ?? gen.status;
             const isVideo = gen.type === 'video';
@@ -201,8 +241,26 @@ function HistoryContent() {
                       </>
                     )
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center px-2 text-center text-gray-600 text-sm">
-                      {displayStatus}
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 px-3 text-center">
+                      <span className="text-gray-500 text-xs leading-snug line-clamp-4">
+                        {displayStatus}
+                      </span>
+                      {isErrorState && gen.creditCost > 0 && (
+                        <span className="text-[11px] font-medium text-green-500">
+                          הקרדיטים הוחזרו
+                        </span>
+                      )}
+                      {isErrorState && (
+                        <button
+                          type="button"
+                          onClick={() => handleRecreate(gen)}
+                          disabled={recreatingId === gen.id}
+                          className="btn-secondary inline-flex items-center gap-2 text-xs disabled:opacity-60"
+                        >
+                          {recreatingId === gen.id ? <SpinnerIcon /> : <RefreshIcon />}
+                          {recreatingId === gen.id ? 'יוצר...' : 'צור מחדש'}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -240,7 +298,22 @@ function HistoryContent() {
           onClose={() => setSelectedGeneration(null)}
           onSendEmail={sendEmail}
           sendingEmail={sendingId === selectedGeneration.id}
+          onRecreate={handleRecreate}
+          recreating={recreatingId === selectedGeneration.id}
         />
+      )}
+
+      {recreateMsg && (
+        <div
+          className={`fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-lg px-4 py-2 text-sm font-medium shadow-lg ${
+            recreateMsg.type === 'success'
+              ? 'bg-green-600 text-white'
+              : 'bg-red-600 text-white'
+          }`}
+          role="status"
+        >
+          {recreateMsg.text}
+        </div>
       )}
 
       <EmailToast toast={toast} />
@@ -255,6 +328,8 @@ function GenerationDetailsModal({
   onClose,
   onSendEmail,
   sendingEmail,
+  onRecreate,
+  recreating,
 }: {
   generation: Generation;
   editHref: string;
@@ -262,11 +337,15 @@ function GenerationDetailsModal({
   onClose: () => void;
   onSendEmail: (generation: Generation) => void;
   sendingEmail: boolean;
+  onRecreate: (generation: Generation) => void;
+  recreating: boolean;
 }) {
   const hasAsset = Boolean(generation.resultUrl);
   const isVideo = generation.type === 'video';
+  const isErrorState =
+    generation.status === 'failed' || generation.status === 'cancelled';
   const displayStatus =
-    generation.status === 'failed' && generation.errorMessage
+    isErrorState && generation.errorMessage
       ? translateError(generation.errorMessage)
       : STATUS_LABELS[generation.status] ?? generation.status;
   const details = [
@@ -374,6 +453,17 @@ function GenerationDetailsModal({
                 </button>
               </div>
             )}
+            {isErrorState && (
+              <button
+                type="button"
+                onClick={() => onRecreate(generation)}
+                disabled={recreating}
+                className="btn-primary inline-flex items-center gap-2 text-sm disabled:opacity-60"
+              >
+                {recreating ? <SpinnerIcon /> : <RefreshIcon />}
+                {recreating ? 'יוצר...' : 'צור מחדש'}
+              </button>
+            )}
           </div>
 
           <div className="space-y-5">
@@ -384,12 +474,19 @@ function GenerationDetailsModal({
               </p>
             </section>
 
-            {generation.status === 'failed' && generation.errorMessage && (
+            {isErrorState && generation.errorMessage && (
               <section>
-                <h3 className="font-semibold mb-2">שגיאה</h3>
+                <h3 className="font-semibold mb-2">
+                  {generation.status === 'cancelled' ? 'בוטל' : 'שגיאה'}
+                </h3>
                 <p className="rounded-lg border border-red-900/50 bg-red-950/30 p-3 text-sm leading-6 text-red-200 whitespace-pre-wrap">
                   {translateError(generation.errorMessage)}
                 </p>
+                {generation.creditCost > 0 && (
+                  <p className="mt-2 text-sm font-medium text-green-500">
+                    הקרדיטים הוחזרו ({generation.creditCost})
+                  </p>
+                )}
               </section>
             )}
 
@@ -472,6 +569,15 @@ function OpenIcon() {
       <path d="M14 5h5v5" />
       <path d="M10 14 19 5" />
       <path d="M19 14v5H5V5h5" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+      <path d="M21 3v5h-5" />
     </svg>
   );
 }

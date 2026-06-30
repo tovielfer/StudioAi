@@ -49,6 +49,8 @@ export interface Generation {
   size: string;
   resolution: string | null;
   provider: string;
+  durationSeconds: number | null;
+  generateAudio: boolean | null;
   creditCost: number;
   pricingRuleId: string | null;
   actualCostUsd: number | null;
@@ -300,6 +302,25 @@ class ApiClient {
     return this.request<Generation>('/generations/create', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  // Starts a brand-new generation that reuses every parameter of an existing one
+  // (prompt, model, type, size, quality, resolution, provider, references, and
+  // the video-only controls). Used by the immediate "create again" action on
+  // failed/cancelled items.
+  recreateGeneration(gen: Generation) {
+    return this.createGeneration({
+      prompt: gen.prompt,
+      model: gen.model,
+      type: gen.type,
+      quality: gen.quality ?? undefined,
+      size: gen.size,
+      resolution: gen.resolution ?? undefined,
+      provider: gen.provider,
+      referenceImageUrls: gen.referenceImageUrls ?? undefined,
+      durationSeconds: gen.durationSeconds ?? undefined,
+      generateAudio: gen.generateAudio ?? undefined,
     });
   }
 

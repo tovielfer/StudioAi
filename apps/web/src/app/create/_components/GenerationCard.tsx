@@ -28,8 +28,9 @@ export function GenerationCard({
   const canUse = Boolean(gen.resultUrl && gen.status === 'done');
   const isProcessing = gen.status === 'pending' || gen.status === 'processing';
   const isVideo = gen.type === 'video';
+  const isErrorState = gen.status === 'failed' || gen.status === 'cancelled';
   const displayStatus =
-    gen.status === 'failed' && gen.errorMessage
+    isErrorState && gen.errorMessage
       ? translateError(gen.errorMessage)
       : STATUS_LABELS[gen.status] ?? gen.status;
 
@@ -145,10 +146,37 @@ export function GenerationCard({
             </p>
           </div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center px-2 text-center">
-            <span className="text-gray-500 text-sm">
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2 px-3 text-center">
+            <span className="text-xs leading-snug text-gray-400 line-clamp-4">
               {displayStatus}
             </span>
+            {isErrorState && gen.creditCost > 0 && (
+              <span className="text-[11px] font-medium text-green-500">
+                הקרדיטים הוחזרו
+              </span>
+            )}
+            {isErrorState && (
+              <div className="mt-1 flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => onReuse(gen)}
+                  className="btn-secondary inline-flex items-center gap-1 px-2.5 py-1 text-xs"
+                >
+                  <RefreshIcon />
+                  צור מחדש
+                </button>
+                <Tooltip label="פרטים">
+                  <button
+                    type="button"
+                    onClick={() => onSelect(gen)}
+                    className="icon-button h-7 w-7 bg-black/40"
+                    aria-label="פרטים"
+                  >
+                    <InfoIcon />
+                  </button>
+                </Tooltip>
+              </div>
+            )}
           </div>
         )}
       </div>

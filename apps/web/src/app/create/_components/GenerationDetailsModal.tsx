@@ -25,8 +25,10 @@ export function GenerationDetailsModal({
 }) {
   const hasAsset = Boolean(generation.resultUrl && generation.status === 'done');
   const isVideo = generation.type === 'video';
+  const isErrorState =
+    generation.status === 'failed' || generation.status === 'cancelled';
   const displayStatus =
-    generation.status === 'failed' && generation.errorMessage
+    isErrorState && generation.errorMessage
       ? translateError(generation.errorMessage)
       : STATUS_LABELS[generation.status] ?? generation.status;
 
@@ -162,12 +164,19 @@ export function GenerationDetailsModal({
               </p>
             </section>
 
-            {generation.status === 'failed' && generation.errorMessage && (
+            {isErrorState && generation.errorMessage && (
               <section>
-                <h3 className="font-semibold mb-2">שגיאה</h3>
+                <h3 className="font-semibold mb-2">
+                  {generation.status === 'cancelled' ? 'בוטל' : 'שגיאה'}
+                </h3>
                 <p className="rounded-lg border border-red-900/50 bg-red-950/30 p-3 text-sm leading-6 text-red-200 whitespace-pre-wrap">
                   {translateError(generation.errorMessage)}
                 </p>
+                {generation.creditCost > 0 && (
+                  <p className="mt-2 text-sm font-medium text-green-500">
+                    הקרדיטים הוחזרו ({generation.creditCost})
+                  </p>
+                )}
               </section>
             )}
 

@@ -30,14 +30,16 @@ export class GenerationRunnerService {
     private readonly creditsService: CreditsService,
   ) {}
 
-  // Re-reads only the status so we can detect an admin cancel that happened
-  // while the provider request was in flight.
-  private async wasCancelled(generationId: string): Promise<boolean> {
+  // Re-reads only the status to detect that the generation was finalized by
+  // someone else while the provider request was in flight — e.g. an admin
+  // cancelled it, or the stuck-generation watchdog marked it as failed. In any
+  // of those cases the runner must not overwrite the status or refund again.
+  private async wasInterrupted(generationId: string): Promise<boolean> {
     const current = await this.genRepo.findOne({
       where: { id: generationId },
       select: { id: true, status: true },
     });
-    return current?.status === GenerationStatus.CANCELLED;
+    return current?.status !== GenerationStatus.PROCESSING;
   }
 
   async run(generationId: string, isLastAttempt = true) {
@@ -51,11 +53,16 @@ export class GenerationRunnerService {
       return;
     }
 
-    // An admin may have stopped the generation while it was still queued.
-    // Respect that and skip processing so it isn't revived.
-    if (generation.status === GenerationStatus.CANCELLED) {
+    // The generation may have been finalized while it was still queued — an
+    // admin cancelled it, or the stuck-generation watchdog failed it. Respect
+    // that and skip processing so it isn't revived.
+    if (
+      generation.status === GenerationStatus.CANCELLED ||
+      generation.status === GenerationStatus.FAILED ||
+      generation.status === GenerationStatus.DONE
+    ) {
       this.logger.warn(
-        `Generation ${generationId} was cancelled — skipping processing`,
+        `Generation ${generationId} already ${generation.status} — skipping processing`,
       );
       return;
     }
@@ -104,12 +111,13 @@ export class GenerationRunnerService {
         );
       }
 
-      // An admin may have stopped the generation while the provider call was in
-      // flight. Don't overwrite the CANCELLED status (and don't keep a result the
-      // user was already refunded for).
-      if (await this.wasCancelled(generationId)) {
+      // The generation may have been cancelled by an admin or failed by the
+      // stuck-generation watchdog while the provider call was in flight. Don't
+      // overwrite that final status (and don't keep a result the user was
+      // already refunded for).
+      if (await this.wasInterrupted(generationId)) {
         this.logger.warn(
-          `Generation ${generationId} was cancelled during processing — discarding result`,
+          `Generation ${generationId} was finalized elsewhere during processing — discarding result`,
         );
         return;
       }
@@ -141,11 +149,12 @@ export class GenerationRunnerService {
       );
 
       if (isLastAttempt) {
-        // If an admin cancelled mid-flight, the status is already CANCELLED and
-        // the credits were already refunded. Don't overwrite it or refund twice.
-        if (await this.wasCancelled(generationId)) {
+        // If the generation was already finalized elsewhere (admin cancel or the
+        // stuck-generation watchdog), the credits were already refunded. Don't
+        // overwrite the status or refund twice.
+        if (await this.wasInterrupted(generationId)) {
           this.logger.warn(
-            `Generation ${generationId} failed after being cancelled — leaving as cancelled`,
+            `Generation ${generationId} failed after being finalized elsewhere — leaving as is`,
           );
           return;
         }

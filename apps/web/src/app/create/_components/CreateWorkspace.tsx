@@ -103,9 +103,9 @@ export function CreateWorkspace({
     root: isDesktop ? recentScrollEl : null,
   });
 
-  // Failed generations are hidden in the create view but still paginated by the
-  // server, so we filter them out only when rendering.
-  const recentGenerations = recentItems.filter((g) => g.status !== 'failed');
+  // Failed and cancelled generations are shown here too (with their error and a
+  // "create again" action) — they are no longer hidden from the create view.
+  const recentGenerations = recentItems;
 
   const selectedModel = models.find((m) => m.id === model) ?? initialModel;
   const isVideo = generationType === 'video';
@@ -179,12 +179,6 @@ export function CreateWorkspace({
     });
   };
 
-  const clearReferences = useCallback(() => {
-    objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-    objectUrlsRef.current = [];
-    setReferences([]);
-  }, []);
-
   // Video uses two ordered slots: index 0 = start frame, index 1 = end frame.
   const setReferenceSlotFile = useCallback((index: number, file: File) => {
     const MAX_SIZE = 7 * 1024 * 1024;
@@ -233,23 +227,6 @@ export function CreateWorkspace({
       return next;
     });
   }, []);
-
-  const reuseGeneration = useCallback(
-    (gen: Generation) => {
-      setPrompt(gen.prompt);
-      clearReferences();
-      const urls = (gen.referenceImageUrls ?? []).filter(Boolean).slice(0, MAX_REFERENCES);
-      setReferences(
-        urls.map((url) => ({
-          id: `url-${Date.now()}-${url}`,
-          previewUrl: url,
-          sourceUrl: url,
-        })),
-      );
-      setError('');
-    },
-    [clearReferences],
-  );
 
   const handleReferenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -363,7 +340,6 @@ export function CreateWorkspace({
       const gen = await api.getGeneration(id);
       setCurrentGen(gen);
       setRecentGenerations((prev) => {
-        if (gen.status === 'failed') return prev.filter((g) => g.id !== id);
         const idx = prev.findIndex((g) => g.id === id);
         if (idx === -1) return [gen, ...prev];
         const next = [...prev];
@@ -378,6 +354,103 @@ export function CreateWorkspace({
       }
     },
     [refreshCredits, reloadRecent, setRecentGenerations],
+  );
+
+  // "Create again": instead of charging immediately, copy every parameter of the
+  // original generation (prompt, model, size, references, …) into the form and
+  // let the user review and press "create" themselves. No credits are spent
+  // until they approve.
+  const fillFormFromGeneration = useCallback(
+    (gen: Generation) => {
+      setError('');
+      setPrompt(gen.prompt);
+
+      const def = models.find((m) => m.id === gen.model);
+      if (def) {
+        setModel(def.id);
+        if (gen.size && def.sizes.some((s) => s.id === gen.size)) {
+          setSize(gen.size);
+        }
+        if (gen.quality && def.qualities.some((q) => q.id === gen.quality)) {
+          setQuality(gen.quality);
+        }
+        if (
+          gen.resolution &&
+          def.resolutions.some((r) => r.id === gen.resolution)
+        ) {
+          setResolution(gen.resolution);
+        }
+        if (
+          gen.durationSeconds != null &&
+          def.durations?.some((d) => d.id === String(gen.durationSeconds))
+        ) {
+          setDuration(String(gen.durationSeconds));
+        }
+        setGenerateAudio(def.supportsAudio ? Boolean(gen.generateAudio) : false);
+      }
+
+      // Replace any current references with the original reference images.
+      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      objectUrlsRef.current = [];
+      const urls = (gen.referenceImageUrls ?? []).slice(0, MAX_REFERENCES);
+      setReferences(
+        urls.map((url, i) => ({
+          id: `url-${Date.now()}-${i}-${url}`,
+          previewUrl: url,
+          sourceUrl: url,
+        })),
+      );
+
+      // Bring the form into view so it's clear the user needs to approve.
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    },
+    [models],
+  );
+
+  // Immediate "create again" for failed/cancelled items: start a brand-new
+  // generation reusing every original parameter and surface it live, without
+  // touching the form (the user already got their credits back and just wants a
+  // retry).
+  const recreateNow = useCallback(
+    async (gen: Generation) => {
+      if (submitting) return;
+      setError('');
+      setSubmitting(true);
+      setCurrentGen(null);
+      try {
+        const created = await api.recreateGeneration(gen);
+        setCurrentGen(created);
+        setRecentGenerations((prev) => [
+          created,
+          ...prev.filter((g) => g.id !== created.id),
+        ]);
+        refreshCredits();
+        pollGeneration(created.id);
+      } catch (err) {
+        setError(
+          translateError(err instanceof Error ? err.message : 'Generation failed'),
+        );
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [submitting, refreshCredits, pollGeneration, setRecentGenerations],
+  );
+
+  // "Create again" has two modes: a failed/cancelled generation is retried
+  // immediately, while a successful one only pre-fills the form for the user to
+  // review and approve.
+  const handleReuse = useCallback(
+    (gen: Generation) => {
+      if (gen.status === 'failed' || gen.status === 'cancelled') {
+        recreateNow(gen);
+      } else {
+        fillFormFromGeneration(gen);
+      }
+    },
+    [recreateNow, fillFormFromGeneration],
   );
 
   const handleGenerate = async () => {
@@ -513,7 +586,7 @@ export function CreateWorkspace({
             loading={recentLoading}
             activeGenId={currentGen?.id ?? null}
             onUseReference={addReferenceUrl}
-            onReuse={reuseGeneration}
+            onReuse={handleReuse}
             type={generationType}
           />
 
