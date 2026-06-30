@@ -125,6 +125,11 @@ export class AdminController {
     return this.adminService.sendGenerationEmail(id, req.user.email);
   }
 
+  @Post('generations/:id/cancel')
+  cancelGeneration(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.cancelGeneration(id);
+  }
+
   @Get('cost-stats')
   getCostStats() {
     return this.adminService.getCostStats();

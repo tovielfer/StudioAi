@@ -3,6 +3,7 @@ export const STATUS_LABELS: Record<string, string> = {
   processing: 'מעבד',
   done: 'הושלם',
   failed: 'נכשל',
+  cancelled: 'בוטל',
 };
 
 const OPENAI_SAFETY_MESSAGE =

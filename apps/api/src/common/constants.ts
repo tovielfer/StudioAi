@@ -9,6 +9,7 @@ export enum GenerationStatus {
   PROCESSING = 'processing',
   DONE = 'done',
   FAILED = 'failed',
+  CANCELLED = 'cancelled',
 }
 
 export enum ImageQuality {

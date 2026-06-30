@@ -32,16 +32,23 @@ export class AuthService {
     const token = crypto.randomBytes(32).toString('hex');
     const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    await this.usersService.create(dto.email, passwordHash, {
-      emailVerificationToken: token,
-      emailVerificationExpiry: expiry,
-    });
+    const user = await this.usersService
+      .create(dto.email, passwordHash, {
+        emailVerificationToken: token,
+        emailVerificationExpiry: expiry,
+      })
+      .catch((error: unknown) => {
+        if (isUniqueViolation(error)) {
+          throw new UnauthorizedException('Email already registered');
+        }
+        throw error;
+      });
 
     const frontendUrl =
       this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000';
     const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
 
-    await this.mailService.sendEmailVerification({ to: dto.email, verifyUrl });
+    await this.mailService.sendEmailVerification({ to: user.email, verifyUrl });
 
     return { message: 'Verification email sent' };
   }
@@ -132,4 +139,13 @@ export class AuthService {
       },
     };
   }
+}
+
+function isUniqueViolation(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === '23505'
+  );
 }

@@ -83,6 +83,40 @@ export class AdminService {
     return { success: true };
   }
 
+  // Lets an admin stop a generation that is still pending or processing. The
+  // status is moved to CANCELLED and any credits charged for it are refunded.
+  async cancelGeneration(id: string) {
+    const generation = await this.generationsRepo.findOne({ where: { id } });
+    if (!generation) {
+      throw new NotFoundException('Generation not found');
+    }
+
+    if (
+      generation.status !== GenerationStatus.PENDING &&
+      generation.status !== GenerationStatus.PROCESSING
+    ) {
+      throw new BadRequestException(
+        'Only pending or processing generations can be stopped',
+      );
+    }
+
+    await this.generationsRepo.update(id, {
+      status: GenerationStatus.CANCELLED,
+      errorMessage: 'בוטל על ידי מנהל',
+    });
+
+    if (generation.creditCost > 0) {
+      await this.creditsService.addCredits(
+        generation.userId,
+        generation.creditCost,
+        `refund:cancelled:${id}`,
+      );
+    }
+
+    const updated = await this.generationsRepo.findOne({ where: { id } });
+    return updated ?? { ...generation, status: GenerationStatus.CANCELLED };
+  }
+
   async getStats() {
     const [usersTotal, generationsTotal, creditTotals, statusRows] =
       await Promise.all([

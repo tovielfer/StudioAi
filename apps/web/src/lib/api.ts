@@ -42,7 +42,7 @@ export interface Generation {
   type: string;
   prompt: string;
   model: string;
-  status: 'pending' | 'processing' | 'done' | 'failed';
+  status: 'pending' | 'processing' | 'done' | 'failed' | 'cancelled';
   resultUrl: string | null;
   referenceImageUrls: string[] | null;
   quality: string | null;
@@ -461,6 +461,12 @@ class ApiClient {
       `/admin/generations/${id}/send-email`,
       { method: 'POST' },
     );
+  }
+
+  cancelAdminGeneration(id: string) {
+    return this.request<AdminGeneration>(`/admin/generations/${id}/cancel`, {
+      method: 'POST',
+    });
   }
 
   addAdminCredits(userId: string, amount: number, reason?: string) {

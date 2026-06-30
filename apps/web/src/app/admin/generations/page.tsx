@@ -55,6 +55,7 @@ function AdminGenerationsContent() {
 
   const {
     items: generations,
+    setItems: setGenerations,
     total: generationsTotal,
     loading,
     loadingMore,
@@ -62,6 +63,18 @@ function AdminGenerationsContent() {
     error: message,
     sentinelRef,
   } = useInfiniteList<AdminGeneration>(fetchPage, { pageSize: PAGE_SIZE });
+
+  const handleGenerationUpdated = useCallback(
+    (updated: AdminGeneration) => {
+      setGenerations((prev) =>
+        prev.map((g) => (g.id === updated.id ? { ...g, ...updated } : g)),
+      );
+      setSelected((curr) =>
+        curr && curr.id === updated.id ? { ...curr, ...updated } : curr,
+      );
+    },
+    [setGenerations],
+  );
 
   return (
     <AdminShell
@@ -125,6 +138,7 @@ function AdminGenerationsContent() {
                 <option value="processing">בעיבוד</option>
                 <option value="done">הושלם</option>
                 <option value="failed">נכשל</option>
+                <option value="cancelled">בוטל</option>
               </select>
             </div>
           </div>
@@ -285,7 +299,11 @@ function AdminGenerationsContent() {
       </div>
 
       {selected && (
-        <AdminGenerationModal generation={selected} onClose={() => setSelected(null)} />
+        <AdminGenerationModal
+          generation={selected}
+          onClose={() => setSelected(null)}
+          onUpdated={handleGenerationUpdated}
+        />
       )}
     </AdminShell>
   );

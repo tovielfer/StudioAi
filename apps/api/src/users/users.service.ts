@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Raw, Repository } from 'typeorm';
 import { CreditTransaction } from '../credits/credit-transaction.entity';
 import { User } from './user.entity';
 
 /** Credits granted to a new account on signup. */
 export const SIGNUP_BONUS_CREDITS = 150;
+
+export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 @Injectable()
 export class UsersService {
@@ -17,7 +19,14 @@ export class UsersService {
   ) {}
 
   findByEmail(email: string) {
-    return this.usersRepo.findOne({ where: { email } });
+    const normalizedEmail = normalizeEmail(email);
+    return this.usersRepo.findOne({
+      where: {
+        email: Raw((alias) => `LOWER(TRIM(${alias})) = :email`, {
+          email: normalizedEmail,
+        }),
+      },
+    });
   }
 
   findById(id: string) {
@@ -37,8 +46,9 @@ export class UsersService {
     passwordHash: string,
     opts?: { emailVerificationToken?: string; emailVerificationExpiry?: Date },
   ) {
+    const normalizedEmail = normalizeEmail(email);
     const user = this.usersRepo.create({
-      email,
+      email: normalizedEmail,
       passwordHash,
       credits: SIGNUP_BONUS_CREDITS,
       emailVerified: false,

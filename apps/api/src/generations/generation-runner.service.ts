@@ -30,6 +30,16 @@ export class GenerationRunnerService {
     private readonly creditsService: CreditsService,
   ) {}
 
+  // Re-reads only the status so we can detect an admin cancel that happened
+  // while the provider request was in flight.
+  private async wasCancelled(generationId: string): Promise<boolean> {
+    const current = await this.genRepo.findOne({
+      where: { id: generationId },
+      select: { id: true, status: true },
+    });
+    return current?.status === GenerationStatus.CANCELLED;
+  }
+
   async run(generationId: string, isLastAttempt = true) {
     this.logger.log(`Processing generation ${generationId}`);
 
@@ -38,6 +48,15 @@ export class GenerationRunnerService {
     });
     if (!generation) {
       this.logger.error(`Generation ${generationId} not found`);
+      return;
+    }
+
+    // An admin may have stopped the generation while it was still queued.
+    // Respect that and skip processing so it isn't revived.
+    if (generation.status === GenerationStatus.CANCELLED) {
+      this.logger.warn(
+        `Generation ${generationId} was cancelled — skipping processing`,
+      );
       return;
     }
 
@@ -85,6 +104,16 @@ export class GenerationRunnerService {
         );
       }
 
+      // An admin may have stopped the generation while the provider call was in
+      // flight. Don't overwrite the CANCELLED status (and don't keep a result the
+      // user was already refunded for).
+      if (await this.wasCancelled(generationId)) {
+        this.logger.warn(
+          `Generation ${generationId} was cancelled during processing — discarding result`,
+        );
+        return;
+      }
+
       await this.genRepo.update(generationId, {
         status: GenerationStatus.DONE,
         resultUrl,
@@ -112,6 +141,15 @@ export class GenerationRunnerService {
       );
 
       if (isLastAttempt) {
+        // If an admin cancelled mid-flight, the status is already CANCELLED and
+        // the credits were already refunded. Don't overwrite it or refund twice.
+        if (await this.wasCancelled(generationId)) {
+          this.logger.warn(
+            `Generation ${generationId} failed after being cancelled — leaving as cancelled`,
+          );
+          return;
+        }
+
         await this.genRepo.update(generationId, {
           status: GenerationStatus.FAILED,
           errorMessage: message,

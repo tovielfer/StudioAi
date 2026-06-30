@@ -20,13 +20,18 @@ function formatTokens(value: number | undefined) {
 export function AdminGenerationModal({
   generation,
   onClose,
+  onUpdated,
 }: {
   generation: AdminGeneration;
   onClose: () => void;
+  onUpdated?: (generation: AdminGeneration) => void;
 }) {
   const hasImage = Boolean(generation.resultUrl && generation.status === 'done');
   const tokens = generation.tokensUsed;
+  const canStop =
+    generation.status === 'pending' || generation.status === 'processing';
   const [sending, setSending] = useState(false);
+  const [canceling, setCanceling] = useState(false);
   const [emailToast, setEmailToast] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -54,6 +59,29 @@ export function AdminGenerationModal({
       setSending(false);
     }
   };
+  const handleCancel = async () => {
+    if (canceling) return;
+    if (
+      !window.confirm('לעצור את היצירה? הסטטוס ישתנה ל"בוטל" והקרדיטים יוחזרו למשתמש.')
+    ) {
+      return;
+    }
+    setCanceling(true);
+    setEmailToast(null);
+    try {
+      const updated = await api.cancelAdminGeneration(generation.id);
+      onUpdated?.(updated);
+      setEmailToast({ type: 'success', message: 'היצירה נעצרה' });
+    } catch (err) {
+      setEmailToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'עצירת היצירה נכשלה',
+      });
+    } finally {
+      setCanceling(false);
+    }
+  };
+
   const displayStatus =
     generation.status === 'failed' && generation.errorMessage
       ? translateError(generation.errorMessage, { includeRequestId: true })
@@ -94,17 +122,30 @@ export function AdminGenerationModal({
             <h2 className="text-2xl font-bold text-gray-950">פרטי יצירה</h2>
             <p className="mt-1 text-sm text-gray-500">{formatDateTime(generation.createdAt)}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-50"
-            aria-label="סגור"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6 6 18" />
-              <path d="m6 6 12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            {canStop && (
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={canceling}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-60"
+              >
+                {canceling ? <SpinnerIcon /> : null}
+                {canceling ? 'עוצר...' : 'עצירת היצירה'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-50"
+              aria-label="סגור"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
