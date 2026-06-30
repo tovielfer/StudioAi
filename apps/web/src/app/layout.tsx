@@ -17,8 +17,18 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'vookaPix — יצירת תמונות וווידאו',
-  description: 'צור תמונות מרהיבות בעזרת בינה מלאכותית עם vookaPix',
+  title: 'vookaPix — יצירת תמונות ווידאו בבינה מלאכותית',
+  description: 'צור תמונות וסרטונים מרהיבים בעזרת בינה מלאכותית עם vookaPix. מחולל תמונות ווידאו מתקדם, מהיר וקל לשימוש בעברית.',
+  keywords: ['בינה מלאכותית', 'יצירת תמונות', 'יצירת וידאו', 'מחולל תמונות', 'AI', 'vookaPix', 'ווקפיקס'],
+  metadataBase: new URL('https://vookapix.com'),
+  openGraph: {
+    title: 'vookaPix — יצירת תמונות ווידאו בבינה מלאכותית',
+    description: 'צור תמונות וסרטונים מרהיבים בעזרת בינה מלאכותית עם vookaPix. מחולל תמונות ווידאו מתקדם בעברית.',
+    url: 'https://vookapix.com',
+    siteName: 'vookaPix',
+    locale: 'he_IL',
+    type: 'website',
+  },
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
