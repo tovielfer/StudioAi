@@ -3,6 +3,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 export interface User {
   id: string;
   email: string;
+  nickname?: string | null;
   credits: number;
   role: 'user' | 'admin';
   createdAt?: string;
@@ -452,6 +453,13 @@ class ApiClient {
     return this.request<{ credits: number }>(`/admin/users/${userId}/credits`, {
       method: 'POST',
       body: JSON.stringify({ amount, reason }),
+    });
+  }
+
+  updateAdminUser(userId: string, data: { nickname?: string | null }) {
+    return this.request<User>(`/admin/users/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     });
   }
 

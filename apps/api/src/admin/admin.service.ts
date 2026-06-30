@@ -113,21 +113,49 @@ export class AdminService {
   }
 
   async listUsers(params: { search?: string; limit: number; offset: number }) {
+    const search = params.search
+      ? ([
+          { email: ILike(`%${params.search}%`) },
+          { nickname: ILike(`%${params.search}%`) },
+        ] as const)
+      : undefined;
+
     const [items, total] = await this.usersRepo.findAndCount({
       select: {
         id: true,
         email: true,
+        nickname: true,
         credits: true,
         role: true,
         createdAt: true,
       },
-      where: params.search ? { email: ILike(`%${params.search}%`) } : {},
+      where: search ? [...search] : {},
       order: { createdAt: 'DESC' },
       take: params.limit,
       skip: params.offset,
     });
 
     return { items, total };
+  }
+
+  async updateUserNickname(userId: string, nickname: string | null) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const trimmed = nickname?.trim();
+    user.nickname = trimmed ? trimmed : null;
+    await this.usersRepo.save(user);
+
+    return {
+      id: user.id,
+      email: user.email,
+      nickname: user.nickname,
+      credits: user.credits,
+      role: user.role,
+      createdAt: user.createdAt,
+    };
   }
 
   async listCreditTransactions(params: {

@@ -18,6 +18,7 @@ import { GenerationStatus } from '../common/constants';
 import { AdminService } from './admin.service';
 import { AddUserCreditsDto } from './dto/add-user-credits.dto';
 import { UpdatePricingRuleDto } from './dto/update-pricing-rule.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -145,6 +146,14 @@ export class AdminController {
   @Get('pricing-rules/:id/audit-log')
   getPricingRuleAuditLog(@Param('id', ParseUUIDPipe) id: string) {
     return this.adminService.getPricingRuleAuditLog(id);
+  }
+
+  @Patch('users/:id')
+  updateUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateUserDto,
+  ) {
+    return this.adminService.updateUserNickname(id, dto.nickname ?? null);
   }
 
   @Post('users/:id/credits')
