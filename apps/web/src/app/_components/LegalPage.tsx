@@ -18,7 +18,7 @@ export function LegalPage({
 
       <article className="relative max-w-3xl mx-auto px-4 pt-20 pb-28 text-right">
         <Link
-          href="/"
+          href="/dashboard"
           className="text-sm text-gray-400 hover:text-white transition-colors"
         >
           ← חזרה לדף הבית

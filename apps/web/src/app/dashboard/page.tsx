@@ -76,7 +76,7 @@ function DashboardContent() {
 
       <div className="relative flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold">לוח בקרה</h1>
+          <h1 className="text-3xl font-bold">דף הבית</h1>
           <p className="text-gray-400 mt-1">שלום, {user?.email}</p>
         </div>
         <div className="flex gap-2">
