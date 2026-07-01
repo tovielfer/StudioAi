@@ -25,7 +25,7 @@ export function FeedbackWidget() {
         onClick={() => setOpen(true)}
         className={`fixed bottom-6 z-40 rounded-full bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-black/30 transition-colors hover:bg-brand-500 ${formOnLeft ? 'right-4 md:right-6' : 'left-4 md:left-6'}`}
       >
-    מה כדאי לשפר?
+  אהבתם? יש לכם רעיון לשיפור? כתבו לנו
       </button>
 
       {open && (
