@@ -104,6 +104,12 @@ export function AdminGenerationModal({
         : '—',
     ],
     ['תאריך', formatDateTime(generation.createdAt)],
+    ...(generation.deletedAt
+      ? ([['נמחקה בתאריך', formatDateTime(generation.deletedAt)]] as [
+          string,
+          string,
+        ][])
+      : []),
   ];
 
   return (
@@ -119,7 +125,14 @@ export function AdminGenerationModal({
       >
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-950">פרטי יצירה</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-bold text-gray-950">פרטי יצירה</h2>
+              {generation.deletedAt && (
+                <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+                  נמחקה
+                </span>
+              )}
+            </div>
             <p className="mt-1 text-sm text-gray-500">{formatDateTime(generation.createdAt)}</p>
           </div>
           <div className="flex items-center gap-2">

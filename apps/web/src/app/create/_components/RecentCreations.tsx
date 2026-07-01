@@ -3,6 +3,11 @@
 import { useState } from 'react';
 import { Generation } from '@/lib/api';
 import { useSendGenerationEmail, EmailToast } from '@/components/SendEmail';
+import {
+  useDeleteGeneration,
+  DeleteConfirmDialog,
+  DeleteToast,
+} from '@/components/DeleteGeneration';
 import { GenerationCard } from './GenerationCard';
 import { GenerationDetailsModal } from './GenerationDetailsModal';
 
@@ -12,6 +17,7 @@ export function RecentCreations({
   activeGenId,
   onUseReference,
   onReuse,
+  onDeleted,
   type = 'image',
 }: {
   generations: Generation[];
@@ -19,10 +25,22 @@ export function RecentCreations({
   activeGenId: string | null;
   onUseReference: (url: string) => void;
   onReuse: (gen: Generation) => void;
+  onDeleted?: (id: string) => void;
   type?: 'image' | 'video';
 }) {
   const [selected, setSelected] = useState<Generation | null>(null);
   const { sendingId, toast, sendEmail } = useSendGenerationEmail();
+  const {
+    pendingDelete,
+    deletingId,
+    toast: deleteToast,
+    requestDelete,
+    cancelDelete,
+    confirmDelete,
+  } = useDeleteGeneration((id) => {
+    onDeleted?.(id);
+    setSelected((current) => (current?.id === id ? null : current));
+  });
   const isVideo = type === 'video';
 
   return (
@@ -61,6 +79,8 @@ export function RecentCreations({
               onSelect={setSelected}
               onSendEmail={sendEmail}
               sendingEmail={sendingId === gen.id}
+              onDelete={requestDelete}
+              deleting={deletingId === gen.id}
             />
           ))}
         </div>
@@ -74,9 +94,19 @@ export function RecentCreations({
           onClose={() => setSelected(null)}
           onSendEmail={sendEmail}
           sendingEmail={sendingId === selected.id}
+          onDelete={requestDelete}
+          deleting={deletingId === selected.id}
         />
       )}
 
+      <DeleteConfirmDialog
+        generation={pendingDelete}
+        deleting={Boolean(deletingId)}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
+
+      <DeleteToast toast={deleteToast} />
       <EmailToast toast={toast} />
     </div>
   );

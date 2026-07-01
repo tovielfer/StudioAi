@@ -17,6 +17,13 @@ import { api, Generation } from '@/lib/api';
 import { useInfiniteList } from '@/lib/use-infinite-list';
 import { downloadImage } from '@/lib/download';
 import { STATUS_LABELS, translateError } from '@/lib/he';
+import {
+  useDeleteGeneration,
+  DeleteConfirmDialog,
+  DeleteToast,
+  canDeleteGeneration,
+  TrashIcon,
+} from '@/components/DeleteGeneration';
 
 const TYPE_FILTER_OPTIONS = [
   { value: '', label: 'כל הסוגים' },
@@ -54,13 +61,28 @@ function HistoryContent() {
 
   const {
     items: generations,
+    setItems: setGenerations,
     total,
+    setTotal,
     loading,
     loadingMore,
     hasMore,
     sentinelRef,
     reload,
   } = useInfiniteList<Generation>(fetchPage, { pageSize: 24 });
+
+  const {
+    pendingDelete,
+    deletingId,
+    toast: deleteToast,
+    requestDelete,
+    cancelDelete,
+    confirmDelete,
+  } = useDeleteGeneration((id) => {
+    setGenerations((prev) => prev.filter((g) => g.id !== id));
+    setTotal((prev) => Math.max(0, prev - 1));
+    setSelectedGeneration((current) => (current?.id === id ? null : current));
+  });
 
   const [recreatingId, setRecreatingId] = useState<string | null>(null);
   const [recreateMsg, setRecreateMsg] = useState<{
@@ -208,6 +230,17 @@ function HistoryContent() {
                     {sendingId === gen.id ? <SpinnerIcon /> : <EnvelopeIcon />}
                   </button>
                 </Tooltip>
+                <Tooltip label="מחיקה">
+                  <button
+                    type="button"
+                    onClick={() => requestDelete(gen)}
+                    disabled={deletingId === gen.id}
+                    className="icon-button h-8 w-8 bg-red-600/80 text-white hover:bg-red-500 disabled:opacity-60"
+                    aria-label="מחיקה"
+                  >
+                    <TrashIcon />
+                  </button>
+                </Tooltip>
               </div>
             );
 
@@ -251,15 +284,28 @@ function HistoryContent() {
                         </span>
                       )}
                       {isErrorState && (
-                        <button
-                          type="button"
-                          onClick={() => handleRecreate(gen)}
-                          disabled={recreatingId === gen.id}
-                          className="btn-secondary inline-flex items-center gap-2 text-xs disabled:opacity-60"
-                        >
-                          {recreatingId === gen.id ? <SpinnerIcon /> : <RefreshIcon />}
-                          {recreatingId === gen.id ? 'יוצר...' : 'צור מחדש'}
-                        </button>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleRecreate(gen)}
+                            disabled={recreatingId === gen.id}
+                            className="btn-secondary inline-flex items-center gap-2 text-xs disabled:opacity-60"
+                          >
+                            {recreatingId === gen.id ? <SpinnerIcon /> : <RefreshIcon />}
+                            {recreatingId === gen.id ? 'יוצר...' : 'צור מחדש'}
+                          </button>
+                          <Tooltip label="מחיקה">
+                            <button
+                              type="button"
+                              onClick={() => requestDelete(gen)}
+                              disabled={deletingId === gen.id}
+                              className="icon-button h-7 w-7 bg-red-600/80 text-white hover:bg-red-500 disabled:opacity-60"
+                              aria-label="מחיקה"
+                            >
+                              <TrashIcon />
+                            </button>
+                          </Tooltip>
+                        </div>
                       )}
                     </div>
                   )}
@@ -300,8 +346,19 @@ function HistoryContent() {
           sendingEmail={sendingId === selectedGeneration.id}
           onRecreate={handleRecreate}
           recreating={recreatingId === selectedGeneration.id}
+          onDelete={requestDelete}
+          deleting={deletingId === selectedGeneration.id}
         />
       )}
+
+      <DeleteConfirmDialog
+        generation={pendingDelete}
+        deleting={Boolean(deletingId)}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
+
+      <DeleteToast toast={deleteToast} />
 
       {recreateMsg && (
         <div
@@ -330,6 +387,8 @@ function GenerationDetailsModal({
   sendingEmail,
   onRecreate,
   recreating,
+  onDelete,
+  deleting,
 }: {
   generation: Generation;
   editHref: string;
@@ -339,6 +398,8 @@ function GenerationDetailsModal({
   sendingEmail: boolean;
   onRecreate: (generation: Generation) => void;
   recreating: boolean;
+  onDelete: (generation: Generation) => void;
+  deleting: boolean;
 }) {
   const hasAsset = Boolean(generation.resultUrl);
   const isVideo = generation.type === 'video';
@@ -462,6 +523,17 @@ function GenerationDetailsModal({
               >
                 {recreating ? <SpinnerIcon /> : <RefreshIcon />}
                 {recreating ? 'יוצר...' : 'צור מחדש'}
+              </button>
+            )}
+            {canDeleteGeneration(generation) && (
+              <button
+                type="button"
+                onClick={() => onDelete(generation)}
+                disabled={deleting}
+                className="inline-flex w-fit items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-60"
+              >
+                <TrashIcon />
+                {deleting ? 'מוחק...' : 'מחיקת יצירה'}
               </button>
             )}
           </div>

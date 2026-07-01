@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   Query,
@@ -168,5 +169,11 @@ export class GenerationsController {
   @UseGuards(JwtAuthGuard)
   findOne(@Req() req: { user: { id: string } }, @Param('id') id: string) {
     return this.generationsService.findById(id, req.user.id);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  remove(@Req() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.generationsService.remove(id, req.user.id);
   }
 }

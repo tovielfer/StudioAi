@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Optional,
   Logger,
   OnModuleInit,
@@ -232,6 +233,26 @@ export class GenerationsService implements OnModuleInit, OnModuleDestroy {
       throw new ForbiddenException('Access denied');
     }
     return gen;
+  }
+
+  // Soft-deletes a creation the user no longer wants in their list. Ownership is
+  // enforced via findById. In-progress jobs can't be removed (they'd finish and
+  // resurface, and their credits/queue state are still in flux). The stored asset
+  // is intentionally left in place — only the DB row is marked deleted.
+  async remove(id: string, userId: string) {
+    const generation = await this.findById(id, userId);
+
+    if (
+      generation.status === GenerationStatus.PENDING ||
+      generation.status === GenerationStatus.PROCESSING
+    ) {
+      throw new BadRequestException(
+        'לא ניתן למחוק יצירה בזמן עיבוד. יש להמתין שתסתיים.',
+      );
+    }
+
+    await this.genRepo.softDelete(id);
+    return { success: true };
   }
 
   async findByUser(

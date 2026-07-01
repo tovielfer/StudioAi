@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
@@ -93,4 +94,10 @@ export class Generation {
 
   @CreateDateColumn()
   createdAt: Date;
+
+  // Soft delete: set when a user removes the creation from their list. Queries on
+  // this entity exclude soft-deleted rows automatically; admin views opt back in
+  // with `withDeleted()` to keep audit/cost history intact.
+  @DeleteDateColumn({ type: 'timestamptz', nullable: true })
+  deletedAt: Date | null;
 }

@@ -6,6 +6,7 @@ import { STATUS_LABELS, translateError } from '@/lib/he';
 import { VideoPreview } from '@/components/VideoPreview';
 import { PlusIcon, DownloadIcon, OpenIcon, CloseIcon, RefreshIcon } from './icons';
 import { EnvelopeIcon, SpinnerIcon } from '@/components/SendEmail';
+import { canDeleteGeneration, TrashIcon } from '@/components/DeleteGeneration';
 import { CopyButton } from './CopyButton';
 
 export function GenerationDetailsModal({
@@ -15,6 +16,8 @@ export function GenerationDetailsModal({
   onClose,
   onSendEmail,
   sendingEmail,
+  onDelete,
+  deleting,
 }: {
   generation: Generation;
   onUseReference: (url: string) => void;
@@ -22,6 +25,8 @@ export function GenerationDetailsModal({
   onClose: () => void;
   onSendEmail: (gen: Generation) => void;
   sendingEmail: boolean;
+  onDelete: (gen: Generation) => void;
+  deleting: boolean;
 }) {
   const hasAsset = Boolean(generation.resultUrl && generation.status === 'done');
   const isVideo = generation.type === 'video';
@@ -146,6 +151,17 @@ export function GenerationDetailsModal({
                   {sendingEmail ? 'שולח...' : 'שלח לי במייל'}
                 </button>
                 </>
+              )}
+              {canDeleteGeneration(generation) && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(generation)}
+                  disabled={deleting}
+                  className="inline-flex items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-60"
+                >
+                  <TrashIcon />
+                  {deleting ? 'מוחק...' : 'מחיקה'}
+                </button>
               )}
             </div>
           </div>

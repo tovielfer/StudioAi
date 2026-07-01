@@ -59,6 +59,7 @@ export interface Generation {
   errorMessage: string | null;
   providerErrorRaw: string | null;
   createdAt: string;
+  deletedAt?: string | null;
 }
 
 export interface AdminStats {
@@ -334,6 +335,12 @@ class ApiClient {
       `/generations/${id}/send-email`,
       { method: 'POST' },
     );
+  }
+
+  deleteGeneration(id: string) {
+    return this.request<{ success: boolean }>(`/generations/${id}`, {
+      method: 'DELETE',
+    });
   }
 
   getUserGenerations(

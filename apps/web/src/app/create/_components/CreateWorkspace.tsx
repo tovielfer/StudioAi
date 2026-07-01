@@ -587,6 +587,9 @@ export function CreateWorkspace({
             activeGenId={currentGen?.id ?? null}
             onUseReference={addReferenceUrl}
             onReuse={handleReuse}
+            onDeleted={(id) =>
+              setRecentGenerations((prev) => prev.filter((g) => g.id !== id))
+            }
             type={generationType}
           />
 

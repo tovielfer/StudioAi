@@ -54,6 +54,11 @@ export function AdminGenerationCard({
         <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
           {STATUS_LABELS[gen.status] ?? gen.status}
         </span>
+        {gen.deletedAt && (
+          <span className="absolute right-2 top-2 rounded-full bg-red-600/90 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
+            נמחקה
+          </span>
+        )}
       </div>
 
       <p className="line-clamp-2 text-sm text-gray-800" title={gen.prompt}>

@@ -6,6 +6,7 @@ import { STATUS_LABELS, translateError } from '@/lib/he';
 import { Tooltip } from '@/components/Tooltip';
 import { VideoPreview } from '@/components/VideoPreview';
 import { EnvelopeIcon, SpinnerIcon } from '@/components/SendEmail';
+import { TrashIcon } from '@/components/DeleteGeneration';
 import { InfoIcon, PlusIcon, DownloadIcon, OpenIcon, RefreshIcon } from './icons';
 
 export function GenerationCard({
@@ -16,6 +17,8 @@ export function GenerationCard({
   onSelect,
   onSendEmail,
   sendingEmail,
+  onDelete,
+  deleting,
 }: {
   gen: Generation;
   isActive: boolean;
@@ -24,6 +27,8 @@ export function GenerationCard({
   onSelect: (gen: Generation) => void;
   onSendEmail: (gen: Generation) => void;
   sendingEmail: boolean;
+  onDelete: (gen: Generation) => void;
+  deleting: boolean;
 }) {
   const canUse = Boolean(gen.resultUrl && gen.status === 'done');
   const isProcessing = gen.status === 'pending' || gen.status === 'processing';
@@ -100,6 +105,17 @@ export function GenerationCard({
           {sendingEmail ? <SpinnerIcon /> : <EnvelopeIcon />}
         </button>
       </Tooltip>
+      <Tooltip label="מחיקה">
+        <button
+          type="button"
+          onClick={() => onDelete(gen)}
+          disabled={deleting}
+          className="icon-button h-8 w-8 bg-red-600/80 text-white hover:bg-red-500 disabled:opacity-60"
+          aria-label="מחיקה"
+        >
+          <TrashIcon />
+        </button>
+      </Tooltip>
     </div>
   );
 
@@ -173,6 +189,17 @@ export function GenerationCard({
                     aria-label="פרטים"
                   >
                     <InfoIcon />
+                  </button>
+                </Tooltip>
+                <Tooltip label="מחיקה">
+                  <button
+                    type="button"
+                    onClick={() => onDelete(gen)}
+                    disabled={deleting}
+                    className="icon-button h-7 w-7 bg-red-600/80 text-white hover:bg-red-500 disabled:opacity-60"
+                    aria-label="מחיקה"
+                  >
+                    <TrashIcon />
                   </button>
                 </Tooltip>
               </div>

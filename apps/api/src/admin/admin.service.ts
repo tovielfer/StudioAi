@@ -121,10 +121,12 @@ export class AdminService {
     const [usersTotal, generationsTotal, creditTotals, statusRows] =
       await Promise.all([
         this.usersRepo.count(),
-        this.generationsRepo.count(),
+        // Include soft-deleted rows: they still represent real activity and spend.
+        this.generationsRepo.count({ withDeleted: true }),
         this.getCreditTotals(),
         this.generationsRepo
           .createQueryBuilder('g')
+          .withDeleted()
           .select('g.status', 'status')
           .addSelect('COUNT(*)', 'count')
           .groupBy('g.status')
@@ -334,6 +336,7 @@ export class AdminService {
   }) {
     const qb = this.generationsRepo
       .createQueryBuilder('g')
+      .withDeleted()
       .leftJoin('g.user', 'user');
 
     if (params.status) {
@@ -410,6 +413,7 @@ export class AdminService {
       .addSelect('g.errorMessage', 'errorMessage')
       .addSelect('g.providerErrorRaw', 'providerErrorRaw')
       .addSelect('g.createdAt', 'createdAt')
+      .addSelect('g.deletedAt', 'deletedAt')
       .orderBy('g.createdAt', 'DESC')
       .limit(params.limit)
       .offset(params.offset)
@@ -443,6 +447,7 @@ export class AdminService {
   async getCostStats() {
     const rows = await this.generationsRepo
       .createQueryBuilder('g')
+      .withDeleted()
       .select('g.type', 'type')
       .addSelect('g.provider', 'provider')
       .addSelect('g.model', 'model')
@@ -631,6 +636,7 @@ export class AdminService {
 
     const qb = this.generationsRepo
       .createQueryBuilder('g')
+      .withDeleted()
       .leftJoin('g.user', 'user')
       .where('g.pricingRuleId = :id', { id });
 
@@ -714,12 +720,14 @@ export class AdminService {
       .addSelect('g.tokensUsed', 'tokensUsed')
       .addSelect('g.errorMessage', 'errorMessage')
       .addSelect('g.providerErrorRaw', 'providerErrorRaw')
-      .addSelect('g.createdAt', 'createdAt');
+      .addSelect('g.createdAt', 'createdAt')
+      .addSelect('g.deletedAt', 'deletedAt');
   }
 
   private async getPricingMetricsByRuleId() {
     const rows = await this.generationsRepo
       .createQueryBuilder('g')
+      .withDeleted()
       .select('g.pricingRuleId', 'pricingRuleId')
       .addSelect('COUNT(*)::int', 'generationCount')
       .addSelect(

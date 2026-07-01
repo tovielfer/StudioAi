@@ -115,6 +115,7 @@ export function useInfiniteList<T>(
     items,
     setItems,
     total,
+    setTotal,
     loading,
     loadingMore,
     error,
