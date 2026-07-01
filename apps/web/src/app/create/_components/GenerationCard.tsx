@@ -40,7 +40,8 @@ export function GenerationCard({
       : STATUS_LABELS[gen.status] ?? gen.status;
 
   const actions = (
-    <div className="absolute left-2 top-2 flex flex-wrap gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
+    <>
+    <div className="absolute left-2 top-2 flex flex-wrap gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:translate-y-1 md:opacity-0 md:transition md:duration-200 md:ease-out md:group-hover:translate-y-0 md:group-hover:opacity-100">
       <Tooltip label="פרטים">
         <button
           type="button"
@@ -105,18 +106,21 @@ export function GenerationCard({
           {sendingEmail ? <SpinnerIcon /> : <EnvelopeIcon />}
         </button>
       </Tooltip>
+    </div>
+    <div className="absolute bottom-2 left-2 opacity-100 md:translate-y-1 md:opacity-0 md:transition md:duration-200 md:ease-out md:group-hover:translate-y-0 md:group-hover:opacity-100">
       <Tooltip label="מחיקה">
         <button
           type="button"
           onClick={() => onDelete(gen)}
           disabled={deleting}
-          className="icon-button h-8 w-8 bg-red-600/80 text-white hover:bg-red-500 disabled:opacity-60"
+          className="icon-button h-8 w-8 border-none bg-red-600/85 text-white shadow-lg backdrop-blur-sm hover:bg-red-500 disabled:opacity-60"
           aria-label="מחיקה"
         >
           <TrashIcon />
         </button>
       </Tooltip>
     </div>
+    </>
   );
 
   return (

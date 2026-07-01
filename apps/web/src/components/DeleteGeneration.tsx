@@ -3,11 +3,9 @@
 import { useEffect, useState } from 'react';
 import { api, Generation } from '@/lib/api';
 import { translateError } from '@/lib/he';
+import { Toast, type ToastState } from '@/components/Toast';
 
-export interface DeleteToastState {
-  type: 'success' | 'error';
-  message: string;
-}
+export type DeleteToastState = ToastState;
 
 // Shared logic for the "delete this creation" action. Holds the item pending
 // confirmation, the in-flight id (for spinner/disabled state) and an
@@ -66,19 +64,7 @@ export function useDeleteGeneration(onDeleted?: (id: string) => void) {
 }
 
 export function DeleteToast({ toast }: { toast: DeleteToastState | null }) {
-  if (!toast) return null;
-  return (
-    <div
-      className={`fixed bottom-6 left-1/2 z-[80] -translate-x-1/2 rounded-xl border px-5 py-3 text-sm font-medium shadow-2xl ${
-        toast.type === 'success'
-          ? 'border-green-500/30 bg-green-500/15 text-green-200'
-          : 'border-red-500/30 bg-red-500/15 text-red-200'
-      }`}
-      role="status"
-    >
-      {toast.message}
-    </div>
-  );
+  return <Toast toast={toast} />;
 }
 
 export function DeleteConfirmDialog({

@@ -24,6 +24,7 @@ import {
   canDeleteGeneration,
   TrashIcon,
 } from '@/components/DeleteGeneration';
+import { Toast } from '@/components/Toast';
 
 const TYPE_FILTER_OPTIONS = [
   { value: '', label: 'כל הסוגים' },
@@ -173,7 +174,8 @@ function HistoryContent() {
             const isVideo = gen.type === 'video';
 
             const actions = (
-              <div className="absolute left-2 top-2 flex flex-wrap gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
+              <>
+              <div className="absolute left-2 top-2 flex flex-wrap gap-1.5 rounded-lg bg-black/50 p-1 opacity-100 backdrop-blur-sm md:translate-y-1 md:opacity-0 md:transition md:duration-200 md:ease-out md:group-hover:translate-y-0 md:group-hover:opacity-100">
                 <Tooltip label="פרטים">
                   <button
                     type="button"
@@ -230,18 +232,21 @@ function HistoryContent() {
                     {sendingId === gen.id ? <SpinnerIcon /> : <EnvelopeIcon />}
                   </button>
                 </Tooltip>
+              </div>
+              <div className="absolute bottom-2 left-2 opacity-100 md:translate-y-1 md:opacity-0 md:transition md:duration-200 md:ease-out md:group-hover:translate-y-0 md:group-hover:opacity-100">
                 <Tooltip label="מחיקה">
                   <button
                     type="button"
                     onClick={() => requestDelete(gen)}
                     disabled={deletingId === gen.id}
-                    className="icon-button h-8 w-8 bg-red-600/80 text-white hover:bg-red-500 disabled:opacity-60"
+                    className="icon-button h-8 w-8 border-none bg-red-600/85 text-white shadow-lg backdrop-blur-sm hover:bg-red-500 disabled:opacity-60"
                     aria-label="מחיקה"
                   >
                     <TrashIcon />
                   </button>
                 </Tooltip>
               </div>
+              </>
             );
 
             return (
@@ -360,18 +365,13 @@ function HistoryContent() {
 
       <DeleteToast toast={deleteToast} />
 
-      {recreateMsg && (
-        <div
-          className={`fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-lg px-4 py-2 text-sm font-medium shadow-lg ${
-            recreateMsg.type === 'success'
-              ? 'bg-green-600 text-white'
-              : 'bg-red-600 text-white'
-          }`}
-          role="status"
-        >
-          {recreateMsg.text}
-        </div>
-      )}
+      <Toast
+        toast={
+          recreateMsg
+            ? { type: recreateMsg.type, message: recreateMsg.text }
+            : null
+        }
+      />
 
       <EmailToast toast={toast} />
     </div>
