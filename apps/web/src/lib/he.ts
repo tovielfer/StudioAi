@@ -48,6 +48,18 @@ export function translateError(
   }
 
   if (
+    message.includes('Google Gemini returned text instead of image') ||
+    message.includes('Google Gemini returned no image') ||
+    message.includes('Google Gemini finished without image')
+  ) {
+    return 'המודל החזיר תשובה טקסטואלית במקום תמונה. נסח את הבקשה כבקשה ליצירת תמונה — למשל התחל ב"צור תמונה של..." ותאר מה שברצונך לראות — ונסה שוב.';
+  }
+
+  if (message.includes('Google Gemini blocked the request')) {
+    return 'הבקשה נחסמה על ידי מערכת הבטיחות של Google. נסה לשנות את התיאור או להסיר פרטים שעלולים להיחסם.';
+  }
+
+  if (
     message.includes('invalid_image_file') ||
     message.includes('Invalid image file or mode')
   ) {

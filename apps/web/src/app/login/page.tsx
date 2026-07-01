@@ -81,6 +81,9 @@ export default function LoginPage() {
             <label className="block text-sm text-gray-400 mb-1.5">אימייל</label>
             <input
               type="email"
+              name="email"
+              autoComplete="email"
+              inputMode="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input-field"
