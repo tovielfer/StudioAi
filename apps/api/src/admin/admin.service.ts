@@ -13,7 +13,7 @@ import { Generation } from '../generations/generation.entity';
 import { GenerationStatus } from '../common/constants';
 import { MailService } from '../mail/mail.service';
 import { creditsToIls, getBillingConfig, usdToCredits } from '../config/billing';
-import { User } from '../users/user.entity';
+import { User, UserRole } from '../users/user.entity';
 import { UpdatePricingRuleDto } from './dto/update-pricing-rule.dto';
 
 type PricingMetric = {
@@ -171,6 +171,7 @@ export class AdminService {
       .addSelect('u.nickname', 'nickname')
       .addSelect('u.credits', 'credits')
       .addSelect('u.role', 'role')
+      .addSelect('u."isBlocked"', 'isBlocked')
       .addSelect('u."emailVerified"', 'emailVerified')
       .addSelect('u."createdAt"', 'createdAt')
       .addSelect('COUNT(g.id)::int', 'generationsCount')
@@ -209,6 +210,7 @@ export class AdminService {
       nickname: (r.nickname as string | null) ?? null,
       credits: Number(r.credits),
       role: r.role as string,
+      isBlocked: Boolean(r.isBlocked),
       emailVerified: Boolean(r.emailVerified),
       createdAt: r.createdAt as Date,
       generationsCount: Number(r.generationsCount),
@@ -217,14 +219,29 @@ export class AdminService {
     return { items, total };
   }
 
-  async updateUserNickname(userId: string, nickname: string | null) {
+  async updateUser(
+    userId: string,
+    dto: { nickname?: string | null; isBlocked?: boolean },
+    adminUserId?: string,
+  ) {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    const trimmed = nickname?.trim();
-    user.nickname = trimmed ? trimmed : null;
+    if (dto.nickname !== undefined) {
+      const trimmed = dto.nickname?.trim();
+      user.nickname = trimmed ? trimmed : null;
+    }
+    if (dto.isBlocked !== undefined) {
+      if (dto.isBlocked && user.id === adminUserId) {
+        throw new BadRequestException('You cannot block your own admin user');
+      }
+      if (dto.isBlocked && user.role === UserRole.ADMIN) {
+        throw new BadRequestException('Admin users cannot be blocked');
+      }
+      user.isBlocked = dto.isBlocked;
+    }
     await this.usersRepo.save(user);
 
     return {
@@ -233,6 +250,7 @@ export class AdminService {
       nickname: user.nickname,
       credits: user.credits,
       role: user.role,
+      isBlocked: user.isBlocked,
       emailVerified: user.emailVerified,
       createdAt: user.createdAt,
     };

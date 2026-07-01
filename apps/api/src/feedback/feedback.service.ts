@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
 import { MailService } from '../mail/mail.service';
@@ -22,6 +27,23 @@ export class FeedbackService {
   create(userId: string, dto: CreateFeedbackDto) {
     const submission = this.feedbackRepo.create({
       userId,
+      type: dto.type,
+      title: dto.title?.trim() ?? '',
+      message: dto.message.trim(),
+    });
+
+    return this.feedbackRepo.save(submission);
+  }
+
+  createPublic(dto: CreateFeedbackDto) {
+    const contactEmail = dto.contactEmail?.trim().toLowerCase();
+    if (!contactEmail) {
+      throw new BadRequestException('Contact email is required');
+    }
+
+    const submission = this.feedbackRepo.create({
+      userId: null,
+      contactEmail,
       type: dto.type,
       title: dto.title?.trim() ?? '',
       message: dto.message.trim(),
@@ -78,6 +100,7 @@ export class FeedbackService {
       .select('feedback.id', 'id')
       .addSelect('feedback.userId', 'userId')
       .addSelect('user.email', 'userEmail')
+      .addSelect('feedback.contactEmail', 'contactEmail')
       .addSelect('feedback.type', 'type')
       .addSelect('feedback.title', 'title')
       .addSelect('feedback.message', 'message')
@@ -132,17 +155,18 @@ export class FeedbackService {
 
     const saved = await this.feedbackRepo.save(item);
 
-    if (shouldSendEmail && item.adminReply && item.user?.email) {
+    const replyTo = item.user?.email ?? item.contactEmail;
+    if (shouldSendEmail && item.adminReply && replyTo) {
       this.mailService
         .sendFeedbackReply({
-          to: item.user.email,
+          to: replyTo,
           feedbackTitle: item.title,
           feedbackMessage: item.message,
           adminReply: item.adminReply,
         })
         .catch((err: unknown) =>
           this.logger.error(
-            `Failed to send feedback reply email to ${item.user.email}: ${err instanceof Error ? err.message : String(err)}`,
+            `Failed to send feedback reply email to ${replyTo}: ${err instanceof Error ? err.message : String(err)}`,
           ),
         );
     }

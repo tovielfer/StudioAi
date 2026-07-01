@@ -171,8 +171,9 @@ export class AdminController {
   updateUser(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateUserDto,
+    @Req() req: { user: { id: string } },
   ) {
-    return this.adminService.updateUserNickname(id, dto.nickname ?? null);
+    return this.adminService.updateUser(id, dto, req.user.id);
   }
 
   @Post('users/:id/credits')

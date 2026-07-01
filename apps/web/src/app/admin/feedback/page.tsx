@@ -176,7 +176,7 @@ function AdminFeedbackContent() {
                       {FEEDBACK_STATUS_LABELS[item.status] ?? item.status}
                     </span>
                     <span className="font-medium text-xs text-gray-600">
-                      {item.userEmail ?? 'משתמש לא ידוע'}
+                      {item.userEmail ?? item.contactEmail ?? 'פנייה ציבורית'}
                     </span>
                     <span className="ms-auto text-xs text-gray-400">
                       {formatDate(item.createdAt)}

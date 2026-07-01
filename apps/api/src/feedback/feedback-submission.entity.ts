@@ -28,12 +28,15 @@ export class FeedbackSubmission {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
-  userId: string;
+  @Column({ type: 'uuid', nullable: true })
+  userId: string | null;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'userId' })
-  user: User;
+  user: User | null;
+
+  @Column({ type: 'varchar', nullable: true, default: null })
+  contactEmail: string | null;
 
   @Column({ type: 'varchar', default: FeedbackType.REQUEST })
   type: FeedbackType;

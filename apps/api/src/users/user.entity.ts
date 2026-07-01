@@ -34,6 +34,9 @@ export class User {
   role: UserRole;
 
   @Column({ default: false })
+  isBlocked: boolean;
+
+  @Column({ default: false })
   emailVerified: boolean;
 
   @Column({ type: 'varchar', nullable: true, default: null })

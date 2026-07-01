@@ -6,6 +6,7 @@ export interface User {
   nickname?: string | null;
   credits: number;
   role: 'user' | 'admin';
+  isBlocked?: boolean;
   emailVerified?: boolean;
   createdAt?: string;
   generationsCount?: number;
@@ -207,8 +208,9 @@ export type FeedbackStatus = 'open' | 'in_progress' | 'answered' | 'closed';
 
 export interface FeedbackSubmission {
   id: string;
-  userId: string;
+  userId: string | null;
   userEmail?: string | null;
+  contactEmail?: string | null;
   type: FeedbackType;
   title: string;
   message: string;
@@ -505,7 +507,10 @@ class ApiClient {
     });
   }
 
-  updateAdminUser(userId: string, data: { nickname?: string | null }) {
+  updateAdminUser(
+    userId: string,
+    data: { nickname?: string | null; isBlocked?: boolean },
+  ) {
     return this.request<User>(`/admin/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -652,6 +657,18 @@ class ApiClient {
     message: string;
   }) {
     return this.request<FeedbackSubmission>('/feedback', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  createPublicFeedback(data: {
+    type: FeedbackType;
+    title?: string;
+    message: string;
+    contactEmail: string;
+  }) {
+    return this.request<FeedbackSubmission>('/feedback/public', {
       method: 'POST',
       body: JSON.stringify(data),
     });

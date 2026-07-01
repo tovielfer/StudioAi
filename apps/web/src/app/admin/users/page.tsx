@@ -80,6 +80,7 @@ function AdminUsersContent() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const [savingNickname, setSavingNickname] = useState(false);
+  const [savingBlockedId, setSavingBlockedId] = useState<string | null>(null);
 
   const [quickAddId, setQuickAddId] = useState<string | null>(null);
   const [quickAmount, setQuickAmount] = useState('25');
@@ -267,6 +268,31 @@ function AdminUsersContent() {
     }
   }
 
+  async function toggleBlocked(user: User) {
+    const nextBlocked = !user.isBlocked;
+    setSavingBlockedId(user.id);
+    setMessage(null);
+    try {
+      const updated = await api.updateAdminUser(user.id, {
+        isBlocked: nextBlocked,
+      });
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id ? { ...u, isBlocked: updated.isBlocked } : u,
+        ),
+      );
+      setMessage(
+        nextBlocked
+          ? `${user.nickname || user.email} נחסם ולא יוכל להיכנס.`
+          : `${user.nickname || user.email} שוחרר ויוכל להיכנס שוב.`,
+      );
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'עדכון החסימה נכשל');
+    } finally {
+      setSavingBlockedId(null);
+    }
+  }
+
   async function openTransactions(user: User) {
     setTransactionsUser(user);
     setTransactions([]);
@@ -429,7 +455,9 @@ function AdminUsersContent() {
                 <div
                   key={user.id}
                   className={`rounded-lg border p-2.5 transition-all hover:shadow-sm ${
-                    user.emailVerified === false
+                    user.isBlocked
+                      ? 'border-red-300 bg-red-50/70 hover:border-red-400'
+                      : user.emailVerified === false
                       ? 'border-amber-300 bg-amber-50/70 hover:border-amber-400'
                       : 'border-gray-200 hover:border-brand-300'
                   }`}
@@ -437,7 +465,9 @@ function AdminUsersContent() {
                   <div className="flex items-center gap-2.5">
                     <div
                       className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
-                        user.emailVerified === false
+                        user.isBlocked
+                          ? 'bg-red-100 text-red-800'
+                          : user.emailVerified === false
                           ? 'bg-amber-100 text-amber-800'
                           : 'bg-brand-100 text-brand-700'
                       }`}
@@ -502,6 +532,11 @@ function AdminUsersContent() {
                       {user.emailVerified === false && (
                         <span className="mt-1 inline-flex rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
                           מייל לא אומת
+                        </span>
+                      )}
+                      {user.isBlocked && (
+                        <span className="mt-1 inline-flex rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800">
+                          חסום
                         </span>
                       )}
                     </div>
@@ -579,6 +614,24 @@ function AdminUsersContent() {
                     >
                       תנועות
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => void toggleBlocked(user)}
+                      disabled={savingBlockedId === user.id || user.role === 'admin'}
+                      className={`rounded-md border px-2 py-1 text-xs transition-colors disabled:opacity-50 ${
+                        user.isBlocked
+                          ? 'border-green-200 text-green-700 hover:border-green-300 hover:bg-green-50'
+                          : 'border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50'
+                      }`}
+                    >
+                      {savingBlockedId === user.id
+                        ? 'מעדכן...'
+                        : user.role === 'admin'
+                          ? 'מנהל'
+                          : user.isBlocked
+                          ? 'שחרור'
+                          : 'חסימה'}
+                    </button>
                   </div>
                 </div>
               ))}
@@ -591,6 +644,7 @@ function AdminUsersContent() {
                     <th className="text-right py-3">כינוי</th>
                     <th className="text-right py-3">אימייל</th>
                     <th className="text-right py-3">אימות</th>
+                    <th className="text-right py-3">חסימה</th>
                     <th className="text-right py-3">תפקיד</th>
                     <th className="text-right py-3">יצירות</th>
                     <th className="text-right py-3">קרדיטים</th>
@@ -603,7 +657,11 @@ function AdminUsersContent() {
                     <tr
                       key={user.id}
                       className={`border-b border-gray-100 ${
-                        user.emailVerified === false ? 'bg-amber-50/60' : ''
+                        user.isBlocked
+                          ? 'bg-red-50/60'
+                          : user.emailVerified === false
+                            ? 'bg-amber-50/60'
+                            : ''
                       }`}
                     >
                       <td className="py-3 font-medium text-gray-950">
@@ -654,6 +712,17 @@ function AdminUsersContent() {
                           {user.emailVerified === false ? 'לא אומת' : 'אומת'}
                         </span>
                       </td>
+                      <td className="py-3">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            user.isBlocked
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-green-100 text-green-800'
+                          }`}
+                        >
+                          {user.isBlocked ? 'חסום' : 'פעיל'}
+                        </span>
+                      </td>
                       <td className="py-3 text-gray-600">
                         {user.role === 'admin' ? 'מנהל' : 'משתמש'}
                       </td>
@@ -681,6 +750,26 @@ function AdminUsersContent() {
                             className="text-xs text-brand-600 hover:text-brand-800"
                           >
                             תנועות
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void toggleBlocked(user)}
+                            disabled={
+                              savingBlockedId === user.id || user.role === 'admin'
+                            }
+                            className={`text-xs disabled:opacity-50 ${
+                              user.isBlocked
+                                ? 'text-green-700 hover:text-green-900'
+                                : 'text-red-700 hover:text-red-900'
+                            }`}
+                          >
+                            {savingBlockedId === user.id
+                              ? 'מעדכן...'
+                              : user.role === 'admin'
+                                ? 'מנהל'
+                                : user.isBlocked
+                                ? 'שחרור חסימה'
+                                : 'חסימה'}
                           </button>
                         </div>
                       </td>

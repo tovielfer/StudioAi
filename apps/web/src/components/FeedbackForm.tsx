@@ -12,12 +12,15 @@ const FEEDBACK_TYPES: { id: FeedbackType; label: string; emoji: string }[] = [
 ];
 
 export function FeedbackForm({
+  publicMode = false,
   onSubmitted,
 }: {
+  publicMode?: boolean;
   onSubmitted?: () => void | Promise<void>;
 }) {
   const [type, setType] = useState<FeedbackType>('request');
   const [title, setTitle] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -26,16 +29,26 @@ export function FeedbackForm({
   async function submitFeedback(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!message.trim()) return;
+    if (publicMode && !contactEmail.trim()) return;
     setSaving(true);
     setError(null);
 
     try {
-      await api.createFeedback({
+      const payload = {
         type,
         title: title.trim() || undefined,
         message,
-      });
+      };
+      if (publicMode) {
+        await api.createPublicFeedback({
+          ...payload,
+          contactEmail: contactEmail.trim(),
+        });
+      } else {
+        await api.createFeedback(payload);
+      }
       setTitle('');
+      setContactEmail('');
       setMessage('');
       setType('request');
       setShowSuccess(true);
@@ -126,6 +139,24 @@ export function FeedbackForm({
         />
       </div>
 
+      {publicMode && (
+        <div>
+          <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-300">
+            אימייל לחזרה
+            <span className="text-xs font-normal text-red-400">*</span>
+          </label>
+          <input
+            type="email"
+            value={contactEmail}
+            onChange={(e) => setContactEmail(e.target.value)}
+            className="w-full rounded-xl border border-surface-border bg-surface px-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:border-brand-500/60 focus:outline-none transition-colors"
+            maxLength={255}
+            placeholder="name@example.com"
+            required
+          />
+        </div>
+      )}
+
       <div>
         <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-300">
           ההודעה
@@ -146,7 +177,9 @@ export function FeedbackForm({
             </span>
             <button
               type="submit"
-              disabled={saving || !message.trim()}
+              disabled={
+                saving || !message.trim() || (publicMode && !contactEmail.trim())
+              }
               className="rounded-full bg-brand-600 px-5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? 'שולח...' : 'שליחה'}

@@ -16,7 +16,7 @@ export function FeedbackWidget() {
     return () => window.removeEventListener('formSideChange', handler);
   }, []);
 
-  if (loading || !user) return null;
+  if (loading) return null;
 
   return (
     <>
@@ -43,7 +43,7 @@ export function FeedbackWidget() {
             </div>
 
             <div className="max-h-[75vh] overflow-y-auto px-5 py-4">
-              <FeedbackForm />
+              <FeedbackForm publicMode={!user} />
             </div>
           </div>
         </div>

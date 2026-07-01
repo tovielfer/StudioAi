@@ -19,11 +19,11 @@ import { UpdateFeedbackDto } from './dto/update-feedback.dto';
 import { FeedbackService } from './feedback.service';
 
 @Controller('feedback')
-@UseGuards(JwtAuthGuard)
 export class FeedbackController {
   constructor(private readonly feedbackService: FeedbackService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   create(
     @Req() req: { user: { id: string } },
     @Body() dto: CreateFeedbackDto,
@@ -31,29 +31,37 @@ export class FeedbackController {
     return this.feedbackService.create(req.user.id, dto);
   }
 
+  @Post('public')
+  createPublic(@Body() dto: CreateFeedbackDto) {
+    return this.feedbackService.createPublic(dto);
+  }
+
   @Get('unread-count')
+  @UseGuards(JwtAuthGuard)
   unreadCount(@Req() req: { user: { id: string } }) {
     return this.feedbackService.countUnreadRepliesForUser(req.user.id);
   }
 
   @Post('mark-read')
+  @UseGuards(JwtAuthGuard)
   markRead(@Req() req: { user: { id: string } }) {
     return this.feedbackService.markRepliesReadForUser(req.user.id);
   }
 
   @Get('admin/unread-count')
-  @UseGuards(AdminGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   adminUnreadCount() {
     return this.feedbackService.countNewForAdmin();
   }
 
   @Post('admin/mark-read')
-  @UseGuards(AdminGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   adminMarkRead() {
     return this.feedbackService.markAllReadForAdmin();
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   listMine(
     @Req() req: { user: { id: string } },
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
@@ -66,7 +74,7 @@ export class FeedbackController {
   }
 
   @Get('admin')
-  @UseGuards(AdminGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   listAdmin(
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
     @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset = 0,
@@ -78,7 +86,7 @@ export class FeedbackController {
   }
 
   @Patch('admin/:id')
-  @UseGuards(AdminGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   updateAdmin(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateFeedbackDto,

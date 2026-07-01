@@ -61,6 +61,9 @@ export class AuthService {
     if (user.emailVerificationExpiry < new Date()) {
       throw new BadRequestException('Invalid or expired verification token');
     }
+    if (user.isBlocked) {
+      throw new UnauthorizedException('User is blocked');
+    }
 
     await this.usersService.markEmailVerified(user.id);
     return this.buildAuthResponse(user);
@@ -70,6 +73,10 @@ export class AuthService {
     const user = await this.usersService.findByEmail(dto.email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.isBlocked) {
+      throw new UnauthorizedException('User is blocked');
     }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
@@ -123,6 +130,7 @@ export class AuthService {
     email: string;
     credits: number;
     role: UserRole;
+    isBlocked?: boolean;
   }) {
     const token = this.jwtService.sign({
       sub: user.id,

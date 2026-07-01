@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { LegalPage, LegalSection } from '@/app/_components/LegalPage';
+import { FeedbackForm } from '@/components/FeedbackForm';
 import { LEGAL } from '@/lib/legal';
 
 export const metadata: Metadata = {
@@ -60,7 +61,8 @@ export default function ContactPage() {
 
       <LegalSection title="פנייה דרך השירות">
         <p>
-          משתמשים רשומים יכולים לפתוח פנייה ישירות מתוך החשבון בעמוד{' '}
+          אפשר לפתוח פנייה גם בלי להתחבר. משתמשים רשומים יכולים לראות את
+          היסטוריית הפניות והתשובות מתוך החשבון בעמוד{' '}
           <Link
             href="/feedback"
             className="text-brand-300 hover:text-brand-200 underline"
@@ -69,6 +71,9 @@ export default function ContactPage() {
           </Link>
           , ונחזור אליך בהקדם.
         </p>
+        <div className="mt-5 rounded-2xl border border-surface-border bg-surface-card p-4">
+          <FeedbackForm publicMode />
+        </div>
       </LegalSection>
     </LegalPage>
   );
