@@ -89,11 +89,15 @@ export class MailService {
   }
 
   // Builds a thread-scoped reply address like
-  // `reply+<threadToken>@inbound.vookapix.com` when an inbound domain is
-  // configured. Returns null so callers can fall back to the default reply-to.
+  // `reply+<threadToken>@inbound.vookapix.com` so replies flow back into the
+  // conversation. Gated behind MAIL_INBOUND_ENABLED so we can keep the whole
+  // feature in place but temporarily route replies to the normal inbox
+  // (MAIL_REPLY_TO) until inbound receiving is fully wired up. Returns null so
+  // callers fall back to the default reply-to.
   private buildThreadReplyTo(threadToken?: string | null): string | null {
+    const enabled = this.config.get<string>('MAIL_INBOUND_ENABLED') === 'true';
     const domainRaw = this.config.get<string>('MAIL_INBOUND_DOMAIN');
-    if (!domainRaw || !threadToken) return null;
+    if (!enabled || !domainRaw || !threadToken) return null;
     const domain = this.sanitizeFrom(domainRaw).replace(/^@+/, '');
     return `reply+${threadToken}@${domain}`;
   }
