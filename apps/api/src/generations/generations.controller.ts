@@ -130,14 +130,26 @@ export class GenerationsController {
     @Req() req: { user: { id: string } },
     @Param('userId') userId: string,
     @Query('type') type?: GenerationType,
+    @Query('excludeStatus') excludeStatus?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
     if (req.user.id !== userId) {
       throw new BadRequestException('Access denied');
     }
+    // Accept a comma-separated list of statuses to hide (e.g. "failed,cancelled"
+    // so the dashboard can show only successful/in-progress creations). Only
+    // known statuses are honoured; anything else is silently ignored.
+    const validStatuses = Object.values(GenerationStatus) as string[];
+    const excludeStatuses = excludeStatus
+      ? (excludeStatus
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => validStatuses.includes(s)) as GenerationStatus[])
+      : undefined;
     return this.generationsService.findByUser(userId, {
       type,
+      excludeStatuses,
       limit: limit ? parseInt(limit, 10) : undefined,
       offset: offset ? parseInt(offset, 10) : undefined,
     });

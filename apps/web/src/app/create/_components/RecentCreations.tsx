@@ -8,8 +8,8 @@ import {
   DeleteConfirmDialog,
   DeleteToast,
 } from '@/components/DeleteGeneration';
-import { GenerationCard } from './GenerationCard';
-import { GenerationDetailsModal } from './GenerationDetailsModal';
+import { GenerationCard } from '@/components/generation/GenerationCard';
+import { GenerationDetailsModal } from '@/components/generation/GenerationDetailsModal';
 
 export function RecentCreations({
   generations,
@@ -96,6 +96,7 @@ export function RecentCreations({
           sendingEmail={sendingId === selected.id}
           onDelete={requestDelete}
           deleting={deletingId === selected.id}
+          showCopyPrompt
         />
       )}
 

@@ -257,7 +257,12 @@ export class GenerationsService implements OnModuleInit, OnModuleDestroy {
 
   async findByUser(
     userId: string,
-    filters?: { type?: GenerationType; limit?: number; offset?: number },
+    filters?: {
+      type?: GenerationType;
+      excludeStatuses?: GenerationStatus[];
+      limit?: number;
+      offset?: number;
+    },
   ) {
     const qb = this.genRepo
       .createQueryBuilder('g')
@@ -266,6 +271,12 @@ export class GenerationsService implements OnModuleInit, OnModuleDestroy {
 
     if (filters?.type) {
       qb.andWhere('g.type = :type', { type: filters.type });
+    }
+
+    if (filters?.excludeStatuses?.length) {
+      qb.andWhere('g.status NOT IN (:...excludeStatuses)', {
+        excludeStatuses: filters.excludeStatuses,
+      });
     }
 
     const limit = filters?.limit ?? 50;

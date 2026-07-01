@@ -1,33 +1,52 @@
 'use client';
 
+import Link from 'next/link';
 import { Generation } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
 import { STATUS_LABELS, translateError } from '@/lib/he';
 import { VideoPreview } from '@/components/VideoPreview';
-import { PlusIcon, DownloadIcon, OpenIcon, CloseIcon, RefreshIcon } from './icons';
 import { EnvelopeIcon, SpinnerIcon } from '@/components/SendEmail';
 import { canDeleteGeneration, TrashIcon } from '@/components/DeleteGeneration';
 import { CopyButton } from './CopyButton';
+import {
+  PlusIcon,
+  DownloadIcon,
+  OpenIcon,
+  CloseIcon,
+  RefreshIcon,
+  EditIcon,
+} from './icons';
+
+export type GenerationDetailsModalProps = {
+  generation: Generation;
+  onClose: () => void;
+  // "Make similar": in-page reuse (create) as a button, or navigation
+  // (history/dashboard) as a link.
+  onReuse?: (gen: Generation) => void;
+  getEditHref?: (gen: Generation) => string;
+  // Retry on failed/cancelled items (history).
+  onRecreate?: (gen: Generation) => void;
+  onUseReference?: (url: string) => void;
+  onSendEmail?: (gen: Generation) => void;
+  sendingEmail?: boolean;
+  onDelete?: (gen: Generation) => void;
+  deleting?: boolean;
+  showCopyPrompt?: boolean;
+};
 
 export function GenerationDetailsModal({
   generation,
-  onUseReference,
-  onReuse,
   onClose,
+  onReuse,
+  getEditHref,
+  onRecreate,
+  onUseReference,
   onSendEmail,
-  sendingEmail,
+  sendingEmail = false,
   onDelete,
-  deleting,
-}: {
-  generation: Generation;
-  onUseReference: (url: string) => void;
-  onReuse: (gen: Generation) => void;
-  onClose: () => void;
-  onSendEmail: (gen: Generation) => void;
-  sendingEmail: boolean;
-  onDelete: (gen: Generation) => void;
-  deleting: boolean;
-}) {
+  deleting = false,
+  showCopyPrompt = false,
+}: GenerationDetailsModalProps) {
   const hasAsset = Boolean(generation.resultUrl && generation.status === 'done');
   const isVideo = generation.type === 'video';
   const isErrorState =
@@ -92,67 +111,94 @@ export function GenerationDetailsModal({
                   />
                 )
               ) : (
-                <span className="text-gray-500">
-                  {displayStatus}
-                </span>
+                <span className="text-gray-500">{displayStatus}</span>
               )}
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => { onReuse(generation); onClose(); }}
-                className="btn-primary inline-flex items-center gap-2 text-sm"
-                title="העתקת הפרומפט והרפרנסים לטופס לעריכה ויצירה מחדש"
-              >
-                <RefreshIcon />
-                צור מחדש
-              </button>
+              {onReuse && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onReuse(generation);
+                    onClose();
+                  }}
+                  className="btn-primary inline-flex items-center gap-2 text-sm"
+                  title="העתקת הפרומפט והרפרנסים לטופס לעריכה ויצירה מחדש"
+                >
+                  <RefreshIcon />
+                  צור מחדש
+                </button>
+              )}
+              {getEditHref && hasAsset && (
+                <Link
+                  href={getEditHref(generation)}
+                  className="btn-primary inline-flex items-center gap-2 text-sm"
+                >
+                  <EditIcon />
+                  {isVideo ? 'יצירת סרטון דומה' : 'עריכה עם התמונה כרפרנס'}
+                </Link>
+              )}
               {hasAsset && (
                 <>
-                {!isVideo && (
+                  {onUseReference && !isVideo && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUseReference(generation.resultUrl!);
+                        onClose();
+                      }}
+                      className="btn-secondary inline-flex items-center gap-2 text-sm"
+                    >
+                      <PlusIcon />
+                      הוסף כתמונת השראה
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => { onUseReference(generation.resultUrl!); onClose(); }}
+                    onClick={() =>
+                      downloadImage(
+                        generation.resultUrl!,
+                        `generation-${generation.id}.${isVideo ? 'mp4' : 'png'}`,
+                      )
+                    }
                     className="btn-secondary inline-flex items-center gap-2 text-sm"
                   >
-                    <PlusIcon />
-                    הוסף כתמונת השראה
+                    <DownloadIcon />
+                    הורדה
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() =>
-                    downloadImage(
-                      generation.resultUrl!,
-                      `generation-${generation.id}.${isVideo ? 'mp4' : 'png'}`,
-                    )
-                  }
-                  className="btn-secondary inline-flex items-center gap-2 text-sm"
-                >
-                  <DownloadIcon />
-                  הורדה
-                </button>
-                <a
-                  href={generation.resultUrl!}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-secondary inline-flex items-center gap-2 text-sm"
-                >
-                  <OpenIcon />
-                  פתיחה
-                </a>
-                <button
-                  type="button"
-                  onClick={() => onSendEmail(generation)}
-                  disabled={sendingEmail}
-                  className="btn-secondary inline-flex items-center gap-2 text-sm disabled:opacity-60"
-                >
-                  {sendingEmail ? <SpinnerIcon /> : <EnvelopeIcon />}
-                  {sendingEmail ? 'שולח...' : 'שלח לי במייל'}
-                </button>
+                  <a
+                    href={generation.resultUrl!}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-secondary inline-flex items-center gap-2 text-sm"
+                  >
+                    <OpenIcon />
+                    פתיחה
+                  </a>
+                  {onSendEmail && (
+                    <button
+                      type="button"
+                      onClick={() => onSendEmail(generation)}
+                      disabled={sendingEmail}
+                      className="btn-secondary inline-flex items-center gap-2 text-sm disabled:opacity-60"
+                    >
+                      {sendingEmail ? <SpinnerIcon /> : <EnvelopeIcon />}
+                      {sendingEmail ? 'שולח...' : 'שלח לי במייל'}
+                    </button>
+                  )}
                 </>
               )}
-              {canDeleteGeneration(generation) && (
+              {isErrorState && onRecreate && (
+                <button
+                  type="button"
+                  onClick={() => onRecreate(generation)}
+                  className="btn-primary inline-flex items-center gap-2 text-sm"
+                >
+                  <RefreshIcon />
+                  צור מחדש
+                </button>
+              )}
+              {onDelete && canDeleteGeneration(generation) && (
                 <button
                   type="button"
                   onClick={() => onDelete(generation)}
@@ -170,10 +216,12 @@ export function GenerationDetailsModal({
             <section>
               <div className="mb-2 flex items-center justify-between gap-3">
                 <h3 className="font-semibold">Prompt</h3>
-                <CopyButton
-                  text={generation.prompt}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border px-2.5 py-1 text-xs text-gray-300 transition-colors hover:bg-surface"
-                />
+                {showCopyPrompt && (
+                  <CopyButton
+                    text={generation.prompt}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border px-2.5 py-1 text-xs text-gray-300 transition-colors hover:bg-surface"
+                  />
+                )}
               </div>
               <p className="rounded-lg bg-surface p-3 text-sm leading-6 text-gray-200 whitespace-pre-wrap">
                 {generation.prompt}

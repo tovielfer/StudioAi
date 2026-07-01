@@ -347,10 +347,16 @@ class ApiClient {
 
   getUserGenerations(
     userId: string,
-    params?: { type?: string; limit?: number; offset?: number },
+    params?: {
+      type?: string;
+      excludeStatus?: string;
+      limit?: number;
+      offset?: number;
+    },
   ) {
     const query = new URLSearchParams();
     if (params?.type) query.set('type', params.type);
+    if (params?.excludeStatus) query.set('excludeStatus', params.excludeStatus);
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.offset) query.set('offset', String(params.offset));
     const qs = query.toString();
