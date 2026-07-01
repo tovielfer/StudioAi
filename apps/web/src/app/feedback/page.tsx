@@ -16,6 +16,7 @@ const FEEDBACK_TYPE_LABELS: Record<FeedbackType, string> = {
   improvement: 'הארה / שיפור',
   shortcut: 'קיצור דרך',
   other: 'אחר',
+  email: 'אימייל',
 };
 
 const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, string> = {
