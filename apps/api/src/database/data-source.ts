@@ -5,6 +5,7 @@ import { User } from '../users/user.entity';
 import { Generation } from '../generations/generation.entity';
 import { CreditTransaction } from '../credits/credit-transaction.entity';
 import { FeedbackSubmission } from '../feedback/feedback-submission.entity';
+import { FeedbackMessage } from '../feedback/feedback-message.entity';
 import { AiPricingRule } from '../ai/ai-pricing-rule.entity';
 import { AiPricingRuleAuditLog } from '../ai/ai-pricing-rule-audit-log.entity';
 import { CreditPackage } from '../billing/credit-package.entity';
@@ -18,6 +19,7 @@ export default new DataSource({
     Generation,
     CreditTransaction,
     FeedbackSubmission,
+    FeedbackMessage,
     AiPricingRule,
     AiPricingRuleAuditLog,
     CreditPackage,

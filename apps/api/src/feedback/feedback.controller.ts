@@ -15,6 +15,7 @@ import {
 import { AdminGuard } from '../auth/admin.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
+import { ReplyFeedbackDto } from './dto/reply-feedback.dto';
 import { UpdateFeedbackDto } from './dto/update-feedback.dto';
 import { FeedbackService } from './feedback.service';
 
@@ -83,6 +84,21 @@ export class FeedbackController {
       limit: Math.min(Math.max(limit, 1), 100),
       offset: Math.max(offset, 0),
     });
+  }
+
+  @Get('admin/:id/messages')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  listMessages(@Param('id', ParseUUIDPipe) id: string) {
+    return this.feedbackService.listMessages(id);
+  }
+
+  @Post('admin/:id/reply')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  reply(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReplyFeedbackDto,
+  ) {
+    return this.feedbackService.replyAdmin(id, dto.message);
   }
 
   @Patch('admin/:id')

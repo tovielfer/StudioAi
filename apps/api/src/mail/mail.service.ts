@@ -88,6 +88,55 @@ export class MailService {
     return value.trim().replace(/^["']+|["']+$/g, '').trim();
   }
 
+  // Builds a thread-scoped reply address like
+  // `reply+<threadToken>@inbound.vookapix.com` when an inbound domain is
+  // configured. Returns null so callers can fall back to the default reply-to.
+  private buildThreadReplyTo(threadToken?: string | null): string | null {
+    const domainRaw = this.config.get<string>('MAIL_INBOUND_DOMAIN');
+    if (!domainRaw || !threadToken) return null;
+    const domain = this.sanitizeFrom(domainRaw).replace(/^@+/, '');
+    return `reply+${threadToken}@${domain}`;
+  }
+
+  // Retrieves the full content of an inbound email that Resend received. The
+  // `email.received` webhook only carries metadata, so the body/headers must
+  // be fetched separately via the Receiving API using the email id.
+  async fetchReceivedEmail(emailId: string): Promise<{
+    from?: string;
+    to?: string[];
+    subject?: string;
+    text?: string;
+    html?: string;
+    headers?: Record<string, string> | { name: string; value: string }[];
+  }> {
+    const apiKey =
+      this.config.get<string>('RESEND_API_KEY') ??
+      this.config.get<string>('SMTP_PASS');
+    if (!apiKey) {
+      throw new Error('Mail is not configured: missing RESEND_API_KEY');
+    }
+
+    const response = await fetch(
+      `https://api.resend.com/emails/received/${emailId}`,
+      { headers: { Authorization: `Bearer ${apiKey}` } },
+    );
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      throw new Error(
+        `Failed to retrieve received email ${emailId} (${response.status}): ${detail}`,
+      );
+    }
+
+    return (await response.json()) as {
+      from?: string;
+      to?: string[];
+      subject?: string;
+      text?: string;
+      html?: string;
+    };
+  }
+
   async sendGenerationImage({
     to,
     generation,
@@ -183,13 +232,18 @@ export class MailService {
     feedbackTitle,
     feedbackMessage,
     adminReply,
+    threadToken,
   }: {
     to: string;
     feedbackTitle: string;
     feedbackMessage: string;
     adminReply: string;
+    threadToken?: string | null;
   }): Promise<void> {
-    const { resend, from, replyTo } = this.getClient();
+    const { resend, from, replyTo: defaultReplyTo } = this.getClient();
+    // Prefer a thread-scoped reply address so the recipient's reply comes back
+    // into this exact conversation via the inbound webhook.
+    const replyTo = this.buildThreadReplyTo(threadToken) ?? defaultReplyTo;
 
     const html = `
       <div style="background-color: #0f0f13; padding: 0; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">

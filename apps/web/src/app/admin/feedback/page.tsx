@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AdminGuard } from '@/components/AdminGuard';
 import {
   api,
+  FeedbackMessage,
   FeedbackStatus,
   FeedbackSubmission,
   FeedbackType,
@@ -18,6 +19,7 @@ const FEEDBACK_TYPE_LABELS: Record<FeedbackType, string> = {
   improvement: 'הארה / שיפור',
   shortcut: 'קיצור דרך',
   other: 'אחר',
+  email: 'מייל',
 };
 
 const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, string> = {
@@ -53,10 +55,20 @@ function AdminFeedbackContent() {
   const [feedback, setFeedback] = useState<FeedbackSubmission[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [draftReplies, setDraftReplies] = useState<Record<string, string>>({});
-  const [draftStatuses, setDraftStatuses] = useState<Record<string, FeedbackStatus>>({});
   const [message, setMessage] = useState<string | null>(null);
+
+  const [draftReplies, setDraftReplies] = useState<Record<string, string>>({});
+  const [draftStatuses, setDraftStatuses] = useState<
+    Record<string, FeedbackStatus>
+  >({});
+  const [replyingId, setReplyingId] = useState<string | null>(null);
+  const [savingStatusId, setSavingStatusId] = useState<string | null>(null);
+
+  const [threads, setThreads] = useState<Record<string, FeedbackMessage[]>>({});
+  const [threadLoading, setThreadLoading] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const loadFeedback = useCallback(async () => {
     const res = await api.getAdminFeedback({ limit: PAGE_SIZE });
@@ -64,12 +76,6 @@ function AdminFeedbackContent() {
     setTotal(res.total);
     // Opening the admin inbox marks all inquiries as seen, clearing the badge.
     api.markAdminFeedbackRead().catch(() => {});
-    setDraftReplies(
-      res.items.reduce<Record<string, string>>((acc, item) => {
-        acc[item.id] = item.adminReply ?? '';
-        return acc;
-      }, {}),
-    );
     setDraftStatuses(
       res.items.reduce<Record<string, FeedbackStatus>>((acc, item) => {
         acc[item.id] = item.status;
@@ -85,31 +91,66 @@ function AdminFeedbackContent() {
       .finally(() => setLoading(false));
   }, [loadFeedback]);
 
-  async function saveFeedback(item: FeedbackSubmission) {
-    setSavingId(item.id);
+  const loadThread = useCallback(async (id: string) => {
+    setThreadLoading((current) => ({ ...current, [id]: true }));
+    try {
+      const res = await api.getAdminFeedbackMessages(id);
+      setThreads((current) => ({ ...current, [id]: res.items }));
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'טעינת השיחה נכשלה');
+    } finally {
+      setThreadLoading((current) => ({ ...current, [id]: false }));
+    }
+  }, []);
+
+  function toggleThread(item: FeedbackSubmission) {
+    const isOpen = expanded[item.id];
+    setExpanded((current) => ({ ...current, [item.id]: !isOpen }));
+    if (!isOpen && !threads[item.id]) {
+      void loadThread(item.id);
+    }
+  }
+
+  async function sendReply(item: FeedbackSubmission) {
+    const body = (draftReplies[item.id] ?? '').trim();
+    if (!body) return;
+
+    setReplyingId(item.id);
     setMessage(null);
     try {
-      const updated = await api.updateAdminFeedback(item.id, {
-        status: draftStatuses[item.id],
-        adminReply: draftReplies[item.id] ?? '',
-      });
+      const updated = await api.replyAdminFeedback(item.id, body);
       setFeedback((current) =>
-        current.map((feedbackItem) =>
-          feedbackItem.id === item.id
-            ? { ...feedbackItem, ...updated }
-            : feedbackItem,
-        ),
+        current.map((f) => (f.id === item.id ? { ...f, ...updated } : f)),
       );
       setDraftStatuses((current) => ({ ...current, [item.id]: updated.status }));
-      setDraftReplies((current) => ({
-        ...current,
-        [item.id]: updated.adminReply ?? '',
-      }));
-      setMessage('הפניה עודכנה בהצלחה.');
+      setDraftReplies((current) => ({ ...current, [item.id]: '' }));
+      // Ensure the thread is visible and refreshed with the new message.
+      setExpanded((current) => ({ ...current, [item.id]: true }));
+      await loadThread(item.id);
+      setMessage('התשובה נשלחה ונשמרה בשיחה.');
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'שמירת הפניה נכשלה');
+      setMessage(err instanceof Error ? err.message : 'שליחת התשובה נכשלה');
     } finally {
-      setSavingId(null);
+      setReplyingId(null);
+    }
+  }
+
+  async function saveStatus(item: FeedbackSubmission) {
+    const status = draftStatuses[item.id] ?? item.status;
+    if (status === item.status) return;
+
+    setSavingStatusId(item.id);
+    setMessage(null);
+    try {
+      const updated = await api.updateAdminFeedback(item.id, { status });
+      setFeedback((current) =>
+        current.map((f) => (f.id === item.id ? { ...f, ...updated } : f)),
+      );
+      setMessage('הסטטוס עודכן.');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'עדכון הסטטוס נכשל');
+    } finally {
+      setSavingStatusId(null);
     }
   }
 
@@ -117,7 +158,7 @@ function AdminFeedbackContent() {
     <AdminShell
       eyebrow="פידבק מהמשתמשים"
       title="פניות והערות"
-      description="כל הפניות, ההארות, ההערות וקיצורי הדרך שמשתמשים שלחו מתוך המערכת."
+      description="כל הפניות והמיילים הנכנסים, כולל שיחה מלאה הלוך ושוב ומענה ישירות מכאן."
     >
       <div className="space-y-6">
         {message && (
@@ -179,7 +220,7 @@ function AdminFeedbackContent() {
                       {item.userEmail ?? item.contactEmail ?? 'פנייה ציבורית'}
                     </span>
                     <span className="ms-auto text-xs text-gray-400">
-                      {formatDate(item.createdAt)}
+                      {formatDate(item.lastMessageAt ?? item.createdAt)}
                     </span>
                   </div>
 
@@ -192,16 +233,61 @@ function AdminFeedbackContent() {
                     <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700">
                       {item.message}
                     </p>
+
+                    <button
+                      type="button"
+                      onClick={() => toggleThread(item)}
+                      className="mt-3 text-xs font-medium text-brand-600 hover:text-brand-800"
+                    >
+                      {expanded[item.id] ? 'הסתרת השיחה' : 'הצגת השיחה המלאה'}
+                    </button>
                   </div>
 
-                  {item.adminReply && (
-                    <div className="border-s-2 border-green-500 bg-green-50/60 px-5 py-3">
-                      <p className="text-xs font-semibold text-green-700">
-                        התשובה ששמורה כעת
-                      </p>
-                      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-green-900">
-                        {item.adminReply}
-                      </p>
+                  {expanded[item.id] && (
+                    <div className="border-t border-gray-100 bg-white px-5 py-4">
+                      {threadLoading[item.id] ? (
+                        <div className="flex justify-center py-6">
+                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                        </div>
+                      ) : (threads[item.id]?.length ?? 0) === 0 ? (
+                        <p className="py-4 text-center text-sm text-gray-400">
+                          אין הודעות בשיחה.
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {threads[item.id]?.map((msg) => {
+                            const isOutbound = msg.direction === 'outbound';
+                            return (
+                              <div
+                                key={msg.id}
+                                className={`flex ${
+                                  isOutbound ? 'justify-start' : 'justify-end'
+                                }`}
+                              >
+                                <div
+                                  className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-6 ${
+                                    isOutbound
+                                      ? 'bg-brand-600 text-white'
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}
+                                >
+                                  <div
+                                    className={`mb-0.5 text-[11px] ${
+                                      isOutbound
+                                        ? 'text-brand-100'
+                                        : 'text-gray-400'
+                                    }`}
+                                  >
+                                    {isOutbound ? 'צוות vookaPix' : 'המשתמש'} ·{' '}
+                                    {formatDate(msg.createdAt)}
+                                  </div>
+                                  <p className="whitespace-pre-wrap">{msg.body}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -215,11 +301,7 @@ function AdminFeedbackContent() {
                         }))
                       }
                       className="admin-field min-h-20 resize-y"
-                      placeholder={
-                        item.adminReply
-                          ? 'עדכון התשובה...'
-                          : 'כתיבת תשובה שתוצג למשתמש...'
-                      }
+                      placeholder="כתיבת תשובה שתישלח במייל ותתווסף לשיחה..."
                     />
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                       <label className="flex items-center gap-2 text-sm text-gray-500">
@@ -240,14 +322,29 @@ function AdminFeedbackContent() {
                             </option>
                           ))}
                         </select>
+                        <button
+                          type="button"
+                          onClick={() => saveStatus(item)}
+                          disabled={
+                            savingStatusId === item.id ||
+                            (draftStatuses[item.id] ?? item.status) ===
+                              item.status
+                          }
+                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                        >
+                          {savingStatusId === item.id ? 'שומר...' : 'עדכון סטטוס'}
+                        </button>
                       </label>
                       <button
                         type="button"
-                        onClick={() => saveFeedback(item)}
-                        disabled={savingId === item.id}
+                        onClick={() => sendReply(item)}
+                        disabled={
+                          replyingId === item.id ||
+                          !(draftReplies[item.id] ?? '').trim()
+                        }
                         className="btn-primary whitespace-nowrap disabled:opacity-50"
                       >
-                        {savingId === item.id ? 'שומר...' : 'שליחת תשובה'}
+                        {replyingId === item.id ? 'שולח...' : 'שליחת תשובה'}
                       </button>
                     </div>
                   </div>

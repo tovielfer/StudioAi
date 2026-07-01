@@ -202,7 +202,8 @@ export type FeedbackType =
   | 'note'
   | 'improvement'
   | 'shortcut'
-  | 'other';
+  | 'other'
+  | 'email';
 
 export type FeedbackStatus = 'open' | 'in_progress' | 'answered' | 'closed';
 
@@ -219,6 +220,18 @@ export interface FeedbackSubmission {
   answeredAt: string | null;
   userReplyRead?: boolean;
   adminRead?: boolean;
+  createdAt: string;
+  lastMessageAt?: string | null;
+}
+
+export type FeedbackMessageDirection = 'inbound' | 'outbound';
+
+export interface FeedbackMessage {
+  id: string;
+  feedbackId: string;
+  direction: FeedbackMessageDirection;
+  authorType: 'user' | 'admin' | 'system';
+  body: string;
   createdAt: string;
 }
 
@@ -737,6 +750,19 @@ class ApiClient {
     return this.request<FeedbackSubmission>(`/feedback/admin/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+    });
+  }
+
+  getAdminFeedbackMessages(id: string) {
+    return this.request<{ items: FeedbackMessage[] }>(
+      `/feedback/admin/${id}/messages`,
+    );
+  }
+
+  replyAdminFeedback(id: string, message: string) {
+    return this.request<FeedbackSubmission>(`/feedback/admin/${id}/reply`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
     });
   }
 }

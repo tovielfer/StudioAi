@@ -6,7 +6,11 @@ import { AppModule } from './app.module';
 import { isSyncQueue } from './config/env.loader';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule.register());
+  const app = await NestFactory.create(AppModule.register(), {
+    // Preserve the raw request body so the inbound-email webhook can verify
+    // its Svix signature against the exact bytes Resend signed.
+    rawBody: true,
+  });
 
   const logger = new Logger('Bootstrap');
 
