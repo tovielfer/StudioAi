@@ -245,6 +245,14 @@ export class MailService {
     // into this exact conversation via the inbound webhook.
     const replyTo = this.buildThreadReplyTo(threadToken) ?? defaultReplyTo;
 
+    // Use FRONTEND_URL (the var actually set in env), matching auth.service.
+    // Without an absolute base, email clients turn "/feedback" into the invalid
+    // "http:///feedback" link. Strip any trailing slash to avoid "//feedback".
+    const frontendUrl = (
+      this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000'
+    ).replace(/\/+$/, '');
+    const feedbackUrl = `${frontendUrl}/feedback`;
+
     const html = `
       <div style="background-color: #0f0f13; padding: 0; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">
         <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px;">
@@ -260,7 +268,7 @@ export class MailService {
               ${this.escapeHtml(adminReply).replace(/\n/g, '<br>')}
             </div>
             <div style="border-top: 1px solid #2d2d3d; padding-top: 16px; margin-top: 8px;">
-              <p style="margin: 0; color: #6b7280; font-size: 13px;">תוכל לראות את כל הפניות שלך ב‑<a href="${this.config.get<string>('APP_URL') ?? ''}/feedback" style="color: #a78bfa; text-decoration: none;">אזור הפניות</a>.</p>
+              <p style="margin: 0; color: #6b7280; font-size: 13px;">תוכל לראות את כל הפניות שלך ב‑<a href="${feedbackUrl}" style="color: #a78bfa; text-decoration: none;">אזור הפניות</a>.</p>
             </div>
           </div>
           <p style="text-align: center; margin-top: 20px; color: #4b5563; font-size: 12px;">
