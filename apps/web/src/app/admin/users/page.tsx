@@ -94,6 +94,12 @@ function AdminUsersContent() {
     null,
   );
 
+  const [emailUser, setEmailUser] = useState<User | null>(null);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
   const usersRef = useRef<User[]>([]);
   usersRef.current = users;
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -322,6 +328,47 @@ function AdminUsersContent() {
     setTransactions([]);
     setTransactionsTotal(0);
     setTransactionsMessage(null);
+  }
+
+  function openEmail(user: User) {
+    setEmailUser(user);
+    setEmailSubject('');
+    setEmailBody('');
+    setEmailError(null);
+  }
+
+  function closeEmail() {
+    if (sendingEmail) return;
+    setEmailUser(null);
+    setEmailSubject('');
+    setEmailBody('');
+    setEmailError(null);
+  }
+
+  async function sendEmail(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!emailUser) return;
+    const subject = emailSubject.trim();
+    const body = emailBody.trim();
+    if (subject.length < 2 || body.length < 2) {
+      setEmailError('יש למלא נושא ותוכן להודעה');
+      return;
+    }
+
+    setSendingEmail(true);
+    setEmailError(null);
+    try {
+      await api.sendAdminUserEmail(emailUser.id, subject, body);
+      const label = emailUser.nickname || emailUser.email;
+      setEmailUser(null);
+      setEmailSubject('');
+      setEmailBody('');
+      setMessage(`המייל נשלח ל-${label} בהצלחה.`);
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : 'שליחת המייל נכשלה');
+    } finally {
+      setSendingEmail(false);
+    }
   }
 
   const creditAmountValue = parseCreditAmount(creditAmount);
@@ -616,6 +663,13 @@ function AdminUsersContent() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => openEmail(user)}
+                      className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 transition-colors hover:border-brand-300 hover:text-brand-700"
+                    >
+                      מייל
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => void toggleBlocked(user)}
                       disabled={savingBlockedId === user.id || user.role === 'admin'}
                       className={`rounded-md border px-2 py-1 text-xs transition-colors disabled:opacity-50 ${
@@ -753,6 +807,13 @@ function AdminUsersContent() {
                           </button>
                           <button
                             type="button"
+                            onClick={() => openEmail(user)}
+                            className="text-xs text-brand-600 hover:text-brand-800"
+                          >
+                            שליחת מייל
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => void toggleBlocked(user)}
                             disabled={
                               savingBlockedId === user.id || user.role === 'admin'
@@ -887,6 +948,93 @@ function AdminUsersContent() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {emailUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-start justify-between gap-4 border-b border-gray-100 p-5">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold text-gray-950">
+                    שליחת מייל
+                  </h3>
+                  <p className="mt-1 truncate text-sm text-gray-500">
+                    אל: {emailUser.nickname || emailUser.email} ·{' '}
+                    {emailUser.email}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeEmail}
+                  disabled={sendingEmail}
+                  className="rounded-full border border-gray-200 px-3 py-1 text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-800 disabled:opacity-50"
+                >
+                  סגירה
+                </button>
+              </div>
+
+              <form onSubmit={sendEmail} className="space-y-4 p-5">
+                {emailError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                    {emailError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    נושא
+                  </label>
+                  <input
+                    autoFocus
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    maxLength={150}
+                    className="admin-field"
+                    placeholder="נושא המייל"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    תוכן ההודעה
+                  </label>
+                  <textarea
+                    value={emailBody}
+                    onChange={(e) => setEmailBody(e.target.value)}
+                    maxLength={5000}
+                    rows={7}
+                    className="admin-field resize-y"
+                    placeholder="כתוב כאן את תוכן המייל..."
+                  />
+                  <p className="mt-1 text-xs text-gray-400">
+                    ההודעה תישלח בעיצוב של vookaPix. מעברי שורה נשמרים.
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeEmail}
+                    disabled={sendingEmail}
+                    className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    ביטול
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={
+                      sendingEmail ||
+                      emailSubject.trim().length < 2 ||
+                      emailBody.trim().length < 2
+                    }
+                    className="btn-primary disabled:opacity-50"
+                  >
+                    {sendingEmail ? 'שולח...' : 'שליחת מייל'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

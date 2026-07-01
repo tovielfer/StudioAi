@@ -234,6 +234,60 @@ export class MailService {
     this.logger.log(`Sent feedback reply email to ${to}`);
   }
 
+  // A general-purpose branded email an admin can send to a specific user from
+  // the admin area. The message is plain text entered by the admin; we escape
+  // it and preserve line breaks so it renders safely inside the HTML template.
+  async sendCustomEmail({
+    to,
+    subject,
+    message,
+  }: {
+    to: string;
+    subject: string;
+    message: string;
+  }): Promise<void> {
+    const { resend, from, replyTo } = this.getClient();
+
+    const html = `
+      <div style="background-color: #0f0f13; padding: 0; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">
+        <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px;">
+          <div dir="rtl" style="text-align: right; margin-bottom: 28px;">
+            <span style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">vooka</span><span style="font-size: 22px; font-weight: 700; color: #a78bfa;">Pix</span>
+          </div>
+          <div dir="rtl" style="background: #1a1a24; border: 1px solid #2d2d3d; border-radius: 16px; padding: 28px 24px; text-align: right; line-height: 1.7; color: #e5e7eb;">
+            <h2 style="margin: 0 0 16px; font-size: 20px; color: #ffffff;">${this.escapeHtml(subject)}</h2>
+            <div style="color: #d1d5db; font-size: 15px;">
+              ${this.escapeHtml(message).replace(/\n/g, '<br>')}
+            </div>
+            <div style="border-top: 1px solid #2d2d3d; padding-top: 16px; margin-top: 20px;">
+              <p style="margin: 0; color: #6b7280; font-size: 13px;">בברכה, צוות <strong style="color: #a78bfa;">vookaPix</strong> 🙏</p>
+            </div>
+          </div>
+          <p style="text-align: center; margin-top: 20px; color: #4b5563; font-size: 12px;">
+            © ${new Date().getFullYear()} vookaPix · כל הזכויות שמורות
+          </p>
+        </div>
+      </div>
+    `;
+
+    const text = `${subject}\n\n${message}\n\nבברכה, צוות vookaPix`;
+
+    const { error } = await resend.emails.send({
+      from,
+      to,
+      ...(replyTo ? { replyTo } : {}),
+      subject,
+      text,
+      html,
+    });
+
+    if (error) {
+      throw new Error(`Failed to send custom email: ${error.message}`);
+    }
+
+    this.logger.log(`Sent custom email to ${to}`);
+  }
+
   private escapeHtml(value: string): string {
     return value
       .replace(/&/g, '&amp;')

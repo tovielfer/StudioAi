@@ -513,6 +513,16 @@ class ApiClient {
     });
   }
 
+  sendAdminUserEmail(userId: string, subject: string, message: string) {
+    return this.request<{ success: boolean }>(
+      `/admin/users/${userId}/send-email`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ subject, message }),
+      },
+    );
+  }
+
   updateAdminUser(
     userId: string,
     data: { nickname?: string | null; isBlocked?: boolean },

@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GenerationStatus } from '../common/constants';
 import { AdminService } from './admin.service';
 import { AddUserCreditsDto } from './dto/add-user-credits.dto';
+import { SendUserEmailDto } from './dto/send-user-email.dto';
 import { UpdatePricingRuleDto } from './dto/update-pricing-rule.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -182,5 +183,13 @@ export class AdminController {
     @Body() dto: AddUserCreditsDto,
   ) {
     return this.adminService.addCredits(id, dto.amount, dto.reason);
+  }
+
+  @Post('users/:id/send-email')
+  sendUserEmail(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SendUserEmailDto,
+  ) {
+    return this.adminService.sendUserEmail(id, dto.subject, dto.message);
   }
 }

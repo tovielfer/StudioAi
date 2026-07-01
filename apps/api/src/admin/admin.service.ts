@@ -256,6 +256,22 @@ export class AdminService {
     };
   }
 
+  // Sends a one-off branded email to a specific user from the admin area.
+  async sendUserEmail(userId: string, subject: string, message: string) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    await this.mailService.sendCustomEmail({
+      to: user.email,
+      subject: subject.trim(),
+      message: message.trim(),
+    });
+
+    return { success: true };
+  }
+
   async listCreditTransactions(params: {
     search?: string;
     userId?: string;
