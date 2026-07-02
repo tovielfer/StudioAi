@@ -56,6 +56,14 @@ export function translateError(
   }
 
   if (
+    message.includes('This operation was aborted') ||
+    message.includes('The operation was aborted') ||
+    message.includes('AbortError')
+  ) {
+    return 'תם הזמן הקצוב להורדת תמונת ההשראה. ייתכן שהחיבור איטי או שהתמונה גדולה — נסה שוב, ואם התקלה חוזרת כדאי להעלות תמונה קטנה יותר.';
+  }
+
+  if (
     message.includes('Google Gemini returned text instead of image') ||
     message.includes('Google Gemini returned no image') ||
     message.includes('Google Gemini finished without image')

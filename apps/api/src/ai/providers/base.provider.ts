@@ -31,7 +31,12 @@ export abstract class BaseImageProvider {
     return params.referenceImages?.length ? params.referenceImages : [];
   }
 
-  private static readonly REFERENCE_IMAGE_TIMEOUT_MS = 10_000;
+  // Per-attempt download timeout. Under a filtering proxy (NetFree) or slow
+  // storage the fetch can stall; 30s leaves room before we abort and retry.
+  private static readonly REFERENCE_IMAGE_TIMEOUT_MS = 30_000;
+  // Extra download attempts after the first, for transient timeouts/network
+  // blips — so a slow proxy round-trip doesn't fail the whole generation.
+  private static readonly REFERENCE_IMAGE_MAX_RETRIES = 2;
   // Google caps inline image data at 7MB; keep providers aligned with that.
   private static readonly REFERENCE_IMAGE_MAX_BYTES = 7 * 1024 * 1024;
 
@@ -46,40 +51,80 @@ export abstract class BaseImageProvider {
       throw new Error(`Unsupported reference image protocol: ${parsed.protocol}`);
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      BaseImageProvider.REFERENCE_IMAGE_TIMEOUT_MS,
-    );
-    try {
-      const response = await fetch(url, { signal: controller.signal });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch reference image: ${response.statusText}`);
-      }
-      const buffer = await response.arrayBuffer();
-      if (buffer.byteLength > BaseImageProvider.REFERENCE_IMAGE_MAX_BYTES) {
-        throw new Error('Reference image exceeds maximum allowed size');
-      }
-      const rawHeader = response.headers.get('content-type') ?? '';
-      const firstBytes = Array.from(new Uint8Array(buffer).slice(0, 4))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join(' ');
-      // Trust the actual bytes over the header/extension: files are often stored
-      // with a mismatched extension/content-type (e.g. a JPEG saved as .png),
-      // which makes providers reject them with "invalid image file".
-      const sniffed = this.detectImageContentType(buffer);
-      const { data: normalized, contentType: normalizedContentType } =
-        await this.normalizeReferenceImage(buffer);
-      const normalizedBytes = new Uint8Array(normalized);
-      const blob = new Blob([normalizedBytes], { type: normalizedContentType });
-      const filename = this.filenameFromContentType(normalizedContentType);
-      this.baseLogger.log(
-        `fetched ref: bytes=${buffer.byteLength}, normalized-bytes=${normalized.byteLength}, header-content-type="${rawHeader}", magic=[${firstBytes}], sniffed=${sniffed ?? 'null'}, final-content-type="${normalizedContentType}", filename="${filename}" (url=${url})`,
-      );
-      return { blob, filename };
-    } finally {
-      clearTimeout(timeout);
+    const { buffer, rawHeader } = await this.downloadReferenceImage(url);
+    if (buffer.byteLength > BaseImageProvider.REFERENCE_IMAGE_MAX_BYTES) {
+      throw new Error('Reference image exceeds maximum allowed size');
     }
+    const firstBytes = Array.from(new Uint8Array(buffer).slice(0, 4))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join(' ');
+    // Trust the actual bytes over the header/extension: files are often stored
+    // with a mismatched extension/content-type (e.g. a JPEG saved as .png),
+    // which makes providers reject them with "invalid image file".
+    const sniffed = this.detectImageContentType(buffer);
+    const { data: normalized, contentType: normalizedContentType } =
+      await this.normalizeReferenceImage(buffer);
+    const normalizedBytes = new Uint8Array(normalized);
+    const blob = new Blob([normalizedBytes], { type: normalizedContentType });
+    const filename = this.filenameFromContentType(normalizedContentType);
+    this.baseLogger.log(
+      `fetched ref: bytes=${buffer.byteLength}, normalized-bytes=${normalized.byteLength}, header-content-type="${rawHeader}", magic=[${firstBytes}], sniffed=${sniffed ?? 'null'}, final-content-type="${normalizedContentType}", filename="${filename}" (url=${url})`,
+    );
+    return { blob, filename };
+  }
+
+  // Downloads the reference image with a per-attempt timeout and retries the
+  // transient failures (abort/timeout/network) that otherwise surface as
+  // "This operation was aborted" and fail an entire generation. Definitive HTTP
+  // errors (e.g. 404) are not retried.
+  private async downloadReferenceImage(
+    url: string,
+  ): Promise<{ buffer: ArrayBuffer; rawHeader: string }> {
+    const maxRetries = BaseImageProvider.REFERENCE_IMAGE_MAX_RETRIES;
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(
+        () => controller.abort(),
+        BaseImageProvider.REFERENCE_IMAGE_TIMEOUT_MS,
+      );
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`Failed to fetch reference image: ${response.statusText}`);
+        }
+        const buffer = await response.arrayBuffer();
+        const rawHeader = response.headers.get('content-type') ?? '';
+        return { buffer, rawHeader };
+      } catch (error) {
+        lastError = error;
+        if (!this.isRetryableFetchError(error) || attempt === maxRetries) break;
+        this.baseLogger.warn(
+          `reference image download attempt ${attempt + 1} failed, retrying: ${error instanceof Error ? error.message : String(error)} (url=${url})`,
+        );
+        await this.delay(500 * (attempt + 1));
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
+  private isRetryableFetchError(error: unknown): boolean {
+    if (!(error instanceof Error)) return false;
+    return (
+      error.name === 'AbortError' ||
+      /aborted/i.test(error.message) ||
+      /fetch failed/i.test(error.message) ||
+      /network/i.test(error.message) ||
+      /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN/i.test(error.message)
+    );
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // Normalize a reference image to a format/size every provider accepts while

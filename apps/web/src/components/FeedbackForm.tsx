@@ -166,7 +166,7 @@ export function FeedbackForm({
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            className="w-full resize-y bg-transparent px-4 py-3 text-sm leading-6 text-gray-100 placeholder:text-gray-500 focus:outline-none min-h-24"
+            className="w-full resize-y overscroll-contain bg-transparent px-4 py-3 text-sm leading-6 text-gray-100 placeholder:text-gray-500 focus:outline-none min-h-40"
             maxLength={4000}
             placeholder="כתבו כאן הודעה, רעיון, הערה או כל דבר שתרצו..."
             required
