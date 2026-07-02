@@ -200,6 +200,56 @@ export class FeedbackService {
     return { items };
   }
 
+  // Same as listMessages but scoped to the owning user so people can only read
+  // their own conversations.
+  async listMessagesForUser(feedbackId: string, userId: string) {
+    const feedback = await this.feedbackRepo.findOne({
+      where: { id: feedbackId },
+    });
+    if (!feedback || feedback.userId !== userId) {
+      throw new NotFoundException('Feedback not found');
+    }
+
+    const items = await this.messageRepo.find({
+      where: { feedbackId },
+      order: { createdAt: 'ASC' },
+    });
+
+    return { items };
+  }
+
+  // A user replies to their own conversation: append an inbound message and
+  // re-flag the thread as unread for the admin so it resurfaces in the inbox.
+  async replyUser(feedbackId: string, userId: string, reply: string) {
+    const body = reply.trim();
+    if (!body) {
+      throw new BadRequestException('Reply message is required');
+    }
+
+    const item = await this.feedbackRepo.findOne({
+      where: { id: feedbackId },
+    });
+    if (!item || item.userId !== userId) {
+      throw new NotFoundException('Feedback not found');
+    }
+
+    await this.appendMessage(item, {
+      direction: FeedbackMessageDirection.INBOUND,
+      authorType: FeedbackMessageAuthorType.USER,
+      body,
+    });
+
+    // A follow-up from the user reopens the conversation for the admin.
+    item.adminRead = false;
+    if (
+      item.status === FeedbackStatus.CLOSED ||
+      item.status === FeedbackStatus.ANSWERED
+    ) {
+      item.status = FeedbackStatus.OPEN;
+    }
+    return this.feedbackRepo.save(item);
+  }
+
   // Admin sends a reply: append an outbound message, update the submission's
   // status/flags, and email the recipient with a thread-scoped reply-to so
   // their response comes back into this same conversation.

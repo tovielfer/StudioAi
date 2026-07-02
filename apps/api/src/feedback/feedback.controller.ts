@@ -74,6 +74,25 @@ export class FeedbackController {
     });
   }
 
+  @Get(':id/messages')
+  @UseGuards(JwtAuthGuard)
+  listMyMessages(
+    @Req() req: { user: { id: string } },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.feedbackService.listMessagesForUser(id, req.user.id);
+  }
+
+  @Post(':id/reply')
+  @UseGuards(JwtAuthGuard)
+  replyMine(
+    @Req() req: { user: { id: string } },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReplyFeedbackDto,
+  ) {
+    return this.feedbackService.replyUser(id, req.user.id, dto.message);
+  }
+
   @Get('admin')
   @UseGuards(JwtAuthGuard, AdminGuard)
   listAdmin(

@@ -280,10 +280,6 @@ export class FalProvider extends BaseImageProvider {
     );
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
   private resolveEndpoint(model?: string): string {
     const defaults: Record<string, string> = {
       'fal-flux': 'https://fal.run/fal-ai/flux/schnell',

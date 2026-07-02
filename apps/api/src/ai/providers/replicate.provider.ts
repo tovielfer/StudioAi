@@ -178,8 +178,4 @@ export class ReplicateProvider extends BaseImageProvider {
 
     return response.json() as Promise<T>;
   }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
 }

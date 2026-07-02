@@ -713,6 +713,19 @@ class ApiClient {
     );
   }
 
+  getMyFeedbackMessages(id: string) {
+    return this.request<{ items: FeedbackMessage[] }>(
+      `/feedback/${id}/messages`,
+    );
+  }
+
+  replyMyFeedback(id: string, message: string) {
+    return this.request<FeedbackSubmission>(`/feedback/${id}/reply`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+  }
+
   getMyFeedbackUnreadCount() {
     return this.request<{ unread: number }>('/feedback/unread-count');
   }
