@@ -154,7 +154,9 @@ export class FalProvider extends BaseImageProvider {
         return this.fetchJson<FalGenerationResponse>(responseUrl, key);
       }
       if (status.status === 'FAILED' || status.status === 'CANCELLED') {
-        throw new Error(status.error ?? `Fal.ai queue ${status.status.toLowerCase()}`);
+        throw this.toProviderError(
+          status.error ?? `Fal.ai queue ${status.status.toLowerCase()}`,
+        );
       }
       await this.delay(5000);
     }
@@ -259,7 +261,23 @@ export class FalProvider extends BaseImageProvider {
       return new FalProviderError('FAL_INVALID_IMAGE_ASPECT_RATIO', raw);
     }
 
+    // fal's server-side NSFW/safety filter — e.g. "Async prediction failed:
+    // ModelError: The input or output was flagged as sensitive ... (E005)".
+    // It can't be disabled for these models, so surface a stable code the web
+    // can translate into an actionable message.
+    if (this.isContentBlockedError(raw)) {
+      return new FalProviderError('FAL_CONTENT_BLOCKED', raw);
+    }
+
     return new FalProviderError(`Fal.ai error: ${raw}`, raw);
+  }
+
+  private isContentBlockedError(raw: string): boolean {
+    return (
+      /flagged as sensitive/i.test(raw) ||
+      /\(E005\)/i.test(raw) ||
+      /\bNSFW\b/i.test(raw)
+    );
   }
 
   private delay(ms: number): Promise<void> {

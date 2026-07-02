@@ -48,6 +48,14 @@ export function translateError(
   }
 
   if (
+    message.includes('FAL_CONTENT_BLOCKED') ||
+    message.includes('flagged as sensitive') ||
+    message.includes('(E005)')
+  ) {
+    return 'התוכן נחסם על ידי מערכת הבטיחות של הספק (סומן כתוכן רגיש). נסה לנסח מחדש את התיאור, להסיר פרטים שעלולים להיחסם, או להחליף את תמונת ההשראה, ונסה שוב.';
+  }
+
+  if (
     message.includes('Google Gemini returned text instead of image') ||
     message.includes('Google Gemini returned no image') ||
     message.includes('Google Gemini finished without image')
