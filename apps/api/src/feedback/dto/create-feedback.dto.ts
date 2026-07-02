@@ -12,10 +12,10 @@ export class CreateFeedbackDto {
   @IsEnum(FeedbackType)
   type: FeedbackType;
 
-  @IsOptional()
   @IsString()
+  @MinLength(2)
   @MaxLength(120)
-  title?: string;
+  title: string;
 
   @IsString()
   @MinLength(3)

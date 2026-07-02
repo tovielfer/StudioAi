@@ -28,6 +28,7 @@ export function FeedbackForm({
 
   async function submitFeedback(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!title.trim()) return;
     if (!message.trim()) return;
     if (publicMode && !contactEmail.trim()) return;
     setSaving(true);
@@ -36,7 +37,7 @@ export function FeedbackForm({
     try {
       const payload = {
         type,
-        title: title.trim() || undefined,
+        title: title.trim(),
         message,
       };
       if (publicMode) {
@@ -129,6 +130,7 @@ export function FeedbackForm({
       <div>
         <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-300">
           נושא
+          <span className="text-xs font-normal text-red-400">*</span>
         </label>
         <input
           value={title}
@@ -136,6 +138,7 @@ export function FeedbackForm({
           className="w-full rounded-xl border border-surface-border bg-surface px-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:border-brand-500/60 focus:outline-none transition-colors"
           maxLength={120}
           placeholder="כותרת קצרה לפניה..."
+          required
         />
       </div>
 
@@ -178,7 +181,10 @@ export function FeedbackForm({
             <button
               type="submit"
               disabled={
-                saving || !message.trim() || (publicMode && !contactEmail.trim())
+                saving ||
+                !title.trim() ||
+                !message.trim() ||
+                (publicMode && !contactEmail.trim())
               }
               className="rounded-full bg-brand-600 px-5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
