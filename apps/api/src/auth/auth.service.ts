@@ -79,6 +79,10 @@ export class AuthService {
       throw new UnauthorizedException('User is blocked');
     }
 
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('Please login with Google');
+    }
+
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
       throw new UnauthorizedException('Invalid credentials');
@@ -123,6 +127,53 @@ export class AuthService {
     await this.usersService.resetPassword(user.id, passwordHash);
 
     return { message: 'Password reset successfully' };
+  }
+
+  async validateGoogleUser(profile: {
+    email: string;
+    googleId: string;
+    avatarUrl?: string;
+  }) {
+    let user = await this.usersService.findByEmail(profile.email);
+
+    if (user) {
+      // If user exists but doesn't have googleId, we could link them, but for now let's just return the user
+      // Or we can update the googleId and avatarUrl if they are missing
+      if (!user.googleId) {
+        // We could update the user here, but TypeORM update is needed.
+        // For simplicity, we just return the user.
+      }
+      if (user.isBlocked) {
+        throw new UnauthorizedException('User is blocked');
+      }
+      return user;
+    }
+
+    // User doesn't exist, create a new one
+    user = await this.usersService.create(profile.email, null, {
+      googleId: profile.googleId,
+      avatarUrl: profile.avatarUrl,
+      emailVerified: true, // Google emails are already verified
+    });
+
+    return user;
+  }
+
+  async googleLogin(user: any) {
+    return this.buildAuthResponse(user);
+  }
+
+  async getMe(userId: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return {
+      id: user.id,
+      email: user.email,
+      credits: user.credits,
+      role: user.role,
+    };
   }
 
   private buildAuthResponse(user: {

@@ -17,6 +17,7 @@ interface AuthContextType {
   register: (email: string, password: string) => Promise<void>;
   logout: () => void;
   refreshCredits: () => Promise<void>;
+  setToken: (token: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -38,6 +39,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
   };
+
+  const setToken = useCallback(async (token: string) => {
+    localStorage.setItem('token', token);
+    try {
+      const userData = await api.getMe(token);
+      persist(token, userData);
+    } catch (err) {
+      console.error('Failed to fetch user with token', err);
+      localStorage.removeItem('token');
+    }
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await api.login(email, password);
@@ -67,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, register, logout, refreshCredits }}
+      value={{ user, loading, login, register, logout, refreshCredits, setToken }}
     >
       {children}
     </AuthContext.Provider>

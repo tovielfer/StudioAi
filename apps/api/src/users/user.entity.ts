@@ -24,8 +24,14 @@ export class User {
   @Column({ type: 'varchar', nullable: true, default: null })
   nickname: string | null;
 
-  @Column()
-  passwordHash: string;
+  @Column({ type: 'varchar', nullable: true, default: null })
+  passwordHash: string | null;
+
+  @Column({ type: 'varchar', nullable: true, default: null, unique: true })
+  googleId: string | null;
+
+  @Column({ type: 'varchar', nullable: true, default: null })
+  avatarUrl: string | null;
 
   @Column({ default: 150 })
   credits: number;

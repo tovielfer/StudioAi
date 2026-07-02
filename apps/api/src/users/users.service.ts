@@ -29,6 +29,10 @@ export class UsersService {
     });
   }
 
+  findByGoogleId(googleId: string) {
+    return this.usersRepo.findOne({ where: { googleId } });
+  }
+
   findById(id: string) {
     return this.usersRepo.findOne({ where: { id } });
   }
@@ -43,17 +47,25 @@ export class UsersService {
 
   async create(
     email: string,
-    passwordHash: string,
-    opts?: { emailVerificationToken?: string; emailVerificationExpiry?: Date },
+    passwordHash: string | null,
+    opts?: {
+      emailVerificationToken?: string;
+      emailVerificationExpiry?: Date;
+      googleId?: string;
+      avatarUrl?: string;
+      emailVerified?: boolean;
+    },
   ) {
     const normalizedEmail = normalizeEmail(email);
     const user = this.usersRepo.create({
       email: normalizedEmail,
       passwordHash,
       credits: SIGNUP_BONUS_CREDITS,
-      emailVerified: false,
+      emailVerified: opts?.emailVerified ?? false,
       emailVerificationToken: opts?.emailVerificationToken ?? null,
       emailVerificationExpiry: opts?.emailVerificationExpiry ?? null,
+      googleId: opts?.googleId ?? null,
+      avatarUrl: opts?.avatarUrl ?? null,
     });
     const saved = await this.usersRepo.save(user);
 

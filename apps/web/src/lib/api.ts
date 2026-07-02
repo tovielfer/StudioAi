@@ -300,6 +300,14 @@ class ApiClient {
     });
   }
 
+  getMe(token?: string) {
+    const options: RequestInit = {};
+    if (token) {
+      options.headers = { Authorization: `Bearer ${token}` };
+    }
+    return this.request<User>('/auth/me', options);
+  }
+
   getCredits() {
     return this.request<{ credits: number }>('/credits');
   }

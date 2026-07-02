@@ -125,6 +125,28 @@ export default function LoginPage() {
             {loading ? 'מתחבר...' : 'התחברות'}
           </button>
         </form>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-surface-border"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-[#121212] text-gray-400">או</span>
+          </div>
+        </div>
+
+        <a
+          href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/google`}
+          className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-surface-border rounded-lg hover:bg-white/5 transition-colors text-sm font-medium"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.56 12.25C22.56 11.47 22.49 10.72 22.36 10H12V14.26H17.92C17.66 15.63 16.88 16.8 15.71 17.58V20.34H19.28C21.01 18.75 22.56 15.73 22.56 12.25Z" fill="#4285F4"/>
+            <path d="M12 23C14.97 23 17.16 22.02 18.78 20.65L15.21 17.89C14.33 18.48 13.26 18.82 12 18.82C9.56 18.82 7.5 17.17 6.71 14.95H3.03V17.81C4.68 21.09 7.94 23 12 23Z" fill="#34A853"/>
+            <path d="M6.71 14.95C6.51 14.36 6.4 13.74 6.4 13.1C6.4 12.46 6.51 11.84 6.71 11.25V8.39H3.03C2.37 9.71 2 11.36 2 13.1C2 14.84 2.37 16.49 3.03 17.81L6.71 14.95Z" fill="#FBBC05"/>
+            <path d="M12 7.38C13.62 7.38 15.06 7.94 16.2 9.03L19.36 5.87C17.16 3.82 14.97 2.8 12 2.8C7.94 2.8 4.68 4.91 3.03 8.09L6.71 10.95C7.5 8.73 9.56 7.38 12 7.38Z" fill="#EA4335"/>
+          </svg>
+          התחברות עם Google
+        </a>
       </div>
     </div>
   );
