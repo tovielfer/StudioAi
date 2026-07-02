@@ -45,6 +45,21 @@ const FEEDBACK_STATUS_COLORS: Record<FeedbackStatus, string> = {
   closed: 'bg-gray-100 text-gray-600',
 };
 
+// Soft full-background tints so a submission's status is readable at a glance.
+const FEEDBACK_STATUS_BG: Record<FeedbackStatus, string> = {
+  open: 'bg-amber-50 border-amber-200',
+  in_progress: 'bg-blue-50 border-blue-200',
+  answered: 'bg-green-50 border-green-200',
+  closed: 'bg-gray-50 border-gray-200',
+};
+
+const FEEDBACK_STATUS_ROW_BG: Record<FeedbackStatus, string> = {
+  open: 'bg-amber-50/60 hover:bg-amber-100/70',
+  in_progress: 'bg-blue-50/60 hover:bg-blue-100/70',
+  answered: 'bg-green-50/50 hover:bg-green-100/60',
+  closed: 'bg-gray-50 hover:bg-gray-100/70',
+};
+
 const FEEDBACK_STATUSES: FeedbackStatus[] = [
   'open',
   'in_progress',
@@ -314,10 +329,10 @@ function AdminFeedbackContent() {
                     key={item.id}
                     type="button"
                     onClick={() => openDetail(item)}
-                    className={`flex h-full flex-col rounded-2xl border bg-white p-4 text-start transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                    className={`flex h-full flex-col rounded-2xl border p-4 text-start transition-all hover:-translate-y-0.5 hover:shadow-md ${
                       unread
-                        ? 'border-red-300 shadow-[0_0_0_3px_rgba(254,202,202,0.55)]'
-                        : 'border-gray-200 shadow-sm'
+                        ? 'border-red-300 bg-red-50 shadow-[0_0_0_3px_rgba(254,202,202,0.55)]'
+                        : `${FEEDBACK_STATUS_BG[item.status] ?? 'border-gray-200 bg-white'} shadow-sm`
                     }`}
                   >
                     <div className="mb-2 flex flex-wrap items-center gap-1.5">
@@ -379,8 +394,11 @@ function AdminFeedbackContent() {
                       <tr
                         key={item.id}
                         onClick={() => openDetail(item)}
-                        className={`cursor-pointer transition-colors hover:bg-brand-50/40 ${
-                          unread ? 'bg-red-50/50' : ''
+                        className={`cursor-pointer transition-colors ${
+                          unread
+                            ? 'bg-red-50 hover:bg-red-100/70'
+                            : (FEEDBACK_STATUS_ROW_BG[item.status] ??
+                              'hover:bg-brand-50/40')
                         }`}
                       >
                         <td className="px-4 py-3">
