@@ -175,9 +175,9 @@ function AdminGenerationsContent() {
                     <th className="text-right py-3 pe-4">עלות טוקנים</th>
                     <th className="text-right py-3 pe-4">עלות בפועל ($)</th>
                     <th className="text-right py-3 pe-4">tokensUsed</th>
-                    <th className="text-right py-3 pe-4">גודל</th>
+                    <th className="text-right py-3 pe-4">יחס תמונה</th>
                     <th className="text-right py-3 pe-4">רזולוציה</th>
-                    <th className="text-right py-3 pe-4">איכות</th>
+                    <th className="text-right py-3 pe-4">איכות יצירה</th>
                     <th className="text-right py-3 pe-4">תמונת מקור</th>
                     <th className="text-right py-3 pe-4">תוצאה</th>
                     <th className="text-right py-3">נוצר</th>

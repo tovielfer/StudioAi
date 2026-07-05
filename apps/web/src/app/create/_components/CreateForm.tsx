@@ -298,7 +298,7 @@ export function CreateForm({
         <div className="flex flex-nowrap gap-3 lg:shrink-0">
           {selectedModel.sizes.length > 1 && (
             <div className="flex-1 min-w-0">
-              <label className="block text-sm text-gray-400 mb-1.5">יחס</label>
+              <label className="block text-sm text-gray-400 mb-1.5">יחס תמונה</label>
               <FancySelect
                 value={size}
                 onChange={setSize}
@@ -313,7 +313,7 @@ export function CreateForm({
           )}
           {selectedModel.resolutions.length > 1 && (
             <div className="flex-1 min-w-0">
-              <label className="block text-sm text-gray-400 mb-1.5">רזולציה</label>
+              <label className="block text-sm text-gray-400 mb-1.5">רזולוציה</label>
               <FancySelect
                 value={resolution}
                 onChange={setResolution}
@@ -327,7 +327,7 @@ export function CreateForm({
           )}
           {selectedModel.qualities.length > 1 && (
             <div className="flex-1 min-w-0">
-              <label className="block text-sm text-gray-400 mb-1.5">איכות</label>
+              <label className="block text-sm text-gray-400 mb-1.5">איכות יצירה</label>
               <FancySelect
                 value={quality}
                 onChange={setQuality}

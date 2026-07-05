@@ -93,9 +93,9 @@ export function AdminGenerationModal({
     ['סטטוס', displayStatus],
     ['ספק', generation.provider],
     ['מודל', generation.model],
-    ['גודל', generation.size],
+    ['יחס תמונה', generation.size],
     ['רזולוציה', generation.resolution ?? '—'],
-    ['איכות', generation.quality ?? '—'],
+    ['איכות יצירה', generation.quality ?? '—'],
     ['עלות טוקנים', generation.creditCost.toLocaleString('he-IL')],
     [
       'עלות בפועל ($)',

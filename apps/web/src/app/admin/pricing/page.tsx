@@ -560,7 +560,7 @@ function PricingCalculator({ rules }: { rules: AdminPricingRule[] }) {
           onChange={setModel}
           options={modelOptions}
         />
-        <SelectField label="יחס" value={size} onChange={setSize} options={sizeOptions} />
+        <SelectField label="יחס תמונה" value={size} onChange={setSize} options={sizeOptions} />
         <SelectField
           label="רזולוציה"
           value={resolution}
@@ -568,7 +568,7 @@ function PricingCalculator({ rules }: { rules: AdminPricingRule[] }) {
           options={resolutionOptions}
         />
         <SelectField
-          label="איכות"
+          label="איכות יצירה"
           value={quality}
           onChange={setQuality}
           options={qualityOptions}

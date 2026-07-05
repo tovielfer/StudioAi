@@ -308,7 +308,7 @@ function CostAnalysisContent() {
               }))}
             />
             <FilterSelect
-              label="איכות"
+              label="איכות יצירה"
               value={filters.quality}
               onChange={(value) => updateFilter('quality', value)}
               options={filterOptions.qualities.map((value) => ({
@@ -317,7 +317,7 @@ function CostAnalysisContent() {
               }))}
             />
             <FilterSelect
-              label="גודל"
+              label="יחס תמונה"
               value={filters.size}
               onChange={(value) => updateFilter('size', value)}
               options={filterOptions.sizes.map((value) => ({
@@ -374,8 +374,8 @@ function CostAnalysisContent() {
                     <th className="py-3 pe-3 text-right">סוג</th>
                     <th className="py-3 pe-3 text-right">ספק</th>
                     <th className="py-3 pe-3 text-right">מודל</th>
-                    <th className="py-3 pe-3 text-right">איכות</th>
-                    <th className="py-3 pe-3 text-right">גודל</th>
+                    <th className="py-3 pe-3 text-right">איכות יצירה</th>
+                    <th className="py-3 pe-3 text-right">יחס תמונה</th>
                     <th className="py-3 pe-3 text-right">רזולוציה</th>
                     <th className="py-3 pe-3 text-right">מקור</th>
                     <th className="py-3 pe-3 text-right">תמונות מקור</th>
