@@ -21,10 +21,19 @@ class OpenAIProviderError extends Error {
   constructor(
     message: string,
     readonly providerErrorRaw: string,
+    readonly status?: number,
+    readonly code?: string,
+    readonly type?: string,
+    readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = 'OpenAIProviderError';
   }
+}
+
+interface OpenAIReferenceImage {
+  blob: Blob;
+  filename: string;
 }
 
 // OpenAI Standard pricing, USD per 1M tokens.
@@ -39,6 +48,9 @@ const OPENAI_TOKEN_PRICES: Record<string, TokenPrices> = {
 
 export class OpenAIProvider extends BaseImageProvider {
   private readonly logger = new Logger(OpenAIProvider.name);
+  private static readonly MAX_TRANSIENT_RETRIES = 2;
+  private static readonly DEFAULT_RETRY_DELAY_MS = 2_000;
+  private static readonly MAX_RETRY_DELAY_MS = 20_000;
 
   private estimateCostUsd(model: string, usage?: ImageUsage): number {
     if (!usage) return 0;
@@ -84,20 +96,14 @@ export class OpenAIProvider extends BaseImageProvider {
     quality: string,
     refs: string[],
   ): Promise<GenerateImageResult> {
-    const form = new FormData();
-    form.append('model', model);
-    form.append('prompt', params.prompt);
-    form.append('size', size);
-    form.append('quality', quality);
-    form.append('n', '1');
-
     const imageKey = refs.length > 1 ? 'image[]' : 'image';
+    const images: OpenAIReferenceImage[] = [];
     for (const refUrl of refs) {
       const { blob, filename } = await this.fetchReferenceImage(refUrl);
       this.logger.log(
         `OpenAI edit() — appending ref as key="${imageKey}", filename="${filename}", blob.type="${blob.type}", blob.size=${blob.size} bytes (from ${refUrl})`,
       );
-      form.append(imageKey, blob, filename);
+      images.push({ blob, filename });
     }
 
     this.logger.log(
@@ -105,15 +111,23 @@ export class OpenAIProvider extends BaseImageProvider {
     );
 
     const key = this.config.get('OPENAI_API_KEY');
-    const response = await fetch('https://api.openai.com/v1/images/edits', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}` },
-      body: form,
-    });
+    const response = await this.fetchOpenAIWithRetry('images/edits', () => {
+      const form = new FormData();
+      form.append('model', model);
+      form.append('prompt', params.prompt);
+      form.append('size', size);
+      form.append('quality', quality);
+      form.append('n', '1');
+      for (const image of images) {
+        form.append(imageKey, image.blob, image.filename);
+      }
 
-    if (!response.ok) {
-      await this.throwOpenAIError(response);
-    }
+      return {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}` },
+        body: form,
+      };
+    });
 
     const data = (await response.json()) as {
       data?: { url?: string; b64_json?: string }[];
@@ -135,15 +149,11 @@ export class OpenAIProvider extends BaseImageProvider {
     quality: string,
   ): Promise<GenerateImageResult> {
     const key = this.config.get('OPENAI_API_KEY');
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
+    const response = await this.fetchOpenAIWithRetry('images/generations', () => ({
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model, prompt: params.prompt, size, quality, n: 1 }),
-    });
-
-    if (!response.ok) {
-      await this.throwOpenAIError(response);
-    }
+    }));
 
     const data = (await response.json()) as {
       data?: { url?: string; b64_json?: string }[];
@@ -185,7 +195,40 @@ export class OpenAIProvider extends BaseImageProvider {
     throw new Error('OpenAI returned no image');
   }
 
-  private async throwOpenAIError(response: Response): Promise<never> {
+  private async fetchOpenAIWithRetry(
+    path: string,
+    init: () => RequestInit,
+  ): Promise<Response> {
+    let lastError: OpenAIProviderError | null = null;
+
+    for (
+      let attempt = 0;
+      attempt <= OpenAIProvider.MAX_TRANSIENT_RETRIES;
+      attempt++
+    ) {
+      const response = await fetch(`https://api.openai.com/v1/${path}`, init());
+      if (response.ok) return response;
+
+      const error = await this.buildOpenAIError(response);
+      lastError = error;
+      if (
+        attempt === OpenAIProvider.MAX_TRANSIENT_RETRIES ||
+        !this.isRetryableOpenAIError(error)
+      ) {
+        throw this.toUserFacingOpenAIError(error);
+      }
+
+      const delayMs = this.retryDelayMs(error);
+      this.logger.warn(
+        `OpenAI ${path} attempt ${attempt + 1} failed with retryable ${error.status}; retrying in ${delayMs}ms`,
+      );
+      await this.delay(delayMs);
+    }
+
+    throw lastError ?? new OpenAIProviderError('OPENAI_TEMPORARY_OVERLOAD', '');
+  }
+
+  private async buildOpenAIError(response: Response): Promise<OpenAIProviderError> {
     const raw = await response.text();
     this.logger.warn(`OpenAI request failed (${response.status}): ${raw}`);
 
@@ -198,10 +241,16 @@ export class OpenAIProvider extends BaseImageProvider {
 
     const message = payload?.error?.message;
     const code = payload?.error?.code;
+    const type = payload?.error?.type;
+    const retryAfterMs = this.parseRetryAfterMs(response, message);
     if (this.isSafetyRejection(message, code)) {
-      throw new OpenAIProviderError(
+      return new OpenAIProviderError(
         this.formatSafetyRejectionCode(message, response),
         raw,
+        response.status,
+        code,
+        type,
+        retryAfterMs,
       );
     }
 
@@ -209,13 +258,68 @@ export class OpenAIProvider extends BaseImageProvider {
       code === 'invalid_image_file' ||
       message?.includes('Invalid image file or mode')
     ) {
-      throw new OpenAIProviderError(this.formatInvalidImageFileCode(message), raw);
+      return new OpenAIProviderError(
+        this.formatInvalidImageFileCode(message),
+        raw,
+        response.status,
+        code,
+        type,
+        retryAfterMs,
+      );
     }
 
-    throw new OpenAIProviderError(
+    return new OpenAIProviderError(
       message ? `OpenAI error: ${message}` : `OpenAI error: ${response.statusText}`,
       raw,
+      response.status,
+      code,
+      type,
+      retryAfterMs,
     );
+  }
+
+  private isRetryableOpenAIError(error: OpenAIProviderError): boolean {
+    if (error.code === 'insufficient_quota') return false;
+    return error.status === 429 || (error.status !== undefined && error.status >= 500);
+  }
+
+  private toUserFacingOpenAIError(error: OpenAIProviderError): OpenAIProviderError {
+    if (this.isRetryableOpenAIError(error)) {
+      return new OpenAIProviderError(
+        'OPENAI_TEMPORARY_OVERLOAD',
+        error.providerErrorRaw,
+        error.status,
+        error.code,
+        error.type,
+        error.retryAfterMs,
+      );
+    }
+    return error;
+  }
+
+  private retryDelayMs(error: OpenAIProviderError): number {
+    return Math.min(
+      error.retryAfterMs ?? OpenAIProvider.DEFAULT_RETRY_DELAY_MS,
+      OpenAIProvider.MAX_RETRY_DELAY_MS,
+    );
+  }
+
+  private parseRetryAfterMs(response: Response, message?: string): number | undefined {
+    const retryAfter = response.headers.get('retry-after');
+    if (retryAfter) {
+      const seconds = Number(retryAfter);
+      if (Number.isFinite(seconds)) return Math.max(seconds * 1_000, 0);
+
+      const dateMs = Date.parse(retryAfter);
+      if (Number.isFinite(dateMs)) return Math.max(dateMs - Date.now(), 0);
+    }
+
+    const secondsFromMessage = message?.match(/try again in\s+(\d+(?:\.\d+)?)s/i)?.[1];
+    if (secondsFromMessage) {
+      return Math.max(Number(secondsFromMessage) * 1_000, 0);
+    }
+
+    return undefined;
   }
 
   private isSafetyRejection(message?: string, code?: string): boolean {
