@@ -69,7 +69,12 @@ export function VideoPreview({
   const [blocked, setBlocked] = useState(false);
 
   if (blocked) {
-    return <NetfreeBlockedNotice url={src} variant={fallbackVariant} />;
+    return (
+      <>
+        <NetfreeBlockedNotice url={src} variant={fallbackVariant} />
+        {overlay}
+      </>
+    );
   }
 
   const video = (
