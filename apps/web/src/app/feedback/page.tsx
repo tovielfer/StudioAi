@@ -198,7 +198,7 @@ function FeedbackContent() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-gray-500 break-words line-clamp-3">
+                    <p className="mt-1 text-xs text-gray-500 break-words max-h-[3.6rem] overflow-y-auto scrollbar-hide">
                       {item.message}
                     </p>
                   </div>
