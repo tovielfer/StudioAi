@@ -187,22 +187,22 @@ function FeedbackContent() {
                       isNew ? 'animate-pulse bg-green-400' : 'bg-transparent'
                     }`}
                   />
-                  <div className="min-w-0 flex-1 py-1">
-                    <div className="flex items-start gap-2">
-                      <div className="font-semibold text-white break-words line-clamp-1 flex-1">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate font-semibold text-white">
                         {item.title || 'שיחה'}
-                      </div>
+                      </span>
                       {isNew && (
-                        <span className="shrink-0 rounded-full bg-green-500 px-2 py-0.5 text-[11px] font-semibold text-white mt-0.5">
+                        <span className="shrink-0 rounded-full bg-green-500 px-2 py-0.5 text-[11px] font-semibold text-white">
                           תשובה חדשה
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-gray-500 break-words line-clamp-2">
+                    <p className="mt-0.5 truncate text-xs text-gray-500">
                       {item.message}
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1 mt-1">
+                  <div className="flex shrink-0 flex-col items-end gap-1">
                     <span
                       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
                         FEEDBACK_STATUS_COLORS[item.status]
@@ -291,9 +291,9 @@ function ConversationModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start gap-3 border-b border-surface-border px-4 py-3">
-          <div className="min-w-0 flex-1 py-1">
-            <div className="font-semibold text-white break-words line-clamp-3">
+        <div className="flex items-center gap-3 border-b border-surface-border px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-semibold text-white">
               {item.title || 'שיחה'}
             </div>
             <span
@@ -375,11 +375,7 @@ function ConversationModal({
           <div className="flex items-end gap-2">
             <textarea
               value={replyDraft}
-              onChange={(e) => {
-                onReplyChange(e.target.value);
-                e.target.style.height = 'auto';
-                e.target.style.height = `${e.target.scrollHeight}px`;
-              }}
+              onChange={(e) => onReplyChange(e.target.value)}
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                   e.preventDefault();
@@ -387,7 +383,7 @@ function ConversationModal({
                 }
               }}
               rows={1}
-              className="min-h-10 max-h-[30vh] flex-1 resize-none overscroll-contain rounded-xl border border-surface-border bg-surface px-3 py-2 text-sm leading-6 text-gray-100 placeholder:text-gray-500 focus:border-brand-500/60 focus:outline-none scrollbar-hide"
+              className="min-h-10 max-h-40 flex-1 resize-y overscroll-contain rounded-xl border border-surface-border bg-surface px-3 py-2 text-sm leading-6 text-gray-100 placeholder:text-gray-500 focus:border-brand-500/60 focus:outline-none"
               placeholder="כתבו תשובה..."
               maxLength={4000}
             />

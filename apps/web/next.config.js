@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const withSerwist = require('@serwist/next').default;
 
 // Next.js only auto-loads env files from this app's folder, but this monorepo
 // keeps a single `.env` at the repo root (shared with the API). Load it here so
@@ -40,12 +41,9 @@ const nextConfig = {
   },
 };
 
-module.exports = async () => {
-  const { default: withSerwist } = await import('@serwist/next');
-  return withSerwist({
-    swSrc: 'src/app/sw.ts',
-    swDest: 'public/sw.js',
-    reloadOnOnline: true,
-    disable: process.env.NODE_ENV === 'development',
-  })(nextConfig);
-};
+module.exports = withSerwist({
+  swSrc: 'src/app/sw.ts',
+  swDest: 'public/sw.js',
+  reloadOnOnline: true,
+  disable: process.env.NODE_ENV === 'development',
+})(nextConfig);
