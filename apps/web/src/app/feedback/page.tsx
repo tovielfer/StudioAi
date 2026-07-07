@@ -198,11 +198,11 @@ function FeedbackContent() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-gray-500 break-words line-clamp-2">
+                    <p className="mt-1 text-xs text-gray-500 break-words line-clamp-3">
                       {item.message}
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
+                  <div className="flex shrink-0 flex-col items-end gap-1 mt-1">
                     <span
                       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
                         FEEDBACK_STATUS_COLORS[item.status]
@@ -293,7 +293,7 @@ function ConversationModal({
         {/* Header */}
         <div className="flex items-start gap-3 border-b border-surface-border px-4 py-3">
           <div className="min-w-0 flex-1 py-1">
-            <div className="font-semibold text-white break-words line-clamp-3">
+            <div className="font-semibold text-white break-words max-h-24 overflow-y-auto scrollbar-hide">
               {item.title || 'שיחה'}
             </div>
             <span
