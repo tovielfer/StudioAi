@@ -189,7 +189,7 @@ function FeedbackContent() {
                   />
                   <div className="min-w-0 flex-1 py-1">
                     <div className="flex items-start gap-2">
-                      <div className="font-semibold text-white break-words max-h-[3.6rem] overflow-y-auto scrollbar-hide flex-1">
+                      <div className="font-semibold text-white break-words line-clamp-1 flex-1">
                         {item.title || 'שיחה'}
                       </div>
                       {isNew && (
@@ -198,7 +198,7 @@ function FeedbackContent() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-gray-500 break-words max-h-[3.6rem] overflow-y-auto scrollbar-hide">
+                    <p className="mt-1 text-xs text-gray-500 break-words line-clamp-2">
                       {item.message}
                     </p>
                   </div>
@@ -293,7 +293,7 @@ function ConversationModal({
         {/* Header */}
         <div className="flex items-start gap-3 border-b border-surface-border px-4 py-3">
           <div className="min-w-0 flex-1 py-1">
-            <div className="font-semibold text-white break-words max-h-24 overflow-y-auto scrollbar-hide">
+            <div className="font-semibold text-white break-words line-clamp-3">
               {item.title || 'שיחה'}
             </div>
             <span
