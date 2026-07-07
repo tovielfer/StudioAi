@@ -375,7 +375,11 @@ function ConversationModal({
           <div className="flex items-end gap-2">
             <textarea
               value={replyDraft}
-              onChange={(e) => onReplyChange(e.target.value)}
+              onChange={(e) => {
+                onReplyChange(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = `${e.target.scrollHeight}px`;
+              }}
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                   e.preventDefault();
@@ -383,7 +387,7 @@ function ConversationModal({
                 }
               }}
               rows={1}
-              className="min-h-10 max-h-40 flex-1 resize-y overscroll-contain rounded-xl border border-surface-border bg-surface px-3 py-2 text-sm leading-6 text-gray-100 placeholder:text-gray-500 focus:border-brand-500/60 focus:outline-none"
+              className="min-h-10 max-h-[25vh] flex-1 resize-none overscroll-contain rounded-xl border border-surface-border bg-surface px-3 py-2 text-sm leading-6 text-gray-100 placeholder:text-gray-500 focus:border-brand-500/60 focus:outline-none"
               placeholder="כתבו תשובה..."
               maxLength={4000}
             />

@@ -168,8 +168,12 @@ export function FeedbackForm({
         <div className="rounded-xl border border-surface-border bg-surface focus-within:border-brand-500/60 transition-colors">
           <textarea
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            className="w-full resize-y overscroll-contain bg-transparent px-4 py-3 text-sm leading-6 text-gray-100 placeholder:text-gray-500 focus:outline-none min-h-40"
+            onChange={(e) => {
+              setMessage(e.target.value);
+              e.target.style.height = 'auto';
+              e.target.style.height = `${e.target.scrollHeight}px`;
+            }}
+            className="w-full resize-none overscroll-contain bg-transparent px-4 py-3 text-sm leading-6 text-gray-100 placeholder:text-gray-500 focus:outline-none min-h-40 max-h-[60vh]"
             maxLength={4000}
             placeholder="כתבו כאן הודעה, רעיון, הערה או כל דבר שתרצו..."
             required
