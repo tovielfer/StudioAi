@@ -189,7 +189,7 @@ function FeedbackContent() {
                   />
                   <div className="min-w-0 flex-1 py-1">
                     <div className="flex items-start gap-2">
-                      <div className="font-semibold text-white break-words line-clamp-2 flex-1">
+                      <div className="font-semibold text-white break-words max-h-[3.6rem] overflow-y-auto scrollbar-hide flex-1">
                         {item.title || 'שיחה'}
                       </div>
                       {isNew && (
