@@ -187,18 +187,18 @@ function FeedbackContent() {
                       isNew ? 'animate-pulse bg-green-400' : 'bg-transparent'
                     }`}
                   />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate font-semibold text-white">
+                  <div className="min-w-0 flex-1 py-1">
+                    <div className="flex items-start gap-2">
+                      <div className="font-semibold text-white break-words line-clamp-2 flex-1">
                         {item.title || 'שיחה'}
-                      </span>
+                      </div>
                       {isNew && (
-                        <span className="shrink-0 rounded-full bg-green-500 px-2 py-0.5 text-[11px] font-semibold text-white">
+                        <span className="shrink-0 rounded-full bg-green-500 px-2 py-0.5 text-[11px] font-semibold text-white mt-0.5">
                           תשובה חדשה
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500 break-words line-clamp-2">
                       {item.message}
                     </p>
                   </div>
@@ -291,9 +291,9 @@ function ConversationModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-surface-border px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-semibold text-white">
+        <div className="flex items-start gap-3 border-b border-surface-border px-4 py-3">
+          <div className="min-w-0 flex-1 py-1">
+            <div className="font-semibold text-white break-words line-clamp-3">
               {item.title || 'שיחה'}
             </div>
             <span
@@ -387,7 +387,7 @@ function ConversationModal({
                 }
               }}
               rows={1}
-              className="min-h-10 max-h-[25vh] flex-1 resize-none overscroll-contain rounded-xl border border-surface-border bg-surface px-3 py-2 text-sm leading-6 text-gray-100 placeholder:text-gray-500 focus:border-brand-500/60 focus:outline-none"
+              className="min-h-10 max-h-[30vh] flex-1 resize-none overscroll-contain rounded-xl border border-surface-border bg-surface px-3 py-2 text-sm leading-6 text-gray-100 placeholder:text-gray-500 focus:border-brand-500/60 focus:outline-none scrollbar-hide"
               placeholder="כתבו תשובה..."
               maxLength={4000}
             />
