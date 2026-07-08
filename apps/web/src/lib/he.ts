@@ -53,6 +53,7 @@ export function translateError(
 
   if (
     message.includes('FAL_CONTENT_BLOCKED') ||
+    message.includes('REPLICATE_CONTENT_BLOCKED') ||
     message.includes('flagged as sensitive') ||
     message.includes('(E005)')
   ) {

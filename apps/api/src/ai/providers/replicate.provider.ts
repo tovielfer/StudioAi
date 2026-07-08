@@ -112,9 +112,8 @@ export class ReplicateProvider extends BaseImageProvider {
     let prediction = submit;
     while (prediction.status !== 'succeeded') {
       if (prediction.status === 'failed' || prediction.status === 'canceled') {
-        throw new Error(
-          prediction.error ?? `Replicate prediction ${prediction.status}`,
-        );
+        const raw = prediction.error ?? `Replicate prediction ${prediction.status}`;
+        throw new Error(this.toUserError(raw));
       }
       if (Date.now() - startedAt >= timeoutMs) {
         throw new Error('Replicate video generation timed out');
@@ -129,6 +128,22 @@ export class ReplicateProvider extends BaseImageProvider {
     if (!videoUrl) throw new Error('Replicate returned no video');
 
     return { imageUrl: videoUrl, provider: AiProvider.REPLICATE };
+  }
+
+  // Maps raw Replicate/Seedance errors to stable codes the frontend can
+  // translate into actionable Hebrew messages.
+  private toUserError(raw: string): string {
+    if (
+      /nsfw/i.test(raw) ||
+      /content.{0,30}policy/i.test(raw) ||
+      /safety/i.test(raw) ||
+      /flagged/i.test(raw) ||
+      /ReadError/i.test(raw) ||
+      /Async prediction failed/i.test(raw)
+    ) {
+      return `REPLICATE_CONTENT_BLOCKED: ${raw}`;
+    }
+    return raw;
   }
 
   private resolveVideoModel(model: string): string {

@@ -276,7 +276,10 @@ export class FalProvider extends BaseImageProvider {
     return (
       /flagged as sensitive/i.test(raw) ||
       /\(E005\)/i.test(raw) ||
-      /\bNSFW\b/i.test(raw)
+      /\bNSFW\b/i.test(raw) ||
+      // Fal sometimes surfaces content filtering as a ReadError mid-stream
+      // (the generation is aborted before the output is fully written).
+      /Async prediction failed.*ReadError/i.test(raw)
     );
   }
 

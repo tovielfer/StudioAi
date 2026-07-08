@@ -180,6 +180,12 @@ export function GenerationCard({
   return (
     <div className={`card p-3 group ${isActive && isProcessing ? 'ring-2 ring-brand-500' : ''}`}>
       <div className="aspect-square bg-surface rounded-lg overflow-hidden mb-3 relative">
+        {sendingEmail && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 rounded-lg bg-black/60 backdrop-blur-sm">
+            <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-white">שולח במייל...</span>
+          </div>
+        )}
         {canUse ? (
           isVideo ? (
             <VideoPreview
