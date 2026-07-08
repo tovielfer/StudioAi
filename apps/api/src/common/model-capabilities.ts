@@ -90,6 +90,13 @@ export interface ModelCapability {
   durations?: AttrOption[];
   /** Whether the model can generate native audio (renders an on/off toggle). */
   supportsAudio?: boolean;
+  /**
+   * Whether image-to-video accepts an end/tail frame in addition to the start
+   * frame. Only some providers/tiers support it (e.g. Kling v3 and v2.1 pro),
+   * so the create-form hides the end-frame slot and the provider drops the end
+   * image for models where this is falsy.
+   */
+  supportsEndFrame?: boolean;
 }
 
 // Standard aspect ratios honoured by all Google image models
@@ -455,6 +462,7 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     resolutions: [],
     durations: KLING_V3_DURATIONS,
     supportsAudio: true,
+    supportsEndFrame: true,
     // Video is billed per second (see computeVideoSellUsd). fal cost: $0.084/s
     // silent, $0.126/s with audio. baseUsd is only the safety-net seed row.
     pricing: {
@@ -473,6 +481,7 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     resolutions: [],
     durations: KLING_V3_DURATIONS,
     supportsAudio: true,
+    supportsEndFrame: true,
     // fal cost: $0.112/s silent, $0.168/s with audio.
     pricing: {
       baseUsd: 0,
@@ -507,6 +516,8 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     resolutions: [],
     durations: KLING_V21_DURATIONS,
     supportsAudio: false,
+    // v2.1 pro is the only v2.1 tier that accepts an end/tail frame on fal.
+    supportsEndFrame: true,
     // fal cost: flat $0.09/s. Image-to-video only (requires a start image).
     pricing: {
       baseUsd: 0,
@@ -630,6 +641,11 @@ export function normalizeVideoDuration(
 /** Whether the model has native-audio support (renders/sends the audio flag). */
 export function modelSupportsAudio(modelId?: string | null): boolean {
   return Boolean(getModelCapability(modelId)?.supportsAudio);
+}
+
+/** Whether image-to-video accepts an end/tail frame in addition to the start. */
+export function modelSupportsEndFrame(modelId?: string | null): boolean {
+  return Boolean(getModelCapability(modelId)?.supportsEndFrame);
 }
 
 /**

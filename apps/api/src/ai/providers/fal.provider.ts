@@ -1,5 +1,8 @@
 import { AiProvider } from '../../common/constants';
-import { normalizeVideoDuration } from '../../common/model-capabilities';
+import {
+  modelSupportsEndFrame,
+  normalizeVideoDuration,
+} from '../../common/model-capabilities';
 import { GenerateImageParams, GenerateImageResult } from '../ai.types';
 import { BaseImageProvider } from './base.provider';
 
@@ -85,7 +88,9 @@ export class FalProvider extends BaseImageProvider {
   ): Promise<GenerateImageResult> {
     const refs = this.resolveReferenceImages(params);
     const startImage = refs[0];
-    const endImage = refs[1];
+    // Only forward an end/tail frame to models whose fal endpoint accepts one
+    // (Kling v3 + v2.1 pro). v2.1 standard/master reject/ignore the field.
+    const endImage = modelSupportsEndFrame(params.model) ? refs[1] : undefined;
     const endpointId = this.resolveVideoEndpoint(
       params.model,
       Boolean(startImage),

@@ -836,6 +836,9 @@ export interface ModelOption {
   durations?: DurationOption[];
   // Video only: whether the model can generate native audio.
   supportsAudio?: boolean;
+  // Video only: whether image-to-video accepts an end/tail frame in addition
+  // to the start frame (Kling v3 + v2.1 pro). Hides the end-frame slot when off.
+  supportsEndFrame?: boolean;
 }
 
 /** @deprecated Use api.getGenerationCostPreview() for accurate backend pricing. */

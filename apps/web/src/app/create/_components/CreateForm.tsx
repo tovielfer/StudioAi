@@ -410,13 +410,15 @@ export function CreateForm({
             onFile={(file) => setReferenceSlotFile(0, file)}
             onRemove={() => removeReferenceSlot(0)}
           />
-          <VideoFrameSlot
-            label="תמונת סיום"
-            reference={references[1]}
-            disabled={!references[0]}
-            onFile={(file) => setReferenceSlotFile(1, file)}
-            onRemove={() => removeReferenceSlot(1)}
-          />
+          {selectedModel.supportsEndFrame && (
+            <VideoFrameSlot
+              label="תמונת סיום"
+              reference={references[1]}
+              disabled={!references[0]}
+              onFile={(file) => setReferenceSlotFile(1, file)}
+              onRemove={() => removeReferenceSlot(1)}
+            />
+          )}
         </div>
       ) : (
         <div className="lg:shrink-0">
