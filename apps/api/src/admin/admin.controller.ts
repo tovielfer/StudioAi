@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GenerationStatus } from '../common/constants';
 import { AdminService } from './admin.service';
 import { AddUserCreditsDto } from './dto/add-user-credits.dto';
+import { HardDeleteGenerationsDto } from './dto/hard-delete-generations.dto';
 import { SendUserEmailDto } from './dto/send-user-email.dto';
 import { UpdatePricingRuleDto } from './dto/update-pricing-rule.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -94,6 +95,7 @@ export class AdminController {
     @Query('size') size?: string,
     @Query('resolution') resolution?: string,
     @Query('hasReference') hasReference?: string,
+    @Query('onlyDeleted') onlyDeleted?: string,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
     @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset = 0,
   ) {
@@ -113,9 +115,15 @@ export class AdminController {
           : hasReference === 'false'
             ? false
             : undefined,
+      onlyDeleted: onlyDeleted === 'true' ? true : undefined,
       limit: Math.min(Math.max(limit, 1), 100),
       offset: Math.max(offset, 0),
     });
+  }
+
+  @Post('generations/hard-delete')
+  hardDeleteGenerations(@Body() dto: HardDeleteGenerationsDto) {
+    return this.adminService.hardDeleteGenerations(dto.ids);
   }
 
   @Post('generations/:id/send-email')

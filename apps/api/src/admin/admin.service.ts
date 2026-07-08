@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository, SelectQueryBuilder } from 'typeorm';
+import { ILike, In, Repository, SelectQueryBuilder } from 'typeorm';
 import { AiPricingRuleAuditLog } from '../ai/ai-pricing-rule-audit-log.entity';
 import { AiPricingRule } from '../ai/ai-pricing-rule.entity';
 import { CreditTransaction } from '../credits/credit-transaction.entity';
@@ -12,6 +12,7 @@ import { CreditsService } from '../credits/credits.service';
 import { Generation } from '../generations/generation.entity';
 import { GenerationStatus } from '../common/constants';
 import { MailService } from '../mail/mail.service';
+import { StorageService } from '../storage/storage.service';
 import { creditsToIls, getBillingConfig, usdToCredits } from '../config/billing';
 import { User, UserRole } from '../users/user.entity';
 import { UpdatePricingRuleDto } from './dto/update-pricing-rule.dto';
@@ -63,6 +64,7 @@ export class AdminService {
     private readonly pricingAuditRepo: Repository<AiPricingRuleAuditLog>,
     private readonly creditsService: CreditsService,
     private readonly mailService: MailService,
+    private readonly storageService: StorageService,
   ) {}
 
   // Emails a finished generation's asset to the given recipient (the admin's
@@ -115,6 +117,40 @@ export class AdminService {
 
     const updated = await this.generationsRepo.findOne({ where: { id } });
     return updated ?? { ...generation, status: GenerationStatus.CANCELLED };
+  }
+
+  // Permanently removes already soft-deleted generations: deletes the stored
+  // result asset from storage and then hard-deletes the DB row. Only rows that
+  // are already soft-deleted (deletedAt set) are eligible, so this can't be used
+  // to nuke live creations. Returns how many rows were actually removed.
+  async hardDeleteGenerations(ids: string[]) {
+    const uniqueIds = Array.from(new Set(ids));
+    if (uniqueIds.length === 0) {
+      throw new BadRequestException('No generations specified');
+    }
+
+    const generations = await this.generationsRepo.find({
+      where: { id: In(uniqueIds) },
+      withDeleted: true,
+    });
+
+    const deletable = generations.filter((g) => g.deletedAt !== null);
+    if (deletable.length === 0) {
+      throw new BadRequestException(
+        'Only already-deleted generations can be permanently removed',
+      );
+    }
+
+    // Best-effort asset cleanup first; storage failures are logged inside the
+    // service and never block removal of the DB row.
+    await Promise.all(
+      deletable.map((g) => this.storageService.deleteByUrl(g.resultUrl)),
+    );
+
+    const deletableIds = deletable.map((g) => g.id);
+    await this.generationsRepo.delete(deletableIds);
+
+    return { success: true, deleted: deletableIds.length, ids: deletableIds };
   }
 
   async getStats() {
@@ -368,6 +404,7 @@ export class AdminService {
     size?: string;
     resolution?: string;
     hasReference?: boolean;
+    onlyDeleted?: boolean;
     limit: number;
     offset: number;
   }) {
@@ -375,6 +412,10 @@ export class AdminService {
       .createQueryBuilder('g')
       .withDeleted()
       .leftJoin('g.user', 'user');
+
+    if (params.onlyDeleted) {
+      qb.andWhere('g.deletedAt IS NOT NULL');
+    }
 
     if (params.status) {
       qb.andWhere('g.status = :status', { status: params.status });

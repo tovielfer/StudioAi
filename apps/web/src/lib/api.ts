@@ -505,6 +505,7 @@ class ApiClient {
     size?: string;
     resolution?: string;
     hasReference?: boolean;
+    onlyDeleted?: boolean;
     limit?: number;
     offset?: number;
   }) {
@@ -521,6 +522,7 @@ class ApiClient {
     if (typeof params?.hasReference === 'boolean') {
       query.set('hasReference', String(params.hasReference));
     }
+    if (params?.onlyDeleted) query.set('onlyDeleted', 'true');
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.offset) query.set('offset', String(params.offset));
     const qs = query.toString();
@@ -540,6 +542,16 @@ class ApiClient {
     return this.request<AdminGeneration>(`/admin/generations/${id}/cancel`, {
       method: 'POST',
     });
+  }
+
+  hardDeleteAdminGenerations(ids: string[]) {
+    return this.request<{ success: boolean; deleted: number; ids: string[] }>(
+      `/admin/generations/hard-delete`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      },
+    );
   }
 
   addAdminCredits(userId: string, amount: number, reason?: string) {

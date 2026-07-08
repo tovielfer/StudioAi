@@ -21,17 +21,21 @@ export function AdminGenerationModal({
   generation,
   onClose,
   onUpdated,
+  onDeleted,
 }: {
   generation: AdminGeneration;
   onClose: () => void;
   onUpdated?: (generation: AdminGeneration) => void;
+  onDeleted?: (id: string) => void;
 }) {
   const hasImage = Boolean(generation.resultUrl && generation.status === 'done');
   const tokens = generation.tokensUsed;
   const canStop =
     generation.status === 'pending' || generation.status === 'processing';
+  const isDeleted = Boolean(generation.deletedAt);
   const [sending, setSending] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [emailToast, setEmailToast] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -79,6 +83,30 @@ export function AdminGenerationModal({
       });
     } finally {
       setCanceling(false);
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (deleting) return;
+    if (
+      !window.confirm(
+        'למחוק את היצירה לצמיתות? הפעולה תסיר את הרשומה ואת הקובץ המאוחסן ואינה הפיכה.',
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setEmailToast(null);
+    try {
+      await api.hardDeleteAdminGenerations([generation.id]);
+      onDeleted?.(generation.id);
+      onClose();
+    } catch (err) {
+      setEmailToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'מחיקת היצירה נכשלה',
+      });
+      setDeleting(false);
     }
   };
 
@@ -145,6 +173,17 @@ export function AdminGenerationModal({
               >
                 {canceling ? <SpinnerIcon /> : null}
                 {canceling ? 'עוצר...' : 'עצירת היצירה'}
+              </button>
+            )}
+            {isDeleted && (
+              <button
+                type="button"
+                onClick={handleHardDelete}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-600 bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+              >
+                {deleting ? <SpinnerIcon /> : null}
+                {deleting ? 'מוחק...' : 'מחק לצמיתות'}
               </button>
             )}
             <button
