@@ -231,9 +231,11 @@ export function GenerationCard({
           </div>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-2 px-3 text-center">
-            <span className="text-xs leading-snug text-gray-400 line-clamp-4">
-              {displayStatus}
-            </span>
+            <Tooltip label={displayStatus}>
+              <span className="text-xs leading-snug text-gray-400 line-clamp-4 cursor-help">
+                {displayStatus}
+              </span>
+            </Tooltip>
             {isErrorState && gen.creditCost > 0 && (
               <span className="text-[11px] font-medium text-green-500">
                 הקרדיטים הוחזרו
