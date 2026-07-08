@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -65,6 +66,12 @@ export class BillingController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.billingService.payOrderWithSavedCard(req.user.id, id);
+  }
+
+  @Delete('saved-card')
+  @UseGuards(JwtAuthGuard)
+  removeSavedCard(@Req() req: { user: { id: string } }) {
+    return this.billingService.removeSavedCard(req.user.id);
   }
 }
 

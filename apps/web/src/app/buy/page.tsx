@@ -95,6 +95,7 @@ function BuyContent() {
   const [payPkg, setPayPkg] = useState<CreditPackage | null>(null);
   // 'saved' shows the one-tap saved-card modal; 'new' shows the full card form.
   const [payMode, setPayMode] = useState<'saved' | 'new'>('new');
+  const [removingCard, setRemovingCard] = useState(false);
 
   const load = async () => {
     try {
@@ -153,12 +154,35 @@ function BuyContent() {
     await Promise.all([load(), refreshCredits(), refreshUser()]);
   };
 
+  const removeSavedCard = async () => {
+    setMessage(null);
+    setError(null);
+    setRemovingCard(true);
+    try {
+      await api.removeSavedCard();
+      await refreshUser();
+      setMessage('הכרטיס השמור הוסר.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'הסרת הכרטיס נכשלה.');
+    } finally {
+      setRemovingCard(false);
+    }
+  };
+
   // In gateway mode a "pending" order is just an unfinished/abandoned payment
   // attempt — don't surface those as purchases. In manual-approval mode pending
   // means "awaiting admin", so keep showing them.
   const visibleOrders = SUMIT_CONFIGURED
     ? orders.filter((o) => o.status !== 'pending')
     : orders;
+  // The list can grow long; show only the latest few (already sorted DESC).
+  const recentOrders = visibleOrders.slice(0, 5);
+
+  // Worst (highest) price-per-credit across packs — the baseline for showing how
+  // much each larger pack saves relative to the smallest one.
+  const maxPricePerCredit = packages.length
+    ? Math.max(...packages.map((p) => p.priceIls / p.credits))
+    : 0;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
@@ -187,45 +211,121 @@ function BuyContent() {
         </div>
       )}
 
+      {SUMIT_CONFIGURED && user?.hasSavedCard && (
+        <div className="card mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <svg
+              className="h-5 w-5 text-brand-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="2" y="5" width="20" height="14" rx="2" />
+              <path d="M2 10h20" />
+            </svg>
+            <div>
+              <p className="text-sm text-gray-400">כרטיס שמור</p>
+              <p className="font-medium tracking-wide text-white">
+                {user.savedCardLast4
+                  ? `${user.savedCardBrand ? `${user.savedCardBrand} ` : ''}•••• ${user.savedCardLast4}`
+                  : 'כרטיס שמור לרכישה מהירה'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={removeSavedCard}
+            disabled={removingCard}
+            className="text-sm text-red-400 transition-colors hover:text-red-300 disabled:opacity-40"
+          >
+            {removingCard ? 'מסיר...' : 'הסרת כרטיס'}
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-16">
           <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {packages.map((pkg) => (
-              <div
-                key={pkg.id}
-                className={`card flex flex-col ${
-                  pkg.badge ? 'ring-2 ring-brand-500' : ''
-                }`}
-              >
-                {pkg.badge && (
-                  <span className="self-start mb-2 rounded-full bg-brand-600 px-3 py-0.5 text-xs font-semibold text-white">
-                    {pkg.badge}
-                  </span>
-                )}
-                <h3 className="text-lg font-semibold">{pkg.name}</h3>
-                <div className="text-3xl font-bold my-2">₪{pkg.priceIls}</div>
-                <p className="text-brand-400 text-sm">
-                  {pkg.credits.toLocaleString('he-IL')} קרדיטים
-                </p>
-                <button
-                  type="button"
-                  onClick={() => buy(pkg)}
-                  disabled={submittingId !== null}
-                  className="btn-primary mt-5 w-full disabled:opacity-50"
+          <div className="flex flex-wrap justify-center gap-5">
+            {packages.map((pkg) => {
+              const featured = Boolean(pkg.badge);
+              const savings = maxPricePerCredit
+                ? Math.round(
+                    (1 - pkg.priceIls / pkg.credits / maxPricePerCredit) * 100,
+                  )
+                : 0;
+              const perThousand = (
+                (pkg.priceIls / pkg.credits) *
+                1000
+              ).toLocaleString('he-IL', { maximumFractionDigits: 1 });
+              return (
+                <div
+                  key={pkg.id}
+                  className={`relative flex w-full flex-col rounded-2xl border p-6 transition-all sm:w-64 ${
+                    featured
+                      ? 'border-brand-500 bg-gradient-to-b from-brand-600/15 to-surface-card shadow-lg shadow-brand-900/30 sm:-translate-y-2'
+                      : 'border-surface-border bg-surface-card hover:border-brand-500/50 hover:-translate-y-0.5'
+                  }`}
                 >
-                  {submittingId === pkg.id ? 'רגע...' : 'רכישה'}
-                </button>
-              </div>
-            ))}
+                  {pkg.badge && (
+                    <span className="absolute -top-3 right-5 rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white shadow">
+                      {pkg.badge}
+                    </span>
+                  )}
+                  <h3 className="text-base font-semibold text-gray-300">
+                    {pkg.name}
+                  </h3>
+                  <div className="mt-3 flex items-baseline gap-1.5">
+                    <span className="text-4xl font-extrabold text-white">
+                      {pkg.credits.toLocaleString('he-IL')}
+                    </span>
+                    <span className="text-sm text-gray-400">קרדיטים</span>
+                  </div>
+                  {savings > 0 ? (
+                    <span className="mt-2 self-start rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-400">
+                      חיסכון {savings}%
+                    </span>
+                  ) : (
+                    <span className="mt-2 h-[22px]" />
+                  )}
+                  <div className="mt-4 border-t border-surface-border pt-4">
+                    <div className="text-2xl font-bold text-white">
+                      ₪{pkg.priceIls}
+                    </div>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      ₪{perThousand} ל-1,000 קרדיטים
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => buy(pkg)}
+                    disabled={submittingId !== null}
+                    className={`mt-5 w-full rounded-lg py-2.5 font-semibold transition-colors disabled:opacity-50 ${
+                      featured
+                        ? 'btn-primary'
+                        : 'border border-brand-500/60 text-brand-300 hover:bg-brand-500/10'
+                    }`}
+                  >
+                    {submittingId === pkg.id
+                      ? 'רגע...'
+                      : SUMIT_CONFIGURED && user?.hasSavedCard
+                        ? 'רכישה מהירה'
+                        : 'רכישה'}
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           <div className="mt-12">
-            <h2 className="text-xl font-semibold mb-4">הרכישות שלי</h2>
-            {visibleOrders.length === 0 ? (
+            <h2 className="text-xl font-semibold mb-4">רכישות אחרונות</h2>
+            {recentOrders.length === 0 ? (
               <p className="text-gray-500">עדיין אין רכישות.</p>
             ) : (
               <div className="card overflow-x-auto">
@@ -240,7 +340,7 @@ function BuyContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleOrders.map((order) => (
+                    {recentOrders.map((order) => (
                       <tr key={order.id} className="border-b border-surface-border/50">
                         <td className="py-2 text-gray-400">
                           {new Date(order.createdAt).toLocaleString('he-IL', {
@@ -382,45 +482,49 @@ function SavedCardModal({
             </div>
           )}
 
-          <div className="mb-4 flex items-center gap-3 rounded-lg border border-surface-border bg-surface px-4 py-3">
-            <svg
-              className="h-5 w-5 text-brand-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect x="2" y="5" width="20" height="14" rx="2" />
-              <path d="M2 10h20" />
-            </svg>
-            <span className="font-medium tracking-wide text-white">
-              {cardLabel}
-            </span>
-          </div>
-
+          <p className="mb-2 text-xs text-gray-500">
+            לחצו על הכרטיס כדי לשלם:
+          </p>
           <button
             type="button"
             onClick={pay}
             disabled={processing}
-            className="btn-primary w-full disabled:opacity-50"
+            className="group flex w-full items-center justify-between gap-3 rounded-xl border border-brand-500/50 bg-surface px-4 py-4 text-right transition-colors hover:border-brand-400 hover:bg-brand-500/10 disabled:opacity-60"
           >
-            {processing ? (
-              <span className="inline-flex items-center gap-2">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                מעבד תשלום...
+            <span className="flex items-center gap-3">
+              <svg
+                className="h-6 w-6 text-brand-400"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <path d="M2 10h20" />
+              </svg>
+              <span className="font-medium tracking-wide text-white">
+                {cardLabel}
               </span>
-            ) : (
-              `שלם ₪${pkg.priceIls}`
-            )}
+            </span>
+            <span className="font-semibold text-brand-300">
+              {processing ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-400/40 border-t-brand-400" />
+                  מעבד...
+                </span>
+              ) : (
+                `שלם ₪${pkg.priceIls}`
+              )}
+            </span>
           </button>
 
           <button
             type="button"
             onClick={onUseAnotherCard}
             disabled={processing}
-            className="mt-3 w-full text-center text-sm text-brand-400 transition-colors hover:text-brand-300 disabled:opacity-40"
+            className="mt-4 w-full text-center text-sm text-brand-400 transition-colors hover:text-brand-300 disabled:opacity-40"
           >
             תשלום בכרטיס אחר
           </button>
@@ -704,7 +808,9 @@ function PaymentModal({
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
-          פרטי הכרטיס מוצפנים ואינם נשמרים אצלנו.
+          {saveCard
+            ? 'מספר הכרטיס לא נשמר אצלנו; הוא נשמר באופן מאובטח (כטוקן) אצל SUMIT לרכישות הבאות.'
+            : 'פרטי הכרטיס מוצפנים ואינם נשמרים אצלנו.'}
         </p>
 
         <iframe

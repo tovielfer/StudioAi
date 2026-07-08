@@ -464,6 +464,10 @@ class ApiClient {
     );
   }
 
+  removeSavedCard() {
+    return this.request<{ ok: boolean }>('/saved-card', { method: 'DELETE' });
+  }
+
   getModels(type?: 'image' | 'video') {
     const qs = type ? `?type=${type}` : '';
     return this.request<ModelOption[]>(`/generations/models${qs}`);

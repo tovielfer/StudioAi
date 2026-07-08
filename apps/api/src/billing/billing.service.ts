@@ -205,6 +205,12 @@ export class BillingService implements OnApplicationBootstrap {
     return this.fulfillOrder(order, user.credits, result.paymentId);
   }
 
+  /** Forgets the user's saved card so it is no longer offered/charged. */
+  async removeSavedCard(userId: string) {
+    await this.usersService.clearSumitPaymentMethod(userId);
+    return { ok: true };
+  }
+
   /** Loads a pending order owned by the user, plus the user, or throws. */
   private async loadPendingOrder(userId: string, orderId: string) {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
