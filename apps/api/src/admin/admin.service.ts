@@ -165,6 +165,9 @@ export class AdminService {
 
     const qb = this.usersRepo
       .createQueryBuilder('u')
+      // Include soft-deleted generations so the per-user count matches the rest
+      // of the admin views (getStats/listGenerations), which count all activity.
+      .withDeleted()
       .leftJoin('generations', 'g', 'g."userId" = u.id')
       .select('u.id', 'id')
       .addSelect('u.email', 'email')
