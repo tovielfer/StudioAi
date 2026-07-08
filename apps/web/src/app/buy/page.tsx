@@ -85,7 +85,7 @@ export default function BuyPage() {
 }
 
 function BuyContent() {
-  const { user, refreshCredits } = useAuth();
+  const { user, refreshCredits, refreshUser } = useAuth();
   const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,6 +93,8 @@ function BuyContent() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [payPkg, setPayPkg] = useState<CreditPackage | null>(null);
+  // 'saved' shows the one-tap saved-card modal; 'new' shows the full card form.
+  const [payMode, setPayMode] = useState<'saved' | 'new'>('new');
 
   const load = async () => {
     try {
@@ -111,7 +113,9 @@ function BuyContent() {
 
   useEffect(() => {
     load();
-  }, []);
+    // Sync the saved-card state from the server (login response omits it).
+    refreshUser().catch(() => {});
+  }, [refreshUser]);
 
   const buy = async (pkg: CreditPackage) => {
     setMessage(null);
@@ -119,8 +123,10 @@ function BuyContent() {
 
     // With a gateway, just open the payment form. The order is created only when
     // the user actually submits payment, so opening the form never leaves a
-    // stray "pending" row in the purchases list.
+    // stray "pending" row in the purchases list. If the user already has a saved
+    // card, open the one-tap saved-card modal instead of the full form.
     if (SUMIT_CONFIGURED) {
+      setPayMode(user?.hasSavedCard ? 'saved' : 'new');
       setPayPkg(pkg);
       return;
     }
@@ -143,7 +149,8 @@ function BuyContent() {
   const onPaid = async () => {
     setPayPkg(null);
     setMessage('התשלום בוצע בהצלחה! הקרדיטים נכנסו ליתרה שלך.');
-    await Promise.all([load(), refreshCredits()]);
+    // refreshUser picks up a newly-saved card so the next buy is one-tap.
+    await Promise.all([load(), refreshCredits(), refreshUser()]);
   };
 
   // In gateway mode a "pending" order is just an unfinished/abandoned payment
@@ -263,13 +270,162 @@ function BuyContent() {
         </>
       )}
 
-      {payPkg && (
+      {payPkg && payMode === 'saved' && (
+        <SavedCardModal
+          pkg={payPkg}
+          last4={user?.savedCardLast4 ?? null}
+          brand={user?.savedCardBrand ?? null}
+          onClose={() => setPayPkg(null)}
+          onPaid={onPaid}
+          onUseAnotherCard={() => setPayMode('new')}
+        />
+      )}
+
+      {payPkg && payMode === 'new' && (
         <PaymentModal
           pkg={payPkg}
           onClose={() => setPayPkg(null)}
           onPaid={onPaid}
         />
       )}
+    </div>
+  );
+}
+
+function SavedCardModal({
+  pkg,
+  last4,
+  brand,
+  onClose,
+  onPaid,
+  onUseAnotherCard,
+}: {
+  pkg: CreditPackage;
+  last4: string | null;
+  brand: string | null;
+  onClose: () => void;
+  onPaid: () => void;
+  onUseAnotherCard: () => void;
+}) {
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const chargingRef = useRef(false);
+
+  const pay = async () => {
+    if (chargingRef.current) return;
+    chargingRef.current = true;
+    setError(null);
+    setProcessing(true);
+    try {
+      const order = await api.createOrder(pkg.id);
+      await api.payOrderSaved(order.id);
+      onPaid();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'התשלום נכשל. נסה שוב.');
+      setProcessing(false);
+      chargingRef.current = false;
+    }
+  };
+
+  const cardLabel = last4
+    ? `${brand ? `${brand} ` : ''}•••• ${last4}`
+    : 'הכרטיס השמור שלך';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 pay-overlay-in">
+      <div className="pay-modal-in w-full max-w-md relative rounded-2xl border border-surface-border bg-surface-card shadow-2xl shadow-black/50">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={processing}
+          className="absolute top-3 left-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-gray-300 transition-colors hover:bg-black/40 hover:text-white disabled:opacity-40"
+          aria-label="סגירה"
+        >
+          ✕
+        </button>
+
+        <div className="relative rounded-t-2xl bg-gradient-to-br from-brand-600 to-brand-800 px-6 pt-6 pb-5 text-white">
+          <div className="flex items-center gap-2">
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <h2 className="text-xl font-bold">תשלום מהיר</h2>
+          </div>
+          <p className="mt-1 text-sm text-white/80">שלם בכרטיס השמור בלחיצה אחת</p>
+        </div>
+
+        <div className="mt-4 px-6">
+          <div className="flex items-center justify-between rounded-xl border border-surface-border bg-surface px-4 py-3 shadow-lg shadow-black/30">
+            <div>
+              <p className="font-semibold text-white">{pkg.name}</p>
+              <p className="text-xs text-brand-400">
+                {pkg.credits.toLocaleString('he-IL')} קרדיטים
+              </p>
+            </div>
+            <div className="text-2xl font-bold text-white">₪{pkg.priceIls}</div>
+          </div>
+        </div>
+
+        <div className="px-6 pt-5 pb-6">
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+              {error}
+            </div>
+          )}
+
+          <div className="mb-4 flex items-center gap-3 rounded-lg border border-surface-border bg-surface px-4 py-3">
+            <svg
+              className="h-5 w-5 text-brand-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="2" y="5" width="20" height="14" rx="2" />
+              <path d="M2 10h20" />
+            </svg>
+            <span className="font-medium tracking-wide text-white">
+              {cardLabel}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={pay}
+            disabled={processing}
+            className="btn-primary w-full disabled:opacity-50"
+          >
+            {processing ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                מעבד תשלום...
+              </span>
+            ) : (
+              `שלם ₪${pkg.priceIls}`
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={onUseAnotherCard}
+            disabled={processing}
+            className="mt-3 w-full text-center text-sm text-brand-400 transition-colors hover:text-brand-300 disabled:opacity-40"
+          >
+            תשלום בכרטיס אחר
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -292,6 +448,11 @@ function PaymentModal({
   const [ready, setReady] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveCard, setSaveCard] = useState(true);
+  // Read at charge time from a ref so toggling the checkbox doesn't rebind the
+  // payments.js form (which is set up once in the effect below).
+  const saveCardRef = useRef(true);
+  saveCardRef.current = saveCard;
 
   useEffect(() => {
     let cancelled = false;
@@ -304,7 +465,7 @@ function PaymentModal({
           const order = await api.createOrder(pkg.id);
           orderIdRef.current = order.id;
         }
-        await api.payOrder(orderIdRef.current, token);
+        await api.payOrder(orderIdRef.current, token, saveCardRef.current);
         onPaid();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'התשלום נכשל. נסה שוב.');
@@ -501,6 +662,16 @@ function PaymentModal({
 
           <input type="hidden" name="og-token" id="og-token" />
           <div className="og-errors text-sm text-red-300" />
+
+          <label className="flex items-center gap-2 pt-1 text-sm text-gray-300 select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={saveCard}
+              onChange={(e) => setSaveCard(e.target.checked)}
+              className="h-4 w-4 rounded border-surface-border bg-surface text-brand-600 focus:ring-brand-500"
+            />
+            שמור את הכרטיס לרכישות הבאות
+          </label>
 
           <button
             type="submit"

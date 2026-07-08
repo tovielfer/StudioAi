@@ -173,6 +173,9 @@ export class AuthService {
       email: user.email,
       credits: user.credits,
       role: user.role,
+      hasSavedCard: Boolean(user.sumitCustomerId && user.sumitPaymentMethodId),
+      savedCardLast4: user.savedCardLast4,
+      savedCardBrand: user.savedCardBrand,
     };
   }
 

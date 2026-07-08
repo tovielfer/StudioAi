@@ -136,19 +136,18 @@ export class BillingService implements OnApplicationBootstrap {
    *
    * The amount and credit grant are always taken from the persisted order, never
    * from the client, so a tampered request cannot change what is charged.
+   *
+   * When `saveCard` is set (default), the SUMIT customer + payment-method token
+   * returned by the charge are stored on the user so the card can be charged
+   * again later without re-entering details.
    */
-  async payOrder(userId: string, orderId: string, singleUseToken: string) {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('Order not found');
-    if (order.userId !== userId) {
-      throw new NotFoundException('Order not found');
-    }
-    if (order.status !== OrderStatus.PENDING) {
-      throw new BadRequestException('Order is not pending');
-    }
-
-    const user = await this.usersService.findById(userId);
-    if (!user) throw new NotFoundException('User not found');
+  async payOrder(
+    userId: string,
+    orderId: string,
+    singleUseToken: string,
+    saveCard = true,
+  ) {
+    const { order, user } = await this.loadPendingOrder(userId, orderId);
 
     const result = await this.sumitService.charge({
       singleUseToken,
@@ -164,6 +163,70 @@ export class BillingService implements OnApplicationBootstrap {
       );
     }
 
+    if (saveCard && result.customerId && result.paymentMethodId) {
+      await this.usersService.saveSumitPaymentMethod(user.id, {
+        customerId: result.customerId,
+        paymentMethodId: result.paymentMethodId,
+        cardLast4: result.cardLast4,
+        cardBrand: result.cardBrand,
+      });
+    }
+
+    return this.fulfillOrder(order, user.credits, result.paymentId);
+  }
+
+  /**
+   * Charges a pending order against the card previously saved for this user
+   * (SUMIT CustomerID + PaymentMethodID). No card details are needed from the
+   * client — the amount and credits still come from the persisted order.
+   */
+  async payOrderWithSavedCard(userId: string, orderId: string) {
+    const { order, user } = await this.loadPendingOrder(userId, orderId);
+
+    if (!user.sumitCustomerId || !user.sumitPaymentMethodId) {
+      throw new BadRequestException('אין כרטיס שמור. יש להזין פרטי תשלום.');
+    }
+
+    const result = await this.sumitService.chargeSaved({
+      customerId: user.sumitCustomerId,
+      paymentMethodId: user.sumitPaymentMethodId,
+      amountIls: order.priceIls,
+      description: order.packageName,
+      customer: { name: user.email, email: user.email, externalId: user.id },
+      uniqueIdentifier: `order-${order.id}`,
+    });
+
+    if (!result.ok) {
+      throw new BadRequestException(
+        result.errorMessage || 'התשלום נדחה. נסי שוב.',
+      );
+    }
+
+    return this.fulfillOrder(order, user.credits, result.paymentId);
+  }
+
+  /** Loads a pending order owned by the user, plus the user, or throws. */
+  private async loadPendingOrder(userId: string, orderId: string) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order || order.userId !== userId) {
+      throw new NotFoundException('Order not found');
+    }
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException('Order is not pending');
+    }
+
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    return { order, user };
+  }
+
+  /** Grants the order credits and marks it approved after a successful charge. */
+  private async fulfillOrder(
+    order: Order,
+    creditsBefore: number,
+    paymentId: string | null,
+  ) {
     await this.creditsService.addCredits(
       order.userId,
       order.credits,
@@ -172,11 +235,11 @@ export class BillingService implements OnApplicationBootstrap {
 
     order.status = OrderStatus.APPROVED;
     order.provider = 'sumit';
-    order.providerRef = result.paymentId;
+    order.providerRef = paymentId;
     order.decidedAt = new Date();
     await this.orderRepo.save(order);
 
-    return { order, credits: user.credits + order.credits };
+    return { order, credits: creditsBefore + order.credits };
   }
 
   // --- Orders (admin) ---

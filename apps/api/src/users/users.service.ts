@@ -108,6 +108,34 @@ export class UsersService {
     });
   }
 
+  /** Persists the SUMIT saved-card token so the card can be charged again. */
+  async saveSumitPaymentMethod(
+    userId: string,
+    data: {
+      customerId: string;
+      paymentMethodId: string;
+      cardLast4: string | null;
+      cardBrand: string | null;
+    },
+  ) {
+    await this.usersRepo.update(userId, {
+      sumitCustomerId: data.customerId,
+      sumitPaymentMethodId: data.paymentMethodId,
+      savedCardLast4: data.cardLast4,
+      savedCardBrand: data.cardBrand,
+    });
+  }
+
+  /** Forgets the saved card (e.g. user removed it or a charge revealed it expired). */
+  async clearSumitPaymentMethod(userId: string) {
+    await this.usersRepo.update(userId, {
+      sumitCustomerId: null,
+      sumitPaymentMethodId: null,
+      savedCardLast4: null,
+      savedCardBrand: null,
+    });
+  }
+
   async updateCredits(userId: string, amount: number) {
     await this.usersRepo.increment({ id: userId }, 'credits', amount);
     return this.findById(userId);

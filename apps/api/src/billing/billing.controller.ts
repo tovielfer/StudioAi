@@ -50,7 +50,21 @@ export class BillingController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: PayOrderDto,
   ) {
-    return this.billingService.payOrder(req.user.id, id, dto.singleUseToken);
+    return this.billingService.payOrder(
+      req.user.id,
+      id,
+      dto.singleUseToken,
+      dto.saveCard ?? true,
+    );
+  }
+
+  @Post('orders/:id/pay-saved')
+  @UseGuards(JwtAuthGuard)
+  payOrderWithSavedCard(
+    @Req() req: { user: { id: string } },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.billingService.payOrderWithSavedCard(req.user.id, id);
   }
 }
 

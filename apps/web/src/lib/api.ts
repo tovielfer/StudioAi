@@ -10,6 +10,10 @@ export interface User {
   emailVerified?: boolean;
   createdAt?: string;
   generationsCount?: number;
+  /** True when a card token is saved and can be charged without re-entry. */
+  hasSavedCard?: boolean;
+  savedCardLast4?: string | null;
+  savedCardBrand?: string | null;
 }
 
 export type AdminUsersSort =
@@ -443,13 +447,20 @@ class ApiClient {
     return this.request<Order[]>('/orders');
   }
 
-  payOrder(orderId: string, singleUseToken: string) {
+  payOrder(orderId: string, singleUseToken: string, saveCard = true) {
     return this.request<{ order: Order; credits: number }>(
       `/orders/${orderId}/pay`,
       {
         method: 'POST',
-        body: JSON.stringify({ singleUseToken }),
+        body: JSON.stringify({ singleUseToken, saveCard }),
       },
+    );
+  }
+
+  payOrderSaved(orderId: string) {
+    return this.request<{ order: Order; credits: number }>(
+      `/orders/${orderId}/pay-saved`,
+      { method: 'POST' },
     );
   }
 

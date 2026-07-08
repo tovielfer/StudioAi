@@ -57,6 +57,22 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true, default: null })
   resetPasswordExpiry: Date | null;
 
+  /** SUMIT customer id, saved after a successful charge for reuse. */
+  @Column({ type: 'varchar', nullable: true, default: null })
+  sumitCustomerId: string | null;
+
+  /** SUMIT payment-method (token) id of the saved card, for future charges. */
+  @Column({ type: 'varchar', nullable: true, default: null })
+  sumitPaymentMethodId: string | null;
+
+  /** Masked last digits of the saved card, for display only. */
+  @Column({ type: 'varchar', nullable: true, default: null })
+  savedCardLast4: string | null;
+
+  /** Brand of the saved card, for display only. */
+  @Column({ type: 'varchar', nullable: true, default: null })
+  savedCardBrand: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

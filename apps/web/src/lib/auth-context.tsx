@@ -17,6 +17,7 @@ interface AuthContextType {
   register: (email: string, password: string) => Promise<void>;
   logout: () => void;
   refreshCredits: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   setToken: (token: string) => Promise<void>;
 }
 
@@ -77,9 +78,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Re-fetches the full profile (credits + saved-card state) from the server.
+  const refreshUser = useCallback(async () => {
+    const fresh = await api.getMe();
+    setUser((prev) => {
+      const updated = { ...(prev ?? {}), ...fresh };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, register, logout, refreshCredits, setToken }}
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        refreshCredits,
+        refreshUser,
+        setToken,
+      }}
     >
       {children}
     </AuthContext.Provider>
