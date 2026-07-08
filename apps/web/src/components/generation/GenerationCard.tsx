@@ -231,11 +231,14 @@ export function GenerationCard({
           </div>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-2 px-3 text-center">
-            <Tooltip label={displayStatus}>
-              <span className="text-xs leading-snug text-gray-400 line-clamp-4 cursor-help">
-                {displayStatus}
-              </span>
-            </Tooltip>
+            <button
+              type="button"
+              onClick={() => onSelect(gen)}
+              className="text-xs leading-snug text-gray-400 line-clamp-4 text-center hover:text-gray-200 transition-colors cursor-pointer"
+              title={displayStatus}
+            >
+              {displayStatus}
+            </button>
             {isErrorState && gen.creditCost > 0 && (
               <span className="text-[11px] font-medium text-green-500">
                 הקרדיטים הוחזרו
