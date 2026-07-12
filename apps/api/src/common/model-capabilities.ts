@@ -392,6 +392,24 @@ export const MODEL_REGISTRY: ModelCapability[] = [
     pricing: { baseUsd: 0.039 },
   },
   {
+    id: 'kling-v3-pro',
+    name: 'Kling Video v3 Pro',
+    provider: AiProvider.FAL,
+    type: GenerationType.VIDEO,
+    sizes: KLING_SIZES,
+    qualities: [],
+    resolutions: [],
+    durations: KLING_V3_DURATIONS,
+    supportsAudio: true,
+    supportsEndFrame: true,
+    // fal cost: $0.112/s silent, $0.168/s with audio.
+    pricing: {
+      baseUsd: 0,
+      referenceImageUsd: 0,
+      videoPerSecondUsd: { audioOff: 0.112, audioOn: 0.168 },
+    },
+  },
+  {
     id: 'seedance-v2',
     name: 'Seedance 2.0',
     provider: AiProvider.REPLICATE,
@@ -469,24 +487,6 @@ export const MODEL_REGISTRY: ModelCapability[] = [
       baseUsd: 0,
       referenceImageUsd: 0,
       videoPerSecondUsd: { audioOff: 0.084, audioOn: 0.126 },
-    },
-  },
-  {
-    id: 'kling-v3-pro',
-    name: 'Kling Video v3 Pro',
-    provider: AiProvider.FAL,
-    type: GenerationType.VIDEO,
-    sizes: KLING_SIZES,
-    qualities: [],
-    resolutions: [],
-    durations: KLING_V3_DURATIONS,
-    supportsAudio: true,
-    supportsEndFrame: true,
-    // fal cost: $0.112/s silent, $0.168/s with audio.
-    pricing: {
-      baseUsd: 0,
-      referenceImageUsd: 0,
-      videoPerSecondUsd: { audioOff: 0.112, audioOn: 0.168 },
     },
   },
   {
