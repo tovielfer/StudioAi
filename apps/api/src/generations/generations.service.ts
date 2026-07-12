@@ -267,7 +267,8 @@ export class GenerationsService implements OnModuleInit, OnModuleDestroy {
     const qb = this.genRepo
       .createQueryBuilder('g')
       .where('g.userId = :userId', { userId })
-      .orderBy('g.createdAt', 'DESC');
+      .orderBy('g.createdAt', 'DESC')
+      .addOrderBy('g.id', 'DESC');
 
     if (filters?.type) {
       qb.andWhere('g.type = :type', { type: filters.type });

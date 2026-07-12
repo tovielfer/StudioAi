@@ -96,6 +96,7 @@ export class AdminController {
     @Query('resolution') resolution?: string,
     @Query('hasReference') hasReference?: string,
     @Query('onlyDeleted') onlyDeleted?: string,
+    @Query('safe') safe?: string,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
     @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset = 0,
   ) {
@@ -116,6 +117,7 @@ export class AdminController {
             ? false
             : undefined,
       onlyDeleted: onlyDeleted === 'true' ? true : undefined,
+      safe: safe === 'true' ? true : undefined,
       limit: Math.min(Math.max(limit, 1), 100),
       offset: Math.max(offset, 0),
     });

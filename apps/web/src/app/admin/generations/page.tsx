@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { AdminGuard } from '@/components/AdminGuard';
-import { AdminGeneration, api } from '@/lib/api';
+import { AdminGeneration, api, isBlockedError } from '@/lib/api';
 import { useInfiniteList } from '@/lib/use-infinite-list';
 import { STATUS_LABELS } from '@/lib/he';
 import { AdminShell } from '../admin-shell';
@@ -39,6 +39,7 @@ export default function AdminGenerationsPage() {
 function AdminGenerationsContent() {
   const [generationSearch, setGenerationSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const [onlyDeleted, setOnlyDeleted] = useState(false);
   const [view, setView] = useState<ViewMode>('cards');
   const [selected, setSelected] = useState<AdminGeneration | null>(null);
@@ -47,15 +48,52 @@ function AdminGenerationsContent() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchPage = useCallback(
-    ({ limit, offset }: { limit: number; offset: number }) =>
-      api.getAdminGenerations({
+    async ({ limit, offset }: { limit: number; offset: number }) => {
+      const baseParams = {
         search: generationSearch || undefined,
         status: statusFilter || undefined,
+        type: typeFilter || undefined,
         onlyDeleted: onlyDeleted || undefined,
-        limit,
-        offset,
-      }),
-    [generationSearch, statusFilter, onlyDeleted],
+      };
+
+      // Some rows contain content that an upstream filter (NetFree) blocks,
+      // returning HTTP 418 for the whole batch and freezing infinite scroll.
+      // We recover by splitting a blocked window in half until we isolate the
+      // offending rows, then re-fetch just those in "safe" mode (prompt & image
+      // redacted) so the rest of the batch still shows and paging continues.
+      const fetchChunk = async (
+        chunkOffset: number,
+        chunkLimit: number,
+      ): Promise<{ items: AdminGeneration[]; total: number }> => {
+        try {
+          return await api.getAdminGenerations({
+            ...baseParams,
+            limit: chunkLimit,
+            offset: chunkOffset,
+          });
+        } catch (err) {
+          if (!isBlockedError(err)) throw err;
+          if (chunkLimit <= 1) {
+            return api.getAdminGenerations({
+              ...baseParams,
+              safe: true,
+              limit: chunkLimit,
+              offset: chunkOffset,
+            });
+          }
+          const half = Math.ceil(chunkLimit / 2);
+          const first = await fetchChunk(chunkOffset, half);
+          const second = await fetchChunk(chunkOffset + half, chunkLimit - half);
+          return {
+            items: [...first.items, ...second.items],
+            total: second.total || first.total,
+          };
+        }
+      };
+
+      return fetchChunk(offset, limit);
+    },
+    [generationSearch, statusFilter, typeFilter, onlyDeleted],
   );
 
   const {
@@ -69,6 +107,8 @@ function AdminGenerationsContent() {
     error: message,
     sentinelRef,
   } = useInfiniteList<AdminGeneration>(fetchPage, { pageSize: PAGE_SIZE });
+
+  const blockedCount = generations.filter((g) => g.blocked).length;
 
   const handleGenerationUpdated = useCallback(
     (updated: AdminGeneration) => {
@@ -142,6 +182,14 @@ function AdminGenerationsContent() {
           </div>
         )}
 
+        {blockedCount > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            {blockedCount.toLocaleString('he-IL')} יצירות הוסתרו חלקית על ידי
+            הסינון (נטפרי). מוצגים רק פרטי המשתמש והנתונים — הפרומפט והתמונה אינם
+            זמינים בחיבור מסונן.
+          </div>
+        )}
+
         <section className="admin-card">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
@@ -192,6 +240,15 @@ function AdminGenerationsContent() {
                 <option value="done">הושלם</option>
                 <option value="failed">נכשל</option>
                 <option value="cancelled">בוטל</option>
+              </select>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="admin-field md:w-40"
+              >
+                <option value="">כל הסוגים</option>
+                <option value="image">תמונה</option>
+                <option value="video">וידאו</option>
               </select>
               <button
                 type="button"
@@ -316,7 +373,13 @@ function AdminGenerationsContent() {
                         </div>
                       </td>
                       <td className="py-3 pe-4 max-w-xs text-gray-700">
-                        <span className="line-clamp-2">{generation.prompt}</span>
+                        {generation.blocked ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                            נחסם ע"י הסינון
+                          </span>
+                        ) : (
+                          <span className="line-clamp-2">{generation.prompt}</span>
+                        )}
                       </td>
                       <td className="py-3 pe-4">
                         <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">

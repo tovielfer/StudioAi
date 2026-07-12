@@ -1,5 +1,25 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+/** Error carrying the HTTP status so callers can react to specific codes
+ *  (e.g. 418 "Blocked by NetFree" when an upstream content filter blocks a
+ *  response body). */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/** True when the failure is an upstream content-filter block (NetFree returns
+ *  status 418 for blocked response bodies). */
+export function isBlockedError(err: unknown): boolean {
+  if (err instanceof ApiError && err.status === 418) return true;
+  const message = err instanceof Error ? err.message : '';
+  return /netfree|blocked by netfree/i.test(message);
+}
+
 export interface User {
   id: string;
   email: string;
@@ -77,6 +97,9 @@ export interface AdminStats {
 
 export interface AdminGeneration extends Generation {
   userEmail: string | null;
+  /** True when the row was returned in "safe" mode because its full payload was
+   *  blocked by the upstream content filter; prompt & image URLs are redacted. */
+  blocked?: boolean;
 }
 
 export type CreditTransactionDirection = 'credit' | 'debit';
@@ -266,7 +289,10 @@ class ApiClient {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ message: res.statusText }));
-      throw new Error(err.message || `Request failed: ${res.status}`);
+      throw new ApiError(
+        err.message || `Request failed: ${res.status}`,
+        res.status,
+      );
     }
 
     return res.json();
@@ -506,6 +532,7 @@ class ApiClient {
     resolution?: string;
     hasReference?: boolean;
     onlyDeleted?: boolean;
+    safe?: boolean;
     limit?: number;
     offset?: number;
   }) {
@@ -523,6 +550,7 @@ class ApiClient {
       query.set('hasReference', String(params.hasReference));
     }
     if (params?.onlyDeleted) query.set('onlyDeleted', 'true');
+    if (params?.safe) query.set('safe', 'true');
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.offset) query.set('offset', String(params.offset));
     const qs = query.toString();

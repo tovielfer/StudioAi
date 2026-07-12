@@ -405,6 +405,11 @@ export class AdminService {
     resolution?: string;
     hasReference?: boolean;
     onlyDeleted?: boolean;
+    // When true, redacts free-text/image fields (prompt, result & reference
+    // image URLs) from the response. Used as a fallback for admin rows whose
+    // normal payload gets blocked by an upstream content filter (NetFree 418),
+    // so the row can still be listed with its metadata.
+    safe?: boolean;
     limit: number;
     offset: number;
   }) {
@@ -493,9 +498,22 @@ export class AdminService {
       .addSelect('g.createdAt', 'createdAt')
       .addSelect('g.deletedAt', 'deletedAt')
       .orderBy('g.createdAt', 'DESC')
+      .addOrderBy('g.id', 'DESC')
       .limit(params.limit)
       .offset(params.offset)
       .getRawMany();
+
+    if (params.safe) {
+      const redacted = items.map((item) => ({
+        ...item,
+        prompt: null,
+        resultUrl: null,
+        referenceImageUrls: null,
+        providerErrorRaw: null,
+        blocked: true,
+      }));
+      return { items: redacted, total };
+    }
 
     return { items, total };
   }
@@ -743,6 +761,7 @@ export class AdminService {
     const total = await qb.clone().getCount();
     const items = await this.selectGenerationRows(qb)
       .orderBy('g.createdAt', 'DESC')
+      .addOrderBy('g.id', 'DESC')
       .take(limit)
       .skip(offset)
       .getRawMany();
