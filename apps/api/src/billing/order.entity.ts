@@ -9,9 +9,14 @@ import {
 import { User } from '../users/user.entity';
 
 export enum OrderStatus {
+  /** Created but not yet paid — an abandoned/unfinished attempt. */
   PENDING = 'pending',
+  /** Paid successfully (gateway) or granted manually by an admin. */
   APPROVED = 'approved',
+  /** Rejected by an admin (manual-approval mode only). */
   REJECTED = 'rejected',
+  /** A charge was attempted but the gateway declined/errored. */
+  FAILED = 'failed',
 }
 
 const numericTransformer = {
@@ -72,6 +77,18 @@ export class Order {
   /** Optional note from the buyer (e.g. payment method / contact). */
   @Column({ type: 'varchar', nullable: true, default: null })
   note: string | null;
+
+  /** Gateway error message when a charge fails (status = failed). */
+  @Column({ type: 'varchar', nullable: true, default: null })
+  failureReason: string | null;
+
+  /** When the failed charge was recorded. */
+  @Column({ type: 'timestamptz', nullable: true, default: null })
+  failedAt: Date | null;
+
+  /** Whether an admin has already seen this (successful) purchase. */
+  @Column({ type: 'boolean', default: false })
+  seenByAdmin: boolean;
 
   @Column({ type: 'uuid', nullable: true, default: null })
   decidedByUserId: string | null;

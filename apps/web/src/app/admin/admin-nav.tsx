@@ -49,14 +49,14 @@ const ADMIN_LINKS = [
   {
     href: '/admin/orders',
     label: 'רכישות',
-    description: 'אישור הזמנות',
+    description: 'מכירות ותקלות',
   },
 ];
 
 export function AdminNav() {
   const pathname = usePathname();
   const [feedbackUnread, setFeedbackUnread] = useState(0);
-  const [pendingOrders, setPendingOrders] = useState(0);
+  const [newOrders, setNewOrders] = useState(0);
 
   useEffect(() => {
     api
@@ -64,8 +64,8 @@ export function AdminNav() {
       .then((res) => setFeedbackUnread(res.unread))
       .catch(() => {});
     api
-      .getAdminOrdersPendingCount()
-      .then((res) => setPendingOrders(res.pending))
+      .getAdminOrdersNewCount()
+      .then((res) => setNewOrders(res.count))
       .catch(() => {});
   }, [pathname]);
 
@@ -77,7 +77,7 @@ export function AdminNav() {
           link.href === '/admin/feedback'
             ? feedbackUnread
             : link.href === '/admin/orders'
-              ? pendingOrders
+              ? newOrders
               : 0;
 
         return (

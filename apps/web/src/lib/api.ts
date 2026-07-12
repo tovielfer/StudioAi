@@ -202,7 +202,7 @@ export interface CreditPackage {
   updatedAt?: string;
 }
 
-export type OrderStatus = 'pending' | 'approved' | 'rejected';
+export type OrderStatus = 'pending' | 'approved' | 'rejected' | 'failed';
 
 export interface Order {
   id: string;
@@ -214,9 +214,19 @@ export interface Order {
   credits: number;
   status: OrderStatus;
   note: string | null;
+  failureReason?: string | null;
+  failedAt?: string | null;
   decidedByUserId?: string | null;
   decidedAt?: string | null;
   createdAt: string;
+}
+
+export interface OrdersSummary {
+  totalRevenue: number;
+  totalOrders: number;
+  avgOrder: number;
+  days: number;
+  series: Array<{ date: string; revenue: number; count: number }>;
 }
 
 export interface PricingRuleAuditLog {
@@ -734,6 +744,20 @@ class ApiClient {
 
   getAdminOrdersPendingCount() {
     return this.request<{ pending: number }>('/admin/orders/pending-count');
+  }
+
+  getAdminOrdersNewCount() {
+    return this.request<{ count: number }>('/admin/orders/new-count');
+  }
+
+  getAdminOrdersSummary(days = 30) {
+    return this.request<OrdersSummary>(`/admin/orders/summary?days=${days}`);
+  }
+
+  markAdminOrdersSeen() {
+    return this.request<{ ok: boolean }>('/admin/orders/mark-seen', {
+      method: 'POST',
+    });
   }
 
   approveAdminOrder(id: string) {

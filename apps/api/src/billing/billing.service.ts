@@ -12,7 +12,7 @@ import { UsersService } from '../users/users.service';
 import { CreditPackage } from './credit-package.entity';
 import { CreatePackageDto, UpdatePackageDto } from './dto/package.dto';
 import { Order, OrderStatus } from './order.entity';
-import { SumitService } from './sumit.service';
+import { SumitChargeResult, SumitService } from './sumit.service';
 
 /**
  * Default packs. The largest pack is the target rate (100 credits / ILS, i.e.
@@ -149,19 +149,15 @@ export class BillingService implements OnApplicationBootstrap {
   ) {
     const { order, user } = await this.loadPendingOrder(userId, orderId);
 
-    const result = await this.sumitService.charge({
-      singleUseToken,
-      amountIls: order.priceIls,
-      description: order.packageName,
-      customer: { name: user.email, email: user.email, externalId: user.id },
-      uniqueIdentifier: `order-${order.id}`,
-    });
-
-    if (!result.ok) {
-      throw new BadRequestException(
-        result.errorMessage || 'התשלום נדחה. נסי שוב.',
-      );
-    }
+    const result = await this.chargeOrRecordFailure(order, () =>
+      this.sumitService.charge({
+        singleUseToken,
+        amountIls: order.priceIls,
+        description: order.packageName,
+        customer: { name: user.email, email: user.email, externalId: user.id },
+        uniqueIdentifier: `order-${order.id}`,
+      }),
+    );
 
     if (saveCard && result.customerId && result.paymentMethodId) {
       await this.usersService.saveSumitPaymentMethod(user.id, {
@@ -187,22 +183,55 @@ export class BillingService implements OnApplicationBootstrap {
       throw new BadRequestException('אין כרטיס שמור. יש להזין פרטי תשלום.');
     }
 
-    const result = await this.sumitService.chargeSaved({
-      customerId: user.sumitCustomerId,
-      paymentMethodId: user.sumitPaymentMethodId,
-      amountIls: order.priceIls,
-      description: order.packageName,
-      customer: { name: user.email, email: user.email, externalId: user.id },
-      uniqueIdentifier: `order-${order.id}`,
-    });
-
-    if (!result.ok) {
-      throw new BadRequestException(
-        result.errorMessage || 'התשלום נדחה. נסי שוב.',
-      );
-    }
+    const result = await this.chargeOrRecordFailure(order, () =>
+      this.sumitService.chargeSaved({
+        customerId: user.sumitCustomerId!,
+        paymentMethodId: user.sumitPaymentMethodId!,
+        amountIls: order.priceIls,
+        description: order.packageName,
+        customer: { name: user.email, email: user.email, externalId: user.id },
+        uniqueIdentifier: `order-${order.id}`,
+      }),
+    );
 
     return this.fulfillOrder(order, user.credits, result.paymentId);
+  }
+
+  /**
+   * Runs a charge and, on a declined/errored payment, marks the order `failed`
+   * with the gateway message before rethrowing. This keeps a permanent record
+   * of *why* a purchase did not complete, so the admin can see the error
+   * instead of a silent `pending` row.
+   */
+  private async chargeOrRecordFailure(
+    order: Order,
+    charge: () => Promise<SumitChargeResult>,
+  ) {
+    let result: SumitChargeResult;
+    try {
+      result = await charge();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'שגיאת תקשורת מול חברת הסליקה';
+      await this.recordFailedCharge(order, message);
+      throw err;
+    }
+
+    if (!result.ok) {
+      const message = result.errorMessage || 'התשלום נדחה. נסי שוב.';
+      await this.recordFailedCharge(order, message);
+      throw new BadRequestException(message);
+    }
+
+    return result;
+  }
+
+  private async recordFailedCharge(order: Order, message: string) {
+    order.status = OrderStatus.FAILED;
+    order.failureReason = message.slice(0, 500);
+    order.failedAt = new Date();
+    order.provider = 'sumit';
+    await this.orderRepo.save(order);
   }
 
   /** Forgets the user's saved card so it is no longer offered/charged. */
@@ -263,6 +292,8 @@ export class BillingService implements OnApplicationBootstrap {
       .addSelect('o.credits', 'credits')
       .addSelect('o.status', 'status')
       .addSelect('o.note', 'note')
+      .addSelect('o.failureReason', 'failureReason')
+      .addSelect('o.failedAt', 'failedAt')
       .addSelect('o.decidedByUserId', 'decidedByUserId')
       .addSelect('o.decidedAt', 'decidedAt')
       .addSelect('o.createdAt', 'createdAt')
@@ -310,5 +341,68 @@ export class BillingService implements OnApplicationBootstrap {
 
   async countPendingOrders() {
     return this.orderRepo.count({ where: { status: OrderStatus.PENDING } });
+  }
+
+  /** Count of successful purchases the admin has not opened the page for yet. */
+  async countNewApprovedOrders() {
+    return this.orderRepo.count({
+      where: { status: OrderStatus.APPROVED, seenByAdmin: false },
+    });
+  }
+
+  /** Marks all successful purchases as seen (clears the admin nav badge). */
+  async markApprovedOrdersSeen() {
+    await this.orderRepo.update(
+      { status: OrderStatus.APPROVED, seenByAdmin: false },
+      { seenByAdmin: true },
+    );
+    return { ok: true };
+  }
+
+  /**
+   * Revenue summary for the admin dashboard: all-time totals plus a per-day
+   * revenue series for the last `days` days (approved orders only, keyed on the
+   * date the payment went through).
+   */
+  async getOrdersSummary(days = 30) {
+    const safeDays = Math.min(Math.max(Math.floor(days) || 30, 1), 365);
+
+    const totals = await this.orderRepo
+      .createQueryBuilder('o')
+      .select('COALESCE(SUM(o."priceIls"), 0)::float8', 'revenue')
+      .addSelect('COUNT(*)::int', 'count')
+      .where('o.status = :status', { status: OrderStatus.APPROVED })
+      .getRawOne<{ revenue: number; count: number }>();
+
+    const totalRevenue = Number(totals?.revenue ?? 0);
+    const totalOrders = Number(totals?.count ?? 0);
+
+    const from = new Date();
+    from.setHours(0, 0, 0, 0);
+    from.setDate(from.getDate() - (safeDays - 1));
+
+    const dateExpr = `date_trunc('day', COALESCE(o."decidedAt", o."createdAt"))`;
+    const series = await this.orderRepo
+      .createQueryBuilder('o')
+      .select(`to_char(${dateExpr}, 'YYYY-MM-DD')`, 'date')
+      .addSelect('COALESCE(SUM(o."priceIls"), 0)::float8', 'revenue')
+      .addSelect('COUNT(*)::int', 'count')
+      .where('o.status = :status', { status: OrderStatus.APPROVED })
+      .andWhere('COALESCE(o."decidedAt", o."createdAt") >= :from', { from })
+      .groupBy(dateExpr)
+      .orderBy(dateExpr, 'ASC')
+      .getRawMany<{ date: string; revenue: number; count: number }>();
+
+    return {
+      totalRevenue,
+      totalOrders,
+      avgOrder: totalOrders > 0 ? totalRevenue / totalOrders : 0,
+      days: safeDays,
+      series: series.map((row) => ({
+        date: row.date,
+        revenue: Number(row.revenue),
+        count: Number(row.count),
+      })),
+    };
   }
 }

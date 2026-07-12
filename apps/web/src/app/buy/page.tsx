@@ -9,12 +9,14 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   pending: 'ממתין לתשלום',
   approved: 'שולם',
   rejected: 'נדחה',
+  failed: 'נכשל',
 };
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
   pending: 'bg-yellow-500/20 text-yellow-400',
   approved: 'bg-green-500/20 text-green-400',
   rejected: 'bg-red-500/20 text-red-400',
+  failed: 'bg-red-500/20 text-red-400',
 };
 
 const SUMIT_COMPANY_ID = process.env.NEXT_PUBLIC_SUMIT_COMPANY_ID;
@@ -169,11 +171,12 @@ function BuyContent() {
     }
   };
 
-  // In gateway mode a "pending" order is just an unfinished/abandoned payment
-  // attempt — don't surface those as purchases. In manual-approval mode pending
-  // means "awaiting admin", so keep showing them.
+  // In gateway mode only completed purchases are shown to the user — a pending
+  // order is an abandoned attempt and a failed one is a declined charge, neither
+  // of which is a real purchase. In manual-approval mode pending means "awaiting
+  // admin", so keep showing everything.
   const visibleOrders = SUMIT_CONFIGURED
-    ? orders.filter((o) => o.status !== 'pending')
+    ? orders.filter((o) => o.status === 'approved')
     : orders;
   // The list can grow long; show only the latest few (already sorted DESC).
   const recentOrders = visibleOrders.slice(0, 5);

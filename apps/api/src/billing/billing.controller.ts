@@ -115,6 +115,23 @@ export class AdminBillingController {
       .then((pending) => ({ pending }));
   }
 
+  @Get('orders/new-count')
+  newCount() {
+    return this.billingService
+      .countNewApprovedOrders()
+      .then((count) => ({ count }));
+  }
+
+  @Get('orders/summary')
+  ordersSummary(@Query('days') days?: string) {
+    return this.billingService.getOrdersSummary(days ? Number(days) : 30);
+  }
+
+  @Post('orders/mark-seen')
+  markOrdersSeen() {
+    return this.billingService.markApprovedOrdersSeen();
+  }
+
   @Post('orders/:id/approve')
   approveOrder(
     @Param('id', ParseUUIDPipe) id: string,
