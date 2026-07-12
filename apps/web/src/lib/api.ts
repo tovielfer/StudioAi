@@ -12,12 +12,17 @@ export class ApiError extends Error {
   }
 }
 
-/** True when the failure is an upstream content-filter block (NetFree returns
- *  status 418 for blocked response bodies). */
+/** True when the failure is (likely) an upstream content-filter block. NetFree
+ *  returns status 418 for blocked response bodies, but because that response is
+ *  injected by the network proxy it often lacks CORS headers, so `fetch` rejects
+ *  with a `TypeError` ("Failed to fetch") and JS never sees the 418. We treat
+ *  both cases as a block; the salvage flow re-fetches in "safe" mode and only
+ *  rethrows if that safe request also fails (i.e. a genuine outage). */
 export function isBlockedError(err: unknown): boolean {
   if (err instanceof ApiError && err.status === 418) return true;
+  if (err instanceof TypeError) return true;
   const message = err instanceof Error ? err.message : '';
-  return /netfree|blocked by netfree/i.test(message);
+  return /netfree|blocked by netfree|failed to fetch|networkerror/i.test(message);
 }
 
 export interface User {
