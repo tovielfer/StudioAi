@@ -119,10 +119,11 @@ export class AdminService {
     return updated ?? { ...generation, status: GenerationStatus.CANCELLED };
   }
 
-  // Permanently removes already soft-deleted generations: deletes the stored
-  // result asset from storage and then hard-deletes the DB row. Only rows that
-  // are already soft-deleted (deletedAt set) are eligible, so this can't be used
-  // to nuke live creations. Returns how many rows were actually removed.
+  // Permanently removes generations: deletes the stored result asset from
+  // storage and then hard-deletes the DB row. An admin can remove any creation,
+  // including ones the user never deleted — the only exception is generations
+  // that are still running (pending/processing), which must be cancelled first
+  // so we don't nuke a live job mid-run. Returns how many rows were removed.
   async hardDeleteGenerations(ids: string[]) {
     const uniqueIds = Array.from(new Set(ids));
     if (uniqueIds.length === 0) {
@@ -134,10 +135,14 @@ export class AdminService {
       withDeleted: true,
     });
 
-    const deletable = generations.filter((g) => g.deletedAt !== null);
+    const deletable = generations.filter(
+      (g) =>
+        g.status !== GenerationStatus.PENDING &&
+        g.status !== GenerationStatus.PROCESSING,
+    );
     if (deletable.length === 0) {
       throw new BadRequestException(
-        'Only already-deleted generations can be permanently removed',
+        'Cannot permanently remove generations that are still pending or processing — cancel them first',
       );
     }
 

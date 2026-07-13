@@ -25,7 +25,9 @@ export function AdminGenerationCard({
 }) {
   const hasImage = Boolean(gen.resultUrl && gen.status === 'done');
   const isProcessing = gen.status === 'pending' || gen.status === 'processing';
-  const showCheckbox = selectable && Boolean(gen.deletedAt);
+  // Any finished creation can be permanently removed by an admin — even ones the
+  // user never deleted. Active (pending/processing) jobs can't be nuked mid-run.
+  const showCheckbox = selectable && !isProcessing;
   const isBlocked = Boolean(gen.blocked);
 
   return (
@@ -104,9 +106,9 @@ export function AdminGenerationCard({
           <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
             {STATUS_LABELS[gen.status] ?? gen.status}
           </span>
-          {gen.deletedAt && !showCheckbox && (
-            <span className="absolute right-2 top-2 rounded-full bg-red-600/90 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
-              נמחקה
+          {gen.deletedAt && (
+            <span className="absolute left-2 top-10 rounded-full bg-red-600/90 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
+              נמחקה ע"י המשתמש
             </span>
           )}
         </div>

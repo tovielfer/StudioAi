@@ -32,7 +32,9 @@ export function AdminGenerationModal({
   const tokens = generation.tokensUsed;
   const canStop =
     generation.status === 'pending' || generation.status === 'processing';
-  const isDeleted = Boolean(generation.deletedAt);
+  // An admin can permanently remove any finished creation, whether or not the
+  // user deleted it. Only active jobs must be cancelled first.
+  const canDelete = !canStop;
   const [sending, setSending] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -175,7 +177,7 @@ export function AdminGenerationModal({
                 {canceling ? 'עוצר...' : 'עצירת היצירה'}
               </button>
             )}
-            {isDeleted && (
+            {canDelete && (
               <button
                 type="button"
                 onClick={handleHardDelete}

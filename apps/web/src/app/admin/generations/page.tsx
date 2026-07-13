@@ -352,15 +352,16 @@ function AdminGenerationsContent() {
                       className="border-b border-gray-100 align-top hover:bg-gray-50"
                     >
                       <td className="py-3 pe-2 text-center">
-                        {generation.deletedAt && (
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.has(generation.id)}
-                            onChange={() => toggleSelect(generation)}
-                            className="h-4 w-4 cursor-pointer accent-red-600"
-                            aria-label="בחר יצירה למחיקה לצמיתות"
-                          />
-                        )}
+                        {generation.status !== 'pending' &&
+                          generation.status !== 'processing' && (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(generation.id)}
+                              onChange={() => toggleSelect(generation)}
+                              className="h-4 w-4 cursor-pointer accent-red-600"
+                              aria-label="בחר יצירה למחיקה לצמיתות"
+                            />
+                          )}
                       </td>
                       <td className="py-3 pe-4 font-medium text-gray-950">
                         <div className="flex items-center gap-2">
