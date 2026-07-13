@@ -245,7 +245,7 @@ export function AdminGenerationModal({
                 >
                   פתיחה
                 </a>
-                <button
+                {/* <button
                   type="button"
                   onClick={handleSendEmail}
                   disabled={sending}
@@ -253,7 +253,7 @@ export function AdminGenerationModal({
                 >
                   {sending ? <SpinnerIcon /> : <EnvelopeIcon />}
                   {sending ? 'שולח...' : 'שלח לי במייל'}
-                </button>
+                </button> */}
               </div>
             )}
             {emailToast && (
