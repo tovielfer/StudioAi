@@ -379,9 +379,15 @@ export class BillingService implements OnApplicationBootstrap {
 
     const from = new Date();
     from.setHours(0, 0, 0, 0);
-    from.setDate(from.getDate() - (safeDays - 1));
+    // Subtract an extra day so the earliest visible day is fully covered even
+    // though the window boundary is an absolute instant rather than an
+    // Israel-local midnight (the frontend only reads the days it renders).
+    from.setDate(from.getDate() - safeDays);
 
-    const dateExpr = `date_trunc('day', COALESCE(o."decidedAt", o."createdAt"))`;
+    // Bucket by Israel calendar day (not the DB session timezone, which is
+    // typically UTC). This must match the day key the admin UI uses so the
+    // per-day totals and the click-to-drill breakdown line up.
+    const dateExpr = `date_trunc('day', COALESCE(o."decidedAt", o."createdAt") AT TIME ZONE 'Asia/Jerusalem')`;
     const series = await this.orderRepo
       .createQueryBuilder('o')
       .select(`to_char(${dateExpr}, 'YYYY-MM-DD')`, 'date')

@@ -40,23 +40,44 @@ function formatIls(value: number) {
   return `₪${value.toLocaleString('he-IL', { maximumFractionDigits: 0 })}`;
 }
 
+// The chart buckets purchases by Israel calendar day. We compute the day key in
+// Asia/Jerusalem explicitly (not the viewer's local timezone) so the bars and
+// the click-to-drill breakdown always agree with the backend, regardless of
+// where the admin is browsing from.
+const IL_TIME_ZONE = 'Asia/Jerusalem';
+const ilDayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: IL_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** Returns the 'YYYY-MM-DD' Israel-local day for a given instant. */
+function ilDayKey(date: Date) {
+  return ilDayKeyFormatter.format(date);
+}
+
 type ChartPoint = { key: string; label: string; revenue: number; count: number };
 
-/** Builds a zero-filled per-day series for the last `days` days. */
+/** Builds a zero-filled per-day series for the last `days` days (Israel time). */
 function buildChartData(summary: OrdersSummary | null): ChartPoint[] {
   if (!summary) return [];
   const byDate = new Map(summary.series.map((s) => [s.date, s]));
   const out: ChartPoint[] = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Anchor at the current Israel calendar day, then walk back day-by-day using
+  // a UTC-noon anchor so DST transitions can't duplicate or skip a day.
+  const [y, m, d] = ilDayKey(new Date()).split('-').map(Number);
+  const anchor = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
   for (let i = summary.days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const day = new Date(anchor);
+    day.setUTCDate(day.getUTCDate() - i);
+    const mm = String(day.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(day.getUTCDate()).padStart(2, '0');
+    const key = `${day.getUTCFullYear()}-${mm}-${dd}`;
     const entry = byDate.get(key);
     out.push({
       key,
-      label: d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' }),
+      label: `${dd}.${mm}`,
       revenue: entry?.revenue ?? 0,
       count: entry?.count ?? 0,
     });
@@ -64,10 +85,9 @@ function buildChartData(summary: OrdersSummary | null): ChartPoint[] {
   return out;
 }
 
-/** Local YYYY-MM-DD key for an order, matching the chart's day buckets. */
+/** Israel-local YYYY-MM-DD key for an order, matching the chart's day buckets. */
 function orderDayKey(order: Order) {
-  const d = new Date(order.decidedAt || order.createdAt);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return ilDayKey(new Date(order.decidedAt || order.createdAt));
 }
 
 /** Custom tooltip showing both revenue and purchase count for a day. */
