@@ -400,7 +400,7 @@ class ApiClient {
 
   sendGenerationByEmail(id: string) {
     return this.request<{ success: boolean }>(
-      `/generations/${id}/send-email`,
+      `/generations/${id}/deliver`,
       { method: 'POST' },
     );
   }
@@ -576,7 +576,7 @@ class ApiClient {
 
   sendAdminGenerationByEmail(id: string) {
     return this.request<{ success: boolean }>(
-      `/admin/generations/${id}/send-email`,
+      `/admin/generations/${id}/deliver`,
       { method: 'POST' },
     );
   }
@@ -606,7 +606,7 @@ class ApiClient {
 
   sendAdminUserEmail(userId: string, subject: string, message: string) {
     return this.request<{ success: boolean }>(
-      `/admin/users/${userId}/send-email`,
+      `/admin/users/${userId}/deliver`,
       {
         method: 'POST',
         body: JSON.stringify({ subject, message }),

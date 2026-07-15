@@ -155,7 +155,7 @@ export class GenerationsController {
     });
   }
 
-  @Post(':id/send-email')
+  @Post(':id/deliver')
   @UseGuards(JwtAuthGuard)
   async sendEmail(
     @Req() req: { user: { id: string; email: string } },

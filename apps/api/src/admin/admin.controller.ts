@@ -128,7 +128,7 @@ export class AdminController {
     return this.adminService.hardDeleteGenerations(dto.ids);
   }
 
-  @Post('generations/:id/send-email')
+  @Post('generations/:id/deliver')
   sendGenerationEmail(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: { user: { email: string } },
@@ -195,7 +195,7 @@ export class AdminController {
     return this.adminService.addCredits(id, dto.amount, dto.reason);
   }
 
-  @Post('users/:id/send-email')
+  @Post('users/:id/deliver')
   sendUserEmail(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SendUserEmailDto,
