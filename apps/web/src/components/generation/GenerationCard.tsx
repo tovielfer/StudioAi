@@ -145,7 +145,7 @@ export function GenerationCard({
             <OpenIcon />
           </a>
         </Tooltip>
-        {onSendEmail && (
+        {/* {onSendEmail && (
           <Tooltip label="שלח לי במייל">
             <button
               type="button"
@@ -157,7 +157,7 @@ export function GenerationCard({
               {sendingEmail ? <SpinnerIcon /> : <EnvelopeIcon />}
             </button>
           </Tooltip>
-        )}
+        )} */}
       </div>
       {onDelete && (
         <div className="absolute bottom-2 left-2 opacity-100 md:translate-y-1 md:opacity-0 md:transition md:duration-200 md:ease-out md:group-hover:translate-y-0 md:group-hover:opacity-100">
