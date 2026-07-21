@@ -177,36 +177,19 @@ export class MailService {
     const assetLabel = isVideo ? 'הסרטון' : 'התמונה';
     const readyLabel = isVideo ? 'הסרטון מוכן' : 'התמונה מוכנה';
     const subject = isVideo ? 'הסרטון שיצרת מצורף 🎬' : 'התמונה שיצרת מצורפת 🖼️';
+    const accent = '#7c3aed';
 
-    const html = `
-      <div style="background-color: #0f0f13; padding: 0; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">
-        <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px;">
-          <!-- Header / Logo -->
-          <div dir="rtl" style="text-align: right; margin-bottom: 28px;">
-            <span style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">vooka</span><span style="font-size: 22px; font-weight: 700; color: #a78bfa;">Pix</span>
-          </div>
+    const html = this.renderEmail({
+      accent,
+      icon: '✨',
+      heading: `${readyLabel}!`,
+      bodyHtml: `
+            <p style="margin: 0 0 12px; color: #374151;">צירפנו את ${assetLabel} למייל הזה כקובץ.</p>
+            <p style="margin: 0 0 4px; color: #6b7280; font-size: 14px;"><strong style="color: ${accent};">תיאור:</strong> ${this.escapeHtml(generation.prompt)}</p>`,
+      cta: { label: 'ליצירה נוספת', url: `${this.siteUrl()}/create` },
+    });
 
-          <!-- Card -->
-          <div dir="rtl" style="background: #1a1a24; border: 1px solid #2d2d3d; border-radius: 16px; padding: 28px 24px; text-align: right; line-height: 1.7; color: #e5e7eb;">
-            <h2 style="margin: 0 0 12px; font-size: 20px; color: #ffffff;">${readyLabel}! ✨</h2>
-            <p style="margin: 0 0 8px; color: #d1d5db;">צירפנו את ${assetLabel} למייל הזה כקובץ.</p>
-            <p style="margin: 0 0 16px; color: #9ca3af; font-size: 14px;">
-              <strong style="color: #c4b5fd;">תיאור:</strong> ${this.escapeHtml(generation.prompt)}
-            </p>
-            <div style="border-top: 1px solid #2d2d3d; padding-top: 16px; margin-top: 8px;">
-              <p style="margin: 0; color: #6b7280; font-size: 13px;">תודה שבחרת ב‑<strong style="color: #a78bfa;">vookaPix</strong> 🙏</p>
-            </div>
-          </div>
-
-          <!-- Footer -->
-          <p style="text-align: center; margin-top: 20px; color: #4b5563; font-size: 12px;">
-            © ${new Date().getFullYear()} vookaPix · כל הזכויות שמורות
-          </p>
-        </div>
-      </div>
-    `;
-
-    const text = `${readyLabel}!\n\nצירפנו את ${assetLabel} למייל הזה כקובץ.\n\nתיאור: ${generation.prompt}\n\nתודה שבחרת ב-vookaPix.`;
+    const text = `${readyLabel}!\n\nצירפנו את ${assetLabel} למייל הזה כקובץ.\n\nתיאור: ${generation.prompt}${this.buildFooterText()}`;
 
     const { error } = await resend.emails.send({
       from,
@@ -256,33 +239,21 @@ export class MailService {
       this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000'
     ).replace(/\/+$/, '');
     const feedbackUrl = `${frontendUrl}/feedback`;
+    const accent = '#2563eb';
 
-    const html = `
-      <div style="background-color: #0f0f13; padding: 0; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">
-        <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px;">
-          <div dir="rtl" style="text-align: right; margin-bottom: 28px;">
-            <span style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">vooka</span><span style="font-size: 22px; font-weight: 700; color: #a78bfa;">Pix</span>
-          </div>
-          <div dir="rtl" style="background: #1a1a24; border: 1px solid #2d2d3d; border-radius: 16px; padding: 28px 24px; text-align: right; line-height: 1.7; color: #e5e7eb;">
-            <h2 style="margin: 0 0 12px; font-size: 20px; color: #ffffff;">קיבלת תגובה לפניה שלך 💬</h2>
-            <p style="margin: 0 0 8px; color: #9ca3af; font-size: 13px;">
-              <strong style="color: #c4b5fd;">הפניה שלך:</strong> ${this.escapeHtml(feedbackTitle || feedbackMessage.slice(0, 80))}
-            </p>
-            <div style="background: #111118; border-right: 3px solid #7c3aed; border-radius: 8px; padding: 14px 16px; margin: 16px 0; color: #e5e7eb;">
+    const html = this.renderEmail({
+      accent,
+      icon: '💬',
+      heading: 'קיבלת תגובה לפנייה שלך',
+      bodyHtml: `
+            <p style="margin: 0 0 12px; color: #6b7280; font-size: 13px;"><strong style="color: ${accent};">הפנייה שלך:</strong> ${this.escapeHtml(feedbackTitle || feedbackMessage.slice(0, 80))}</p>
+            <div style="background: #f3f6fd; border-right: 3px solid ${accent}; border-radius: 8px; padding: 14px 16px; margin: 8px 0; color: #374151;">
               ${this.escapeHtml(adminReply).replace(/\n/g, '<br>')}
-            </div>
-            <div style="border-top: 1px solid #2d2d3d; padding-top: 16px; margin-top: 8px;">
-              <p style="margin: 0; color: #6b7280; font-size: 13px;">תוכל לראות את כל הפניות שלך ב‑<a href="${feedbackUrl}" style="color: #a78bfa; text-decoration: none;">אזור הפניות</a>.</p>
-            </div>
-          </div>
-          <p style="text-align: center; margin-top: 20px; color: #4b5563; font-size: 12px;">
-            © ${new Date().getFullYear()} vookaPix · כל הזכויות שמורות
-          </p>
-        </div>
-      </div>
-    `;
+            </div>`,
+      cta: { label: 'לצפייה בפניות שלך', url: feedbackUrl },
+    });
 
-    const text = `קיבלת תגובה לפניה שלך ב-vookaPix.\n\nהפניה: ${feedbackTitle || feedbackMessage.slice(0, 80)}\n\nתגובה:\n${adminReply}`;
+    const text = `קיבלת תגובה לפנייה שלך ב-vookaPix.\n\nהפנייה: ${feedbackTitle || feedbackMessage.slice(0, 80)}\n\nתגובה:\n${adminReply}${this.buildFooterText()}`;
 
     const { error } = await resend.emails.send({
       from,
@@ -349,47 +320,37 @@ export class MailService {
       ? typeLabels[feedbackType] ?? feedbackType
       : null;
 
+    const accent = '#ea580c';
     const senderLine = senderEmail
-      ? `<p style="margin: 0 0 8px; color: #9ca3af; font-size: 13px;"><strong style="color: #c4b5fd;">מאת:</strong> ${this.escapeHtml(senderEmail)}</p>`
+      ? `<p style="margin: 0 0 8px; color: #6b7280; font-size: 13px;"><strong style="color: ${accent};">מאת:</strong> ${this.escapeHtml(senderEmail)}</p>`
       : '';
     const typeLine = typeLabel
-      ? `<p style="margin: 0 0 8px; color: #9ca3af; font-size: 13px;"><strong style="color: #c4b5fd;">סוג:</strong> ${this.escapeHtml(typeLabel)}</p>`
+      ? `<p style="margin: 0 0 8px; color: #6b7280; font-size: 13px;"><strong style="color: ${accent};">סוג:</strong> ${this.escapeHtml(typeLabel)}</p>`
       : '';
 
-    const heading = isReply ? 'תגובה חדשה לפנייה 💬' : 'פנייה חדשה התקבלה 📨';
+    const heading = isReply ? 'תגובה חדשה לפנייה' : 'פנייה חדשה התקבלה';
     const subjectPrefix = isReply ? 'תגובה חדשה לפנייה' : 'פנייה חדשה התקבלה';
     // Set reply-to to the sender's own address so the admin can just hit
     // "Reply" in their mail client and answer the user directly.
     const replyToSender = senderEmail ? this.sanitizeFrom(senderEmail) : null;
 
-    const html = `
-      <div style="background-color: #0f0f13; padding: 0; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">
-        <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px;">
-          <div dir="rtl" style="text-align: right; margin-bottom: 28px;">
-            <span style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">vooka</span><span style="font-size: 22px; font-weight: 700; color: #a78bfa;">Pix</span>
-          </div>
-          <div dir="rtl" style="background: #1a1a24; border: 1px solid #2d2d3d; border-radius: 16px; padding: 28px 24px; text-align: right; line-height: 1.7; color: #e5e7eb;">
-            <h2 style="margin: 0 0 12px; font-size: 20px; color: #ffffff;">${heading}</h2>
-            <p style="margin: 0 0 8px; color: #d1d5db;"><strong style="color: #c4b5fd;">כותרת:</strong> ${this.escapeHtml(feedbackTitle || '(ללא כותרת)')}</p>
+    const html = this.renderEmail({
+      accent,
+      icon: isReply ? '💬' : '📨',
+      heading,
+      bodyHtml: `
+            <p style="margin: 0 0 8px; color: #374151;"><strong style="color: ${accent};">כותרת:</strong> ${this.escapeHtml(feedbackTitle || '(ללא כותרת)')}</p>
             ${senderLine}
             ${typeLine}
-            <div style="background: #111118; border-right: 3px solid #7c3aed; border-radius: 8px; padding: 14px 16px; margin: 16px 0; color: #e5e7eb;">
+            <div style="background: #fff7ed; border-right: 3px solid ${accent}; border-radius: 8px; padding: 14px 16px; margin: 12px 0; color: #374151;">
               ${this.escapeHtml(feedbackMessage).replace(/\n/g, '<br>')}
-            </div>
-            <div style="text-align: center; margin: 24px 0 8px;">
-              <a href="${adminUrl}" style="display: inline-block; background: #7c3aed; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-size: 14px; font-weight: 600;">פתיחת הפנייה בניהול</a>
-            </div>
-          </div>
-          <p style="text-align: center; margin-top: 20px; color: #4b5563; font-size: 12px;">
-            © ${new Date().getFullYear()} vookaPix · כל הזכויות שמורות
-          </p>
-        </div>
-      </div>
-    `;
+            </div>`,
+      cta: { label: 'פתיחת הפנייה בניהול', url: adminUrl },
+    });
 
     const text = `${subjectPrefix} ב-vookaPix.\n\nכותרת: ${feedbackTitle || '(ללא כותרת)'}${
       senderEmail ? `\nמאת: ${senderEmail}` : ''
-    }${typeLabel ? `\nסוג: ${typeLabel}` : ''}\n\n${feedbackMessage}\n\nניהול: ${adminUrl}`;
+    }${typeLabel ? `\nסוג: ${typeLabel}` : ''}\n\n${feedbackMessage}\n\nניהול: ${adminUrl}${this.buildFooterText()}`;
 
     const { error } = await resend.emails.send({
       from,
@@ -419,29 +380,19 @@ export class MailService {
     subject: string,
     message: string,
   ): { html: string; text: string } {
-    const html = `
-      <div style="background-color: #0f0f13; padding: 0; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">
-        <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px;">
-          <div dir="rtl" style="text-align: right; margin-bottom: 28px;">
-            <span style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">vooka</span><span style="font-size: 22px; font-weight: 700; color: #a78bfa;">Pix</span>
-          </div>
-          <div dir="rtl" style="background: #1a1a24; border: 1px solid #2d2d3d; border-radius: 16px; padding: 28px 24px; text-align: right; line-height: 1.7; color: #e5e7eb;">
-            <h2 style="margin: 0 0 16px; font-size: 20px; color: #ffffff;">${this.escapeHtml(subject)}</h2>
-            <div style="color: #d1d5db; font-size: 15px;">
+    const accent = '#7c3aed';
+    const html = this.renderEmail({
+      accent,
+      icon: '🙏',
+      heading: subject,
+      bodyHtml: `
+            <div style="color: #374151; font-size: 15px;">
               ${this.escapeHtml(message).replace(/\n/g, '<br>')}
             </div>
-            <div style="border-top: 1px solid #2d2d3d; padding-top: 16px; margin-top: 20px;">
-              <p style="margin: 0; color: #6b7280; font-size: 13px;">בברכה, צוות <strong style="color: #a78bfa;">vookaPix</strong> 🙏</p>
-            </div>
-          </div>
-          <p style="text-align: center; margin-top: 20px; color: #4b5563; font-size: 12px;">
-            © ${new Date().getFullYear()} vookaPix · כל הזכויות שמורות
-          </p>
-        </div>
-      </div>
-    `;
+            <p style="margin: 20px 0 0; color: #6b7280; font-size: 13px;">בברכה, צוות <strong style="color: ${accent};">vookaPix</strong></p>`,
+    });
 
-    const text = `${subject}\n\n${message}\n\nבברכה, צוות vookaPix`;
+    const text = `${subject}\n\n${message}\n\nבברכה, צוות vookaPix${this.buildFooterText()}`;
 
     return { html, text };
   }
@@ -546,6 +497,81 @@ export class MailService {
       .replace(/'/g, '&#039;');
   }
 
+  // The absolute base URL of the site. Email clients turn a relative "/foo"
+  // into an invalid "http:///foo", so links and image sources must be
+  // absolute. Falls back to localhost for local dev; strips trailing slashes.
+  private siteUrl(): string {
+    return (
+      this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000'
+    ).replace(/\/+$/, '');
+  }
+
+  // The logo is served from the web app's public folder. Referencing it as a
+  // hosted URL (instead of an attachment) means updating the site logo also
+  // updates every future email automatically.
+  private logoUrl(): string {
+    return `${this.siteUrl()}/logo.png`;
+  }
+
+  // Shared branded wrapper for every outgoing email. A light, modern layout:
+  // light-gray canvas, a white rounded card, a dark header band that holds the
+  // logo (the logo image has a baked-in dark background, so a matching band
+  // keeps it seamless), a per-email accent color/icon for light differentiation
+  // between mail types, and a unified footer that invites the user to reply or
+  // visit the site. Uses inline styles only, as required by email clients.
+  private renderEmail(opts: {
+    accent: string;
+    heading: string;
+    bodyHtml: string;
+    icon?: string;
+    cta?: { label: string; url: string };
+  }): string {
+    const { accent, heading, bodyHtml, icon, cta } = opts;
+    const site = this.siteUrl();
+    const logo = this.logoUrl();
+    const year = new Date().getFullYear();
+
+    const iconHtml = icon
+      ? `<span style="margin-left: 8px;">${icon}</span>`
+      : '';
+
+    const ctaHtml = cta
+      ? `
+            <div style="text-align: center; margin: 28px 0 4px;">
+              <a href="${cta.url}" style="display: inline-block; background: ${accent}; color: #ffffff; text-decoration: none; padding: 13px 30px; border-radius: 10px; font-size: 15px; font-weight: 600;">${cta.label}</a>
+            </div>`
+      : '';
+
+    return `
+      <div style="background-color: #f4f4f7; padding: 32px 16px; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">
+        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 6px 28px rgba(17, 24, 39, 0.08);">
+          <!-- Header band with logo -->
+          <div style="background: #0f0f13; border-top: 4px solid ${accent}; padding: 24px; text-align: center;">
+            <a href="${site}" style="text-decoration: none;">
+              <img src="${logo}" alt="vookaPix" width="150" style="display: inline-block; width: 150px; max-width: 55%; height: auto; border: 0;" />
+            </a>
+          </div>
+          <!-- Body -->
+          <div dir="rtl" style="padding: 32px 28px; text-align: right; line-height: 1.75; color: #374151;">
+            <h2 style="margin: 0 0 16px; font-size: 21px; color: #111827;">${heading}${iconHtml}</h2>
+            ${bodyHtml}${ctaHtml}
+          </div>
+          <!-- Footer -->
+          <div dir="rtl" style="border-top: 1px solid #ececf1; padding: 22px 28px; text-align: center; color: #6b7280; font-size: 13px; line-height: 1.7;">
+            <p style="margin: 0 0 6px;">אפשר להשיב ישירות למייל הזה, או <a href="${site}" style="color: ${accent}; text-decoration: none; font-weight: 600;">להיכנס לאתר</a>.</p>
+            <p style="margin: 0; color: #9ca3af; font-size: 12px;">© ${year} vookaPix · כל הזכויות שמורות</p>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Unified sign-off lines appended to every plain-text email body, mirroring
+  // the HTML footer.
+  private buildFooterText(): string {
+    return `\n\nאפשר להשיב ישירות למייל הזה, או להיכנס לאתר: ${this.siteUrl()}\n© ${new Date().getFullYear()} vookaPix · כל הזכויות שמורות`;
+  }
+
   async sendEmailVerification({
     to,
     verifyUrl,
@@ -555,28 +581,18 @@ export class MailService {
   }): Promise<void> {
     const { resend, from, replyTo } = this.getClient();
 
-    const html = `
-      <div style="background-color: #0f0f13; padding: 0; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">
-        <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px;">
-          <div dir="rtl" style="text-align: right; margin-bottom: 28px;">
-            <span style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">vooka</span><span style="font-size: 22px; font-weight: 700; color: #a78bfa;">Pix</span>
-          </div>
-          <div dir="rtl" style="background: #1a1a24; border: 1px solid #2d2d3d; border-radius: 16px; padding: 28px 24px; text-align: right; line-height: 1.7; color: #e5e7eb;">
-            <h2 style="margin: 0 0 12px; font-size: 20px; color: #ffffff;">אימות כתובת המייל שלך ✉️</h2>
-            <p style="margin: 0 0 16px; color: #d1d5db;">לחץ על הכפתור כדי לאמת את הכתובת ולהתחיל ליצור:</p>
-            <div style="text-align: center; margin: 24px 0;">
-              <a href="${verifyUrl}" style="display: inline-block; background: #7c3aed; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-size: 15px; font-weight: 600;">אמת את המייל</a>
-            </div>
-            <p style="margin: 0; color: #6b7280; font-size: 13px;">הקישור תקף ל-24 שעות. אם לא נרשמת אצלנו, תוכל להתעלם מהמייל הזה.</p>
-          </div>
-          <p style="text-align: center; margin-top: 20px; color: #4b5563; font-size: 12px;">
-            © ${new Date().getFullYear()} vookaPix · כל הזכויות שמורות
-          </p>
-        </div>
-      </div>
-    `;
+    const accent = '#16a34a';
+    const html = this.renderEmail({
+      accent,
+      icon: '✉️',
+      heading: 'אימות כתובת המייל שלך',
+      bodyHtml: `
+            <p style="margin: 0 0 4px; color: #374151;">לחץ על הכפתור כדי לאמת את הכתובת ולהתחיל ליצור:</p>
+            <p style="margin: 16px 0 0; color: #6b7280; font-size: 13px;">הקישור תקף ל-24 שעות. אם לא נרשמת אצלנו, תוכל להתעלם מהמייל הזה.</p>`,
+      cta: { label: 'אמת את המייל', url: verifyUrl },
+    });
 
-    const text = `אמת את המייל שלך ב-vookaPix:\n\n${verifyUrl}\n\nהקישור תקף ל-24 שעות.`;
+    const text = `אמת את המייל שלך ב-vookaPix:\n\n${verifyUrl}\n\nהקישור תקף ל-24 שעות.${this.buildFooterText()}`;
 
     const { error } = await resend.emails.send({
       from,
@@ -603,28 +619,18 @@ export class MailService {
   }): Promise<void> {
     const { resend, from, replyTo } = this.getClient();
 
-    const html = `
-      <div style="background-color: #0f0f13; padding: 0; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">
-        <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px;">
-          <div dir="rtl" style="text-align: right; margin-bottom: 28px;">
-            <span style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">vooka</span><span style="font-size: 22px; font-weight: 700; color: #a78bfa;">Pix</span>
-          </div>
-          <div dir="rtl" style="background: #1a1a24; border: 1px solid #2d2d3d; border-radius: 16px; padding: 28px 24px; text-align: right; line-height: 1.7; color: #e5e7eb;">
-            <h2 style="margin: 0 0 12px; font-size: 20px; color: #ffffff;">איפוס סיסמה 🔑</h2>
-            <p style="margin: 0 0 16px; color: #d1d5db;">קיבלנו בקשה לאיפוס הסיסמה שלך. לחץ על הכפתור להגדרת סיסמה חדשה:</p>
-            <div style="text-align: center; margin: 24px 0;">
-              <a href="${resetUrl}" style="display: inline-block; background: #7c3aed; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-size: 15px; font-weight: 600;">איפוס סיסמה</a>
-            </div>
-            <p style="margin: 0; color: #6b7280; font-size: 13px;">הקישור תקף לשעה אחת. אם לא ביקשת לאפס סיסמה, אפשר להתעלם מהמייל הזה.</p>
-          </div>
-          <p style="text-align: center; margin-top: 20px; color: #4b5563; font-size: 12px;">
-            © ${new Date().getFullYear()} vookaPix · כל הזכויות שמורות
-          </p>
-        </div>
-      </div>
-    `;
+    const accent = '#d97706';
+    const html = this.renderEmail({
+      accent,
+      icon: '🔑',
+      heading: 'איפוס סיסמה',
+      bodyHtml: `
+            <p style="margin: 0 0 4px; color: #374151;">קיבלנו בקשה לאיפוס הסיסמה שלך. לחץ על הכפתור להגדרת סיסמה חדשה:</p>
+            <p style="margin: 16px 0 0; color: #6b7280; font-size: 13px;">הקישור תקף לשעה אחת. אם לא ביקשת לאפס סיסמה, אפשר להתעלם מהמייל הזה.</p>`,
+      cta: { label: 'איפוס סיסמה', url: resetUrl },
+    });
 
-    const text = `איפוס סיסמה ב-vookaPix:\n\n${resetUrl}\n\nהקישור תקף לשעה אחת.`;
+    const text = `איפוס סיסמה ב-vookaPix:\n\n${resetUrl}\n\nהקישור תקף לשעה אחת.${this.buildFooterText()}`;
 
     const { error } = await resend.emails.send({
       from,
