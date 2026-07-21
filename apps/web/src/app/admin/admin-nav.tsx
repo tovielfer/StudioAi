@@ -51,6 +51,11 @@ const ADMIN_LINKS = [
     label: 'רכישות',
     description: 'מכירות ותקלות',
   },
+  {
+    href: '/admin/broadcast',
+    label: 'דיוור',
+    description: 'מייל לכל המשתמשים',
+  },
 ];
 
 export function AdminNav() {
@@ -70,7 +75,7 @@ export function AdminNav() {
   }, [pathname]);
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-9">
+    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-10">
       {ADMIN_LINKS.map((link) => {
         const isActive = pathname === link.href;
         const badge =

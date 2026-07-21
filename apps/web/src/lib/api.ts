@@ -48,6 +48,12 @@ export type AdminUsersSort =
   | 'credits'
   | 'email';
 
+export interface BroadcastFilters {
+  onlyVerified: boolean;
+  excludeBlocked: boolean;
+  excludeAdmins: boolean;
+}
+
 export interface AuthResponse {
   token: string;
   user: User;
@@ -612,6 +618,40 @@ class ApiClient {
         body: JSON.stringify({ subject, message }),
       },
     );
+  }
+
+  countAdminBroadcastRecipients(filters: BroadcastFilters) {
+    const params = new URLSearchParams({
+      onlyVerified: String(filters.onlyVerified),
+      excludeBlocked: String(filters.excludeBlocked),
+      excludeAdmins: String(filters.excludeAdmins),
+    });
+    return this.request<{ total: number }>(
+      `/admin/broadcast/recipients?${params.toString()}`,
+    );
+  }
+
+  sendAdminBroadcast(
+    subject: string,
+    message: string,
+    filters: BroadcastFilters,
+  ) {
+    return this.request<{
+      success: boolean;
+      total: number;
+      sent: number;
+      failed: number;
+    }>(`/admin/broadcast`, {
+      method: 'POST',
+      body: JSON.stringify({ subject, message, ...filters }),
+    });
+  }
+
+  sendAdminBroadcastTest(subject: string, message: string, to: string) {
+    return this.request<{ success: boolean }>(`/admin/broadcast/test`, {
+      method: 'POST',
+      body: JSON.stringify({ subject, message, to }),
+    });
   }
 
   updateAdminUser(

@@ -17,6 +17,12 @@ import { creditsToIls, getBillingConfig, usdToCredits } from '../config/billing'
 import { User, UserRole } from '../users/user.entity';
 import { UpdatePricingRuleDto } from './dto/update-pricing-rule.dto';
 
+type BroadcastFilters = {
+  onlyVerified?: boolean;
+  excludeBlocked?: boolean;
+  excludeAdmins?: boolean;
+};
+
 type PricingMetric = {
   generationCount: number;
   doneCount: number;
@@ -309,6 +315,81 @@ export class AdminService {
 
     await this.mailService.sendCustomEmail({
       to: user.email,
+      subject: subject.trim(),
+      message: message.trim(),
+    });
+
+    return { success: true };
+  }
+
+  // Builds the recipient list for a broadcast based on the admin's audience
+  // filters. `emailVerified`/`isBlocked`/admin filtering happens in SQL so we
+  // only pull the addresses we actually intend to email.
+  private buildBroadcastRecipientQuery(filters: BroadcastFilters) {
+    const {
+      onlyVerified = true,
+      excludeBlocked = true,
+      excludeAdmins = false,
+    } = filters;
+
+    const qb = this.usersRepo.createQueryBuilder('u');
+    if (onlyVerified) {
+      qb.andWhere('u."emailVerified" = true');
+    }
+    if (excludeBlocked) {
+      qb.andWhere('u."isBlocked" = false');
+    }
+    if (excludeAdmins) {
+      qb.andWhere('u.role != :adminRole', { adminRole: UserRole.ADMIN });
+    }
+    return qb;
+  }
+
+  // How many users would receive a broadcast with the given filters. Used to
+  // show a recipient-count preview before the admin commits to a bulk send.
+  async countBroadcastRecipients(filters: BroadcastFilters) {
+    const total = await this.buildBroadcastRecipientQuery(filters).getCount();
+    return { total };
+  }
+
+  // Sends a branded broadcast to every user matching the audience filters.
+  async broadcastEmail(
+    subject: string,
+    message: string,
+    filters: BroadcastFilters,
+  ) {
+    const rows = await this.buildBroadcastRecipientQuery(filters)
+      .select('u.email', 'email')
+      .getRawMany<{ email: string }>();
+
+    const recipients = Array.from(
+      new Set(
+        rows
+          .map((r) => r.email?.trim())
+          .filter((email): email is string => Boolean(email)),
+      ),
+    );
+
+    if (recipients.length === 0) {
+      throw new BadRequestException(
+        'No users match the selected audience for this broadcast',
+      );
+    }
+
+    const { sent, failed } = await this.mailService.sendBroadcast({
+      recipients,
+      subject: subject.trim(),
+      message: message.trim(),
+    });
+
+    return { success: failed === 0, total: recipients.length, sent, failed };
+  }
+
+  // Sends a single test copy of the broadcast to one address so the admin can
+  // preview exactly what recipients will get before sending to everyone.
+  async sendBroadcastTest(to: string, subject: string, message: string) {
+    await this.mailService.sendCustomEmail({
+      to: to.trim(),
       subject: subject.trim(),
       message: message.trim(),
     });

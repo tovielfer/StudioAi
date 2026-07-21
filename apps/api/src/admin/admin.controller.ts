@@ -18,6 +18,10 @@ import { GenerationStatus } from '../common/constants';
 import { AdminService } from './admin.service';
 import { AddUserCreditsDto } from './dto/add-user-credits.dto';
 import { HardDeleteGenerationsDto } from './dto/hard-delete-generations.dto';
+import {
+  SendBroadcastDto,
+  SendBroadcastTestDto,
+} from './dto/send-broadcast.dto';
 import { SendUserEmailDto } from './dto/send-user-email.dto';
 import { UpdatePricingRuleDto } from './dto/update-pricing-rule.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -201,5 +205,32 @@ export class AdminController {
     @Body() dto: SendUserEmailDto,
   ) {
     return this.adminService.sendUserEmail(id, dto.subject, dto.message);
+  }
+
+  @Get('broadcast/recipients')
+  countBroadcastRecipients(
+    @Query('onlyVerified') onlyVerified?: string,
+    @Query('excludeBlocked') excludeBlocked?: string,
+    @Query('excludeAdmins') excludeAdmins?: string,
+  ) {
+    return this.adminService.countBroadcastRecipients({
+      onlyVerified: onlyVerified !== 'false',
+      excludeBlocked: excludeBlocked !== 'false',
+      excludeAdmins: excludeAdmins === 'true',
+    });
+  }
+
+  @Post('broadcast/test')
+  sendBroadcastTest(@Body() dto: SendBroadcastTestDto) {
+    return this.adminService.sendBroadcastTest(dto.to, dto.subject, dto.message);
+  }
+
+  @Post('broadcast')
+  broadcast(@Body() dto: SendBroadcastDto) {
+    return this.adminService.broadcastEmail(dto.subject, dto.message, {
+      onlyVerified: dto.onlyVerified ?? true,
+      excludeBlocked: dto.excludeBlocked ?? true,
+      excludeAdmins: dto.excludeAdmins ?? false,
+    });
   }
 }

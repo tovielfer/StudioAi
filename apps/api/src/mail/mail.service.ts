@@ -300,20 +300,14 @@ export class MailService {
     this.logger.log(`Sent feedback reply email to ${to}`);
   }
 
-  // A general-purpose branded email an admin can send to a specific user from
-  // the admin area. The message is plain text entered by the admin; we escape
-  // it and preserve line breaks so it renders safely inside the HTML template.
-  async sendCustomEmail({
-    to,
-    subject,
-    message,
-  }: {
-    to: string;
-    subject: string;
-    message: string;
-  }): Promise<void> {
-    const { resend, from, replyTo } = this.getClient();
-
+  // Builds the branded HTML + plain-text body for an admin-authored message.
+  // The message is plain text entered by the admin; we escape it and preserve
+  // line breaks so it renders safely inside the HTML template. Shared by the
+  // single-recipient custom email and the broadcast so both look identical.
+  private buildCustomEmailContent(
+    subject: string,
+    message: string,
+  ): { html: string; text: string } {
     const html = `
       <div style="background-color: #0f0f13; padding: 0; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">
         <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px;">
@@ -338,6 +332,23 @@ export class MailService {
 
     const text = `${subject}\n\n${message}\n\nבברכה, צוות vookaPix`;
 
+    return { html, text };
+  }
+
+  // A general-purpose branded email an admin can send to a specific user from
+  // the admin area.
+  async sendCustomEmail({
+    to,
+    subject,
+    message,
+  }: {
+    to: string;
+    subject: string;
+    message: string;
+  }): Promise<void> {
+    const { resend, from, replyTo } = this.getClient();
+    const { html, text } = this.buildCustomEmailContent(subject, message);
+
     const { error } = await resend.emails.send({
       from,
       to,
@@ -352,6 +363,67 @@ export class MailService {
     }
 
     this.logger.log(`Sent custom email to ${to}`);
+  }
+
+  // Sends the same branded message to many recipients (an admin "broadcast").
+  // Each recipient gets their own email (one address per message) so nobody
+  // sees anyone else's address. We use Resend's batch API (up to 100 messages
+  // per request) to stay well within rate limits, and process batches
+  // sequentially so a large audience doesn't fire hundreds of requests at once.
+  // Returns per-recipient success/failure counts so the caller can report a
+  // partial send instead of failing the whole operation on one bad address.
+  async sendBroadcast({
+    recipients,
+    subject,
+    message,
+  }: {
+    recipients: string[];
+    subject: string;
+    message: string;
+  }): Promise<{ sent: number; failed: number }> {
+    const { resend, from, replyTo } = this.getClient();
+    const { html, text } = this.buildCustomEmailContent(subject, message);
+
+    const BATCH_SIZE = 100;
+    let sent = 0;
+    let failed = 0;
+
+    for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+      const chunk = recipients.slice(i, i + BATCH_SIZE);
+      const payload = chunk.map((to) => ({
+        from,
+        to,
+        ...(replyTo ? { replyTo } : {}),
+        subject,
+        text,
+        html,
+      }));
+
+      try {
+        const { error } = await resend.batch.send(payload);
+        if (error) {
+          failed += chunk.length;
+          this.logger.error(
+            `Broadcast batch (${chunk.length} recipients) failed: ${error.message}`,
+          );
+        } else {
+          sent += chunk.length;
+        }
+      } catch (err) {
+        failed += chunk.length;
+        this.logger.error(
+          `Broadcast batch (${chunk.length} recipients) threw: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `Broadcast complete: ${sent} sent, ${failed} failed (of ${recipients.length})`,
+    );
+
+    return { sent, failed };
   }
 
   private escapeHtml(value: string): string {
