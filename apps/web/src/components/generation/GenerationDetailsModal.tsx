@@ -175,7 +175,7 @@ export function GenerationDetailsModal({
                     <OpenIcon />
                     פתיחה
                   </a>
-                  {onSendEmail && (
+                  {/* {onSendEmail && (
                     <button
                       type="button"
                       onClick={() => onSendEmail(generation)}
@@ -185,7 +185,7 @@ export function GenerationDetailsModal({
                       {sendingEmail ? <SpinnerIcon /> : <EnvelopeIcon />}
                       {sendingEmail ? 'שולח...' : 'שלח לי במייל'}
                     </button>
-                  )}
+                  )} */}
                 </>
               )}
               {isErrorState && onRecreate && (
