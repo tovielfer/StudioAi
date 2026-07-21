@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
+import { PackageCard, maxPricePerCredit } from '@/components/PackageCard';
 import { useAuth } from '@/lib/auth-context';
 import { api, CreditPackage, Order, OrderStatus } from '@/lib/api';
 
@@ -181,11 +182,7 @@ function BuyContent() {
   // The list can grow long; show only the latest few (already sorted DESC).
   const recentOrders = visibleOrders.slice(0, 5);
 
-  // Worst (highest) price-per-credit across packs — the baseline for showing how
-  // much each larger pack saves relative to the smallest one.
-  const maxPricePerCredit = packages.length
-    ? Math.max(...packages.map((p) => p.priceIls / p.credits))
-    : 0;
+  const maxPpc = maxPricePerCredit(packages);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
@@ -256,60 +253,17 @@ function BuyContent() {
       ) : (
         <>
           <div className="flex flex-wrap justify-center gap-5">
-            {packages.map((pkg) => {
-              const featured = Boolean(pkg.badge);
-              const savings = maxPricePerCredit
-                ? Math.round(
-                    (1 - pkg.priceIls / pkg.credits / maxPricePerCredit) * 100,
-                  )
-                : 0;
-              const perThousand = (
-                (pkg.priceIls / pkg.credits) *
-                1000
-              ).toLocaleString('he-IL', { maximumFractionDigits: 1 });
-              return (
-                <div
-                  key={pkg.id}
-                  className={`relative flex w-full flex-col rounded-2xl border p-6 transition-all sm:w-64 ${
-                    featured
-                      ? 'border-brand-500 bg-gradient-to-b from-brand-600/15 to-surface-card shadow-lg shadow-brand-900/30 sm:-translate-y-2'
-                      : 'border-surface-border bg-surface-card hover:border-brand-500/50 hover:-translate-y-0.5'
-                  }`}
-                >
-                  {pkg.badge && (
-                    <span className="absolute -top-3 right-5 rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white shadow">
-                      {pkg.badge}
-                    </span>
-                  )}
-                  <h3 className="text-base font-semibold text-gray-300">
-                    {pkg.name}
-                  </h3>
-                  <div className="mt-3 flex items-baseline gap-1.5">
-                    <span className="text-4xl font-extrabold text-white">
-                      {pkg.credits.toLocaleString('he-IL')}
-                    </span>
-                    <span className="text-sm text-gray-400">קרדיטים</span>
-                  </div>
-                  {savings > 0 ? (
-                    <span className="mt-2 self-start rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-400">
-                      חיסכון {savings}%
-                    </span>
-                  ) : (
-                    <span className="mt-2 h-[22px]" />
-                  )}
-                  <div className="mt-4 border-t border-surface-border pt-4">
-                    <div className="text-2xl font-bold text-white">
-                      ₪{pkg.priceIls}
-                    </div>
-                    <p className="mt-0.5 text-xs text-gray-500">
-                      ₪{perThousand} ל-1,000 קרדיטים
-                    </p>
-                  </div>
+            {packages.map((pkg) => (
+              <PackageCard
+                key={pkg.id}
+                pkg={pkg}
+                maxPricePerCredit={maxPpc}
+                renderCta={(featured) => (
                   <button
                     type="button"
                     onClick={() => buy(pkg)}
                     disabled={submittingId !== null}
-                    className={`mt-5 w-full rounded-lg py-2.5 font-semibold transition-colors disabled:opacity-50 ${
+                    className={`w-full rounded-lg py-2.5 font-semibold transition-colors disabled:opacity-50 ${
                       featured
                         ? 'btn-primary'
                         : 'border border-brand-500/60 text-brand-300 hover:bg-brand-500/10'
@@ -321,9 +275,9 @@ function BuyContent() {
                         ? 'רכישה מהירה'
                         : 'רכישה'}
                   </button>
-                </div>
-              );
-            })}
+                )}
+              />
+            ))}
           </div>
 
           <div className="mt-12">

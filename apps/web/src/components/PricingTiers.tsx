@@ -3,8 +3,11 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api, CreditPackage } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
+import { PackageCard, maxPricePerCredit } from '@/components/PackageCard';
 
 export function PricingTiers() {
+  const { user } = useAuth();
   const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -18,37 +21,32 @@ export function PricingTiers() {
 
   if (loaded && packages.length === 0) return null;
 
+  const maxPpc = maxPricePerCredit(packages);
+  // Logged-in visitors go straight to checkout; guests are routed to sign-up
+  // with a `next` so they land back on the buy page once authenticated.
+  const href = user ? '/buy' : '/register?next=/buy';
+
   return (
-    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {packages.map((pkg) => {
-        return (
-          <div
-            key={pkg.id}
-            className={`card-interactive flex flex-col ${
-              pkg.badge
-                ? 'ring-2 ring-brand-500 shadow-glow-sm bg-gradient-to-br from-brand-900/30 to-surface-card'
-                : ''
-            }`}
-          >
-            {pkg.badge && (
-              <span className="self-start mb-2 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 px-3 py-0.5 text-xs font-semibold text-white">
-                {pkg.badge}
-              </span>
-            )}
-            <h3 className="text-lg font-semibold">{pkg.name}</h3>
-            <div className="text-3xl font-bold my-2">₪{pkg.priceIls}</div>
-            <p className="text-brand-300 text-sm">
-              {pkg.credits.toLocaleString('he-IL')} קרדיטים
-            </p>
+    <div className="flex flex-wrap justify-center gap-5">
+      {packages.map((pkg) => (
+        <PackageCard
+          key={pkg.id}
+          pkg={pkg}
+          maxPricePerCredit={maxPpc}
+          renderCta={(featured) => (
             <Link
-              href="/register"
-              className={`mt-4 w-full text-center ${pkg.badge ? 'btn-primary' : 'btn-secondary'}`}
+              href={href}
+              className={`block w-full rounded-lg py-2.5 text-center font-semibold transition-colors ${
+                featured
+                  ? 'btn-primary'
+                  : 'border border-brand-500/60 text-brand-300 hover:bg-brand-500/10'
+              }`}
             >
-              בחירת חבילה
+              {user ? 'רכישה' : 'בחירת חבילה'}
             </Link>
-          </div>
-        );
-      })}
+          )}
+        />
+      ))}
     </div>
   );
 }

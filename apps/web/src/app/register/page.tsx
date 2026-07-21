@@ -7,6 +7,13 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { translateError } from '@/lib/he';
 
+/** Only allow same-origin relative paths as a post-auth target (no open redirects). */
+function safeNext(raw: string | null): string {
+  return raw && raw.startsWith('/') && !raw.startsWith('//')
+    ? raw
+    : '/dashboard';
+}
+
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,14 +22,19 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [next, setNext] = useState('/dashboard');
   const { user, loading: authLoading, register } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
+    setNext(safeNext(new URLSearchParams(window.location.search).get('next')));
+  }, []);
+
+  useEffect(() => {
     if (!authLoading && user) {
-      router.replace('/dashboard');
+      router.replace(next);
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, next]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,7 +80,14 @@ export default function RegisterPage() {
 
       <div className="card auth-card-in">
         <div className="flex gap-1 bg-black/20 border border-surface-border rounded-lg p-1 mb-6">
-          <Link href="/login" className="auth-tab auth-tab-inactive">
+          <Link
+            href={
+              next !== '/dashboard'
+                ? `/login?next=${encodeURIComponent(next)}`
+                : '/login'
+            }
+            className="auth-tab auth-tab-inactive"
+          >
             התחברות
           </Link>
           <Link href="/register" className="auth-tab auth-tab-active">

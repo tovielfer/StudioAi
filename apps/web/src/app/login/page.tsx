@@ -7,20 +7,32 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { translateError } from '@/lib/he';
 
+/** Only allow same-origin relative paths as a post-login target (no open redirects). */
+function safeNext(raw: string | null): string {
+  return raw && raw.startsWith('/') && !raw.startsWith('//')
+    ? raw
+    : '/dashboard';
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [next, setNext] = useState('/dashboard');
   const { user, loading: authLoading, login } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
+    setNext(safeNext(new URLSearchParams(window.location.search).get('next')));
+  }, []);
+
+  useEffect(() => {
     if (!authLoading && user) {
-      router.replace('/dashboard');
+      router.replace(next);
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, next]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +40,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      router.push('/dashboard');
+      router.push(next);
     } catch (err) {
       setError(
         translateError(err instanceof Error ? err.message : 'Login failed'),
@@ -62,7 +74,14 @@ export default function LoginPage() {
           <Link href="/login" className="auth-tab auth-tab-active">
             התחברות
           </Link>
-          <Link href="/register" className="auth-tab auth-tab-inactive">
+          <Link
+            href={
+              next !== '/dashboard'
+                ? `/register?next=${encodeURIComponent(next)}`
+                : '/register'
+            }
+            className="auth-tab auth-tab-inactive"
+          >
             הרשמה
           </Link>
         </div>
