@@ -568,7 +568,7 @@ function PricingCalculator({ rules }: { rules: AdminPricingRule[] }) {
           options={resolutionOptions}
         />
         <SelectField
-          label="איכות יצירה"
+          label="רמת החשיבה"
           value={quality}
           onChange={setQuality}
           options={qualityOptions}

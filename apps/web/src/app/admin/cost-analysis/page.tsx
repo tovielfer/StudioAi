@@ -308,7 +308,7 @@ function CostAnalysisContent() {
               }))}
             />
             <FilterSelect
-              label="איכות יצירה"
+              label="רמת החשיבה"
               value={filters.quality}
               onChange={(value) => updateFilter('quality', value)}
               options={filterOptions.qualities.map((value) => ({
@@ -374,7 +374,7 @@ function CostAnalysisContent() {
                     <th className="py-3 pe-3 text-right">סוג</th>
                     <th className="py-3 pe-3 text-right">ספק</th>
                     <th className="py-3 pe-3 text-right">מודל</th>
-                    <th className="py-3 pe-3 text-right">איכות יצירה</th>
+                    <th className="py-3 pe-3 text-right">רמת החשיבה</th>
                     <th className="py-3 pe-3 text-right">יחס תמונה</th>
                     <th className="py-3 pe-3 text-right">רזולוציה</th>
                     <th className="py-3 pe-3 text-right">מקור</th>

@@ -125,7 +125,7 @@ export function AdminGenerationModal({
     ['מודל', generation.model],
     ['יחס תמונה', generation.size],
     ['רזולוציה', generation.resolution ?? '—'],
-    ['איכות יצירה', generation.quality ?? '—'],
+    ['רמת החשיבה', generation.quality ?? '—'],
     ['עלות טוקנים', generation.creditCost.toLocaleString('he-IL')],
     [
       'עלות בפועל ($)',

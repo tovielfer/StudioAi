@@ -66,7 +66,7 @@ export function GenerationDetailsModal({
     ['מודל', generation.model],
     ['יחס תמונה', generation.size],
     ['רזולוציה', generation.resolution ?? '—'],
-    ['איכות יצירה', generation.quality ?? '—'],
+    ['רמת החשיבה', generation.quality ?? '—'],
     ['עלות', `${generation.creditCost} קרדיטים`],
     ['תאריך', formatDateTime(generation.createdAt)],
   ];

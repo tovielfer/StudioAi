@@ -327,7 +327,7 @@ export function CreateForm({
           )}
           {selectedModel.qualities.length > 1 && (
             <div className="flex-1 min-w-0">
-              <label className="block text-sm text-gray-400 mb-1.5">איכות יצירה</label>
+              <label className="block text-sm text-gray-400 mb-1.5">רמת החשיבה</label>
               <FancySelect
                 value={quality}
                 onChange={setQuality}
