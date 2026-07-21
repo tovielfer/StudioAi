@@ -283,6 +283,20 @@ export interface FeedbackMessage {
   createdAt: string;
 }
 
+/** Wipes the stored session and sends the user to /login. Called when an
+ *  authenticated request comes back 401 (expired/invalid/revoked token), so a
+ *  user can't get stuck "half logged in" — pages rendering from a stale cached
+ *  `user` while every API call fails. Guards against redirect loops when we're
+ *  already on the login page. */
+function handleUnauthorized() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  if (window.location.pathname !== '/login') {
+    window.location.assign('/login?expired=1');
+  }
+}
+
 class ApiClient {
   private getToken(): string | null {
     if (typeof window === 'undefined') return null;
@@ -309,6 +323,12 @@ class ApiClient {
     const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 
     if (!res.ok) {
+      // A 401 on a request that carried a token means the session is no longer
+      // valid. Clear it and bounce to login instead of leaving the app in a
+      // broken "authenticated but every call fails" state.
+      if (res.status === 401 && token) {
+        handleUnauthorized();
+      }
       const err = await res.json().catch(() => ({ message: res.statusText }));
       throw new ApiError(
         err.message || `Request failed: ${res.status}`,

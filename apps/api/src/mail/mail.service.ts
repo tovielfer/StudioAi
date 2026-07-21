@@ -300,6 +300,117 @@ export class MailService {
     this.logger.log(`Sent feedback reply email to ${to}`);
   }
 
+  // Notifies the admin inbox (MAIL_REPLY_TO, falling back to MAIL_FROM) that a
+  // new feedback/inquiry was submitted. Fire-and-forget by convention: callers
+  // wrap this so a mail failure never blocks saving the submission. When no
+  // recipient is configured we log and return instead of throwing.
+  async sendNewFeedbackNotification({
+    feedbackTitle,
+    feedbackMessage,
+    feedbackType,
+    senderEmail,
+    submissionId,
+    isReply = false,
+  }: {
+    feedbackTitle: string;
+    feedbackMessage: string;
+    feedbackType?: string | null;
+    senderEmail?: string | null;
+    submissionId?: string | null;
+    isReply?: boolean;
+  }): Promise<void> {
+    const { resend, from } = this.getClient();
+
+    // Prefer the reply-to inbox (a real address the admin reads); fall back to
+    // the from address so a notification still goes somewhere useful.
+    const replyTo = this.config.get<string>('MAIL_REPLY_TO');
+    const to = replyTo ? this.sanitizeFrom(replyTo) : from;
+    if (!to) {
+      this.logger.warn(
+        'Skipping new-feedback notification: no MAIL_REPLY_TO/MAIL_FROM configured',
+      );
+      return;
+    }
+
+    const frontendUrl = (
+      this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000'
+    ).replace(/\/+$/, '');
+    const adminUrl = `${frontendUrl}/admin/feedback`;
+
+    const typeLabels: Record<string, string> = {
+      request: 'פנייה',
+      note: 'הערה',
+      improvement: 'שיפור',
+      shortcut: 'קיצור דרך',
+      other: 'אחר',
+      email: 'מייל',
+    };
+    const typeLabel = feedbackType
+      ? typeLabels[feedbackType] ?? feedbackType
+      : null;
+
+    const senderLine = senderEmail
+      ? `<p style="margin: 0 0 8px; color: #9ca3af; font-size: 13px;"><strong style="color: #c4b5fd;">מאת:</strong> ${this.escapeHtml(senderEmail)}</p>`
+      : '';
+    const typeLine = typeLabel
+      ? `<p style="margin: 0 0 8px; color: #9ca3af; font-size: 13px;"><strong style="color: #c4b5fd;">סוג:</strong> ${this.escapeHtml(typeLabel)}</p>`
+      : '';
+
+    const heading = isReply ? 'תגובה חדשה לפנייה 💬' : 'פנייה חדשה התקבלה 📨';
+    const subjectPrefix = isReply ? 'תגובה חדשה לפנייה' : 'פנייה חדשה התקבלה';
+    // Set reply-to to the sender's own address so the admin can just hit
+    // "Reply" in their mail client and answer the user directly.
+    const replyToSender = senderEmail ? this.sanitizeFrom(senderEmail) : null;
+
+    const html = `
+      <div style="background-color: #0f0f13; padding: 0; margin: 0; font-family: Arial, 'Segoe UI', sans-serif;">
+        <div style="max-width: 560px; margin: 0 auto; padding: 32px 24px;">
+          <div dir="rtl" style="text-align: right; margin-bottom: 28px;">
+            <span style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">vooka</span><span style="font-size: 22px; font-weight: 700; color: #a78bfa;">Pix</span>
+          </div>
+          <div dir="rtl" style="background: #1a1a24; border: 1px solid #2d2d3d; border-radius: 16px; padding: 28px 24px; text-align: right; line-height: 1.7; color: #e5e7eb;">
+            <h2 style="margin: 0 0 12px; font-size: 20px; color: #ffffff;">${heading}</h2>
+            <p style="margin: 0 0 8px; color: #d1d5db;"><strong style="color: #c4b5fd;">כותרת:</strong> ${this.escapeHtml(feedbackTitle || '(ללא כותרת)')}</p>
+            ${senderLine}
+            ${typeLine}
+            <div style="background: #111118; border-right: 3px solid #7c3aed; border-radius: 8px; padding: 14px 16px; margin: 16px 0; color: #e5e7eb;">
+              ${this.escapeHtml(feedbackMessage).replace(/\n/g, '<br>')}
+            </div>
+            <div style="text-align: center; margin: 24px 0 8px;">
+              <a href="${adminUrl}" style="display: inline-block; background: #7c3aed; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-size: 14px; font-weight: 600;">פתיחת הפנייה בניהול</a>
+            </div>
+          </div>
+          <p style="text-align: center; margin-top: 20px; color: #4b5563; font-size: 12px;">
+            © ${new Date().getFullYear()} vookaPix · כל הזכויות שמורות
+          </p>
+        </div>
+      </div>
+    `;
+
+    const text = `${subjectPrefix} ב-vookaPix.\n\nכותרת: ${feedbackTitle || '(ללא כותרת)'}${
+      senderEmail ? `\nמאת: ${senderEmail}` : ''
+    }${typeLabel ? `\nסוג: ${typeLabel}` : ''}\n\n${feedbackMessage}\n\nניהול: ${adminUrl}`;
+
+    const { error } = await resend.emails.send({
+      from,
+      to,
+      ...(replyToSender ? { replyTo: replyToSender } : {}),
+      subject: `${subjectPrefix} - ${feedbackTitle || '(ללא כותרת)'}`,
+      text,
+      html,
+    });
+
+    if (error) {
+      throw new Error(
+        `Failed to send new-feedback notification email: ${error.message}`,
+      );
+    }
+
+    this.logger.log(
+      `Sent new-feedback notification to ${to}${submissionId ? ` (submission ${submissionId})` : ''}`,
+    );
+  }
+
   // Builds the branded HTML + plain-text body for an admin-authored message.
   // The message is plain text entered by the admin; we escape it and preserve
   // line breaks so it renders safely inside the HTML template. Shared by the

@@ -21,11 +21,14 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [next, setNext] = useState('/dashboard');
+  const [expired, setExpired] = useState(false);
   const { user, loading: authLoading, login } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    setNext(safeNext(new URLSearchParams(window.location.search).get('next')));
+    const params = new URLSearchParams(window.location.search);
+    setNext(safeNext(params.get('next')));
+    setExpired(params.get('expired') === '1');
   }, []);
 
   useEffect(() => {
@@ -89,6 +92,11 @@ export default function LoginPage() {
         <h1 className="text-2xl font-bold mb-2">ברוך שובך</h1>
         <p className="text-gray-400 text-sm mb-6">התחבר לחשבון vookaPix שלך</p>
 
+        {expired && !error && (
+          <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm rounded-lg px-4 py-3 mb-4">
+            החיבור שלך פג תוקף. אנא התחבר שוב.
+          </div>
+        )}
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg px-4 py-3 mb-4">
             {error}

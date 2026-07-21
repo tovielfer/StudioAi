@@ -21,6 +21,7 @@ import {
   FeedbackSubmission,
   FeedbackType,
 } from './feedback-submission.entity';
+import { User } from '../users/user.entity';
 
 @Injectable()
 export class FeedbackService {
@@ -31,11 +32,40 @@ export class FeedbackService {
     private readonly feedbackRepo: Repository<FeedbackSubmission>,
     @InjectRepository(FeedbackMessage)
     private readonly messageRepo: Repository<FeedbackMessage>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly mailService: MailService,
   ) {}
 
   private generateThreadToken() {
     return randomUUID().replace(/-/g, '');
+  }
+
+  // Notifies the admin inbox that a new submission arrived. Fire-and-forget:
+  // resolves the sender's email (contactEmail for public/inbound, or the
+  // logged-in user's email) and hands off to MailService. Never throws — a mail
+  // failure must not fail the submission that already saved successfully.
+  private async notifyAdminOfNewFeedback(
+    saved: FeedbackSubmission,
+    opts?: { isReply?: boolean; body?: string },
+  ) {
+    let senderEmail: string | null = saved.contactEmail ?? null;
+    if (!senderEmail && saved.userId) {
+      const user = await this.userRepo.findOne({
+        where: { id: saved.userId },
+        select: { id: true, email: true },
+      });
+      senderEmail = user?.email ?? null;
+    }
+
+    await this.mailService.sendNewFeedbackNotification({
+      feedbackTitle: saved.title,
+      feedbackMessage: opts?.body ?? saved.message,
+      feedbackType: saved.type,
+      senderEmail,
+      submissionId: saved.id,
+      isReply: opts?.isReply ?? false,
+    });
   }
 
   // Appends a message to a thread and bumps the submission's lastMessageAt so
@@ -85,6 +115,10 @@ export class FeedbackService {
       body: saved.message,
     });
 
+    void this.notifyAdminOfNewFeedback(saved).catch((err) =>
+      this.logger.error(`Failed to send new-feedback notification: ${err}`),
+    );
+
     return saved;
   }
 
@@ -110,6 +144,10 @@ export class FeedbackService {
       authorType: FeedbackMessageAuthorType.USER,
       body: saved.message,
     });
+
+    void this.notifyAdminOfNewFeedback(saved).catch((err) =>
+      this.logger.error(`Failed to send new-feedback notification: ${err}`),
+    );
 
     return saved;
   }
@@ -247,7 +285,16 @@ export class FeedbackService {
     ) {
       item.status = FeedbackStatus.OPEN;
     }
-    return this.feedbackRepo.save(item);
+    const saved = await this.feedbackRepo.save(item);
+
+    void this.notifyAdminOfNewFeedback(saved, {
+      isReply: true,
+      body,
+    }).catch((err) =>
+      this.logger.error(`Failed to send feedback-reply notification: ${err}`),
+    );
+
+    return saved;
   }
 
   // Admin sends a reply: append an outbound message, update the submission's
@@ -377,6 +424,13 @@ export class FeedbackService {
     }
     await this.feedbackRepo.save(feedback);
 
+    void this.notifyAdminOfNewFeedback(feedback, {
+      isReply: true,
+      body: params.body,
+    }).catch((err) =>
+      this.logger.error(`Failed to send feedback-reply notification: ${err}`),
+    );
+
     return feedback;
   }
 
@@ -416,6 +470,10 @@ export class FeedbackService {
       emailMessageId: params.emailMessageId ?? null,
       attachments: params.attachments ?? null,
     });
+
+    void this.notifyAdminOfNewFeedback(saved).catch((err) =>
+      this.logger.error(`Failed to send new-feedback notification: ${err}`),
+    );
 
     return saved;
   }

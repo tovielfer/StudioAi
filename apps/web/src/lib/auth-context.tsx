@@ -28,11 +28,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
     const stored = localStorage.getItem('user');
-    if (stored) {
-      setUser(JSON.parse(stored));
+
+    // No token → make sure we don't render as logged-in from a stale cached user.
+    if (!token) {
+      if (stored) localStorage.removeItem('user');
+      setUser(null);
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    // Optimistically show the cached user so the UI isn't blank while we verify.
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored));
+      } catch {
+        localStorage.removeItem('user');
+      }
+    }
+
+    // Validate the token against the server. If it's expired/invalid, api.getMe
+    // triggers the global 401 handler (clears storage + redirects to login), so
+    // here we just clear local state.
+    let cancelled = false;
+    api
+      .getMe(token)
+      .then((fresh) => {
+        if (cancelled) return;
+        localStorage.setItem('user', JSON.stringify(fresh));
+        setUser(fresh);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const persist = (token: string, userData: User) => {
