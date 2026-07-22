@@ -93,14 +93,14 @@ export function Navbar() {
   return (
     <nav className="border-b border-surface-border bg-surface/80 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href={user ? '/dashboard' : '/'} className="flex items-center gap-2.5">
-          <VookaPixIcon className="w-9 h-9" />
-          <span className="font-bold text-xl tracking-tight">
-            <span className="text-white">vooka</span><span className="text-brand-400">Pix</span>
-          </span>
-        </Link>
-
         <div className="flex items-center gap-6">
+          <Link href={user ? '/dashboard' : '/'} className="flex items-center gap-2.5">
+            <VookaPixIcon className="w-9 h-9" />
+            <span className="font-bold text-xl tracking-tight">
+              <span className="text-white">vooka</span><span className="text-brand-400">Pix</span>
+            </span>
+          </Link>
+
           {links.map((link) => (
             <Link
               key={link.href}
@@ -122,7 +122,9 @@ export function Navbar() {
               )}
             </Link>
           ))}
+        </div>
 
+        <div className="flex items-center gap-6">
           {user ? (
             <div className="flex items-center gap-4">
               <span className="inline-flex items-center gap-1.5 text-sm bg-brand-900/30 border border-brand-700/40 text-brand-200 px-3 py-1 rounded-full">
