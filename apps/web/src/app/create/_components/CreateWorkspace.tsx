@@ -37,7 +37,7 @@ export function CreateWorkspace({
   // falling back to the model's first available size otherwise.
   const initialSize =
     (generationType === 'image'
-      ? initialModel.sizes.find((s) => s.id === '9:16')?.id
+      ? initialModel.sizes.find((s) => s.id === '4:3')?.id
       : undefined) ??
     initialModel.sizes[0]?.id ??
     '1:1';
