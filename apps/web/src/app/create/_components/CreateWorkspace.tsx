@@ -33,12 +33,11 @@ export function CreateWorkspace({
     initialModel.qualities.find((q) => q.id === 'medium')?.id ??
     initialModel.qualities[0]?.id ??
     'auto';
-  // Images default to a 16:9 (landscape) aspect ratio when the model offers it,
-  // falling back to the model's first available size otherwise.
+  // Default aspect ratio per generation type when the model offers it:
+  // images → 4:3, videos → 1:1. Falls back to the model's first size otherwise.
+  const preferredSize = generationType === 'image' ? '4:3' : '1:1';
   const initialSize =
-    (generationType === 'image'
-      ? initialModel.sizes.find((s) => s.id === '4:3')?.id
-      : undefined) ??
+    initialModel.sizes.find((s) => s.id === preferredSize)?.id ??
     initialModel.sizes[0]?.id ??
     '1:1';
   const [prompt, setPrompt] = useState('');
