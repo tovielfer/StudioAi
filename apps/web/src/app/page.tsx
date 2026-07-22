@@ -4,7 +4,7 @@ import { PricingTiers } from '@/components/PricingTiers';
 const features = [
   {
     title: 'מודלי AI מרובים',
-    desc: 'בחר מתוך Replicate, Fal.ai, OpenAI ו-Stability AI — המודל המתאים לכל משימה.',
+    desc: 'בחר מתוך OpenAI, Google, fal ו-Replicate — המודל המתאים לכל משימה.',
     icon: PaletteIcon,
     tint: 'from-brand-500/20 to-brand-700/10 text-brand-300',
   },
@@ -44,11 +44,11 @@ export default function LandingPage() {
         <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
           הופכים רעיונות
           <br />
-          <span className="gradient-text">לויזואלים מרהיבים</span>
+          <span className="gradient-text">לתמונות וסרטונים מרהיבים</span>
         </h1>
 
         <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-10">
-          צור תמונות וסרטונים עם Flux, DALL·E, Stable Diffusion ועוד.
+          צור תמונות וסרטונים עם Nano Banana, GPT Image, Kling ו-Seedance.
           העלה תמונות השראה, בחר מודל, והפוך מילים למציאות — תוך שניות.
         </p>
 

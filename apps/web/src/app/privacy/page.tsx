@@ -69,8 +69,8 @@ export default function PrivacyPage() {
         </p>
         <ul className="list-disc pr-6 space-y-2">
           <li>
-            <strong>ספקי מודלים ליצירת AI</strong> (כגון Replicate, Fal.ai, OpenAI,
-            Stability AI) — הפרומפטים ותמונות ההשראה נשלחים אליהם לצורך יצירת
+            <strong>ספקי מודלים ליצירת AI</strong> (כגון OpenAI, Google, fal
+            ו-Replicate) — הפרומפטים ותמונות ההשראה נשלחים אליהם לצורך יצירת
             התוצר. חלק מהספקים ממוקמים מחוץ לישראל.
           </li>
           <li>
