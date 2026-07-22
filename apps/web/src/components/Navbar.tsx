@@ -93,7 +93,7 @@ export function Navbar() {
   return (
     <nav className="border-b border-surface-border bg-surface/80 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-8">
           <Link href={user ? '/dashboard' : '/'} className="flex items-center gap-2.5">
             <VookaPixIcon className="w-9 h-9" />
             <span className="font-bold text-xl tracking-tight">
@@ -101,27 +101,29 @@ export function Navbar() {
             </span>
           </Link>
 
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`relative text-sm transition-colors after:absolute after:-bottom-1.5 after:right-0 after:h-0.5 after:rounded-full after:bg-gradient-to-l after:from-brand-400 after:to-accent-400 after:transition-all ${
-                pathname === link.href
-                  ? 'text-white after:w-full'
-                  : 'text-gray-400 hover:text-white after:w-0 hover:after:w-full'
-              }`}
-            >
-              {link.label}
-              {link.badge > 0 && (
-                <span
-                  className="absolute -top-1.5 -left-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white"
-                  aria-label={`${link.badge} חדשים`}
-                >
-                  {link.badge > 9 ? '9+' : link.badge}
-                </span>
-              )}
-            </Link>
-          ))}
+          <div className="flex items-center gap-6">
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`relative text-sm transition-colors after:absolute after:-bottom-1.5 after:right-0 after:h-0.5 after:rounded-full after:bg-gradient-to-l after:from-brand-400 after:to-accent-400 after:transition-all ${
+                  pathname === link.href
+                    ? 'text-white after:w-full'
+                    : 'text-gray-400 hover:text-white after:w-0 hover:after:w-full'
+                }`}
+              >
+                {link.label}
+                {link.badge > 0 && (
+                  <span
+                    className="absolute -top-1.5 -left-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white"
+                    aria-label={`${link.badge} חדשים`}
+                  >
+                    {link.badge > 9 ? '9+' : link.badge}
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-6">
