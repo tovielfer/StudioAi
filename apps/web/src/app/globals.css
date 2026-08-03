@@ -196,3 +196,68 @@ body {
 .toast-in {
   animation: toast-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+/* Install banner: slide up from the bottom edge. */
+@keyframes install-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.install-in {
+  animation: install-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Install-reward modal: a springy pop-in. */
+@keyframes reward-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(10px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.reward-pop {
+  animation: reward-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Celebratory confetti falling behind the reward modal. */
+@keyframes reward-confetti {
+  0% {
+    opacity: 0;
+    transform: translateY(0) rotate(0deg);
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(110vh) rotate(720deg);
+  }
+}
+
+.reward-confetti {
+  animation-name: reward-confetti;
+  animation-timing-function: ease-in;
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .install-in,
+  .reward-pop,
+  .reward-confetti {
+    animation: none;
+  }
+}

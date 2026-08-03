@@ -141,6 +141,23 @@ export class UsersService {
     return this.findById(userId);
   }
 
+  /**
+   * Atomically claims the one-time install bonus for a user. Sets
+   * `installRewardGrantedAt` only if it's still null, so two concurrent
+   * requests (e.g. the app opening in two tabs) can never both succeed.
+   * Returns true only for the single request that actually won the claim; the
+   * caller should grant credits exactly when this is true.
+   */
+  async claimInstallReward(userId: string): Promise<boolean> {
+    const result = await this.usersRepo
+      .createQueryBuilder()
+      .update(User)
+      .set({ installRewardGrantedAt: () => 'now()' })
+      .where('id = :id AND "installRewardGrantedAt" IS NULL', { id: userId })
+      .execute();
+    return (result.affected ?? 0) > 0;
+  }
+
   async deductCredits(userId: string, amount: number): Promise<boolean> {
     const result = await this.usersRepo
       .createQueryBuilder()

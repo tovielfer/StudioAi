@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, In, Repository, SelectQueryBuilder } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { AiPricingRuleAuditLog } from '../ai/ai-pricing-rule-audit-log.entity';
 import { AiPricingRule } from '../ai/ai-pricing-rule.entity';
 import { CreditTransaction } from '../credits/credit-transaction.entity';
@@ -200,15 +200,22 @@ export class AdminService {
     limit: number;
     offset: number;
     sort?: 'newest' | 'oldest' | 'generations' | 'credits' | 'email';
+    /** When true, only return users who claimed the install bonus (i.e. opened
+     *  the installed app at least once). */
+    installed?: boolean;
   }) {
-    const where = params.search
-      ? [
-          { email: ILike(`%${params.search}%`) },
-          { nickname: ILike(`%${params.search}%`) },
-        ]
-      : {};
-
-    const total = await this.usersRepo.count({ where });
+    // Count respecting the same filters as the list, so pagination totals match
+    // the "installed only" toggle and search.
+    const countQb = this.usersRepo.createQueryBuilder('u');
+    if (params.search) {
+      countQb.andWhere('(u.email ILIKE :s OR u.nickname ILIKE :s)', {
+        s: `%${params.search}%`,
+      });
+    }
+    if (params.installed) {
+      countQb.andWhere('u."installRewardGrantedAt" IS NOT NULL');
+    }
+    const total = await countQb.getCount();
 
     const qb = this.usersRepo
       .createQueryBuilder('u')
@@ -224,13 +231,18 @@ export class AdminService {
       .addSelect('u."isBlocked"', 'isBlocked')
       .addSelect('u."emailVerified"', 'emailVerified')
       .addSelect('u."createdAt"', 'createdAt')
+      .addSelect('u."installRewardGrantedAt"', 'installRewardGrantedAt')
       .addSelect('COUNT(g.id)::int', 'generationsCount')
       .groupBy('u.id');
 
     if (params.search) {
-      qb.where('(u.email ILIKE :s OR u.nickname ILIKE :s)', {
+      qb.andWhere('(u.email ILIKE :s OR u.nickname ILIKE :s)', {
         s: `%${params.search}%`,
       });
+    }
+
+    if (params.installed) {
+      qb.andWhere('u."installRewardGrantedAt" IS NOT NULL');
     }
 
     switch (params.sort) {
@@ -263,6 +275,7 @@ export class AdminService {
       isBlocked: Boolean(r.isBlocked),
       emailVerified: Boolean(r.emailVerified),
       createdAt: r.createdAt as Date,
+      installedAt: (r.installRewardGrantedAt as Date | null) ?? null,
       generationsCount: Number(r.generationsCount),
     }));
 

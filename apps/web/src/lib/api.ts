@@ -34,6 +34,9 @@ export interface User {
   isBlocked?: boolean;
   emailVerified?: boolean;
   createdAt?: string;
+  /** When the user first opened the installed PWA and claimed the install
+   *  bonus. Null/absent means they haven't installed (or never opened it). */
+  installedAt?: string | null;
   generationsCount?: number;
   /** True when a card token is saved and can be charged without re-entry. */
   hasSavedCard?: boolean;
@@ -383,6 +386,16 @@ class ApiClient {
     return this.request<{ credits: number }>('/credits');
   }
 
+  /** Claims the one-time "installed the app" bonus. Idempotent server-side:
+   *  `granted` is true only the first time; later calls just return the
+   *  current balance. Called when the app detects it runs as an installed PWA. */
+  claimInstallReward() {
+    return this.request<{ granted: boolean; amount: number; credits: number }>(
+      '/credits/install-reward',
+      { method: 'POST' },
+    );
+  }
+
   createGeneration(data: {
     prompt: string;
     model: string;
@@ -547,12 +560,14 @@ class ApiClient {
   getAdminUsers(params?: {
     search?: string;
     sort?: AdminUsersSort;
+    installed?: boolean;
     limit?: number;
     offset?: number;
   }) {
     const query = new URLSearchParams();
     if (params?.search) query.set('search', params.search);
     if (params?.sort) query.set('sort', params.sort);
+    if (params?.installed) query.set('installed', 'true');
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.offset) query.set('offset', String(params.offset));
     const qs = query.toString();

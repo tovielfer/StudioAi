@@ -40,6 +40,7 @@ export class AdminController {
   listUsers(
     @Query('search') search?: string,
     @Query('sort') sort?: string,
+    @Query('installed') installed?: string,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
     @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset = 0,
   ) {
@@ -58,6 +59,7 @@ export class AdminController {
     return this.adminService.listUsers({
       search: search?.trim() || undefined,
       sort: sortOption,
+      installed: installed === 'true' ? true : undefined,
       limit: Math.min(Math.max(limit, 1), 100),
       offset: Math.max(offset, 0),
     });

@@ -5,6 +5,8 @@ import { AuthProvider } from '@/lib/auth-context';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { FeedbackWidget } from '@/components/FeedbackWidget';
+import { InstallPrompt } from '@/components/InstallPrompt';
+import { InstallReward } from '@/components/InstallReward';
 
 const heebo = Heebo({ subsets: ['hebrew', 'latin'], variable: '--font-heebo' });
 
@@ -60,6 +62,8 @@ export default function RootLayout({
           <main className="flex-1">{children}</main>
           <Footer />
           <FeedbackWidget />
+          <InstallPrompt />
+          <InstallReward />
         </AuthProvider>
       </body>
     </html>

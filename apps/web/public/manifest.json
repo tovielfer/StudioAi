@@ -2,7 +2,7 @@
   "name": "vookaPix — יצירת תמונות וווידאו",
   "short_name": "vookaPix",
   "description": "צור תמונות מרהיבות בעזרת בינה מלאכותית עם vookaPix",
-  "start_url": "/",
+  "start_url": "/create",
   "display": "standalone",
   "background_color": "#0f0f0f",
   "theme_color": "#7c3aed",

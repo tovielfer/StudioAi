@@ -57,6 +57,14 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true, default: null })
   resetPasswordExpiry: Date | null;
 
+  /**
+   * When the one-time "installed the app" credit bonus was granted. Null means
+   * the user hasn't claimed it yet; a timestamp both records the grant and acts
+   * as the idempotency guard so the bonus can never be given twice.
+   */
+  @Column({ type: 'timestamptz', nullable: true, default: null })
+  installRewardGrantedAt: Date | null;
+
   /** SUMIT customer id, saved after a successful charge for reuse. */
   @Column({ type: 'varchar', nullable: true, default: null })
   sumitCustomerId: string | null;

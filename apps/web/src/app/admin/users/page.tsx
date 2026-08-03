@@ -44,6 +44,8 @@ function parseCreditAmount(value: string) {
 function formatReason(reason: string) {
   if (reason === 'admin_add') return 'הוספה ידנית';
   if (reason === 'admin_deduct') return 'הורדה ידנית';
+  if (reason === 'signup_bonus') return 'בונוס הרשמה';
+  if (reason === 'install_reward') return 'בונוס התקנה';
   if (reason.startsWith('purchase:order:')) return 'רכישת קרדיטים';
   if (reason.startsWith('generation:')) return 'חיוב על יצירה';
   if (reason.startsWith('refund:failed:')) return 'החזר על יצירה שנכשלה';
@@ -67,6 +69,7 @@ function AdminUsersContent() {
   const [query, setQuery] = useState('');
   const [view, setView] = useState<ViewMode>('cards');
   const [sort, setSort] = useState<AdminUsersSort>('newest');
+  const [installedOnly, setInstalledOnly] = useState(false);
 
   const [creditUserId, setCreditUserId] = useState('');
   const [creditAmount, setCreditAmount] = useState('25');
@@ -117,11 +120,12 @@ function AdminUsersContent() {
       return api.getAdminUsers({
         search: query || undefined,
         sort,
+        installed: installedOnly || undefined,
         limit: PAGE_SIZE,
         offset,
       });
     },
-    [query, sort],
+    [query, sort, installedOnly],
   );
 
   // Reset and load the first page whenever the search query changes.
@@ -416,6 +420,20 @@ function AdminUsersContent() {
                   </select>
                 </label>
 
+                <button
+                  type="button"
+                  onClick={() => setInstalledOnly((v) => !v)}
+                  className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    installedOnly
+                      ? 'border-brand-300 bg-brand-50 text-brand-700'
+                      : 'border-gray-200 text-gray-600 hover:border-brand-300 hover:text-brand-700'
+                  }`}
+                  title="הצג רק משתמשים שהתקינו את האפליקציה ופתחו אותה"
+                >
+                  <span>📲</span>
+                  רק מי שהתקין
+                </button>
+
                 <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
                   <button
                     type="button"
@@ -586,6 +604,14 @@ function AdminUsersContent() {
                           חסום
                         </span>
                       )}
+                      {user.installedAt && (
+                        <span
+                          className="mt-1 ms-1 inline-flex rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-medium text-brand-700"
+                          title={`הותקן · ${formatDate(user.installedAt)}`}
+                        >
+                          📲 הותקן
+                        </span>
+                      )}
                     </div>
                     <span
                       className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
@@ -699,6 +725,7 @@ function AdminUsersContent() {
                     <th className="text-right py-3">אימייל</th>
                     <th className="text-right py-3">אימות</th>
                     <th className="text-right py-3">חסימה</th>
+                    <th className="text-right py-3">התקנה</th>
                     <th className="text-right py-3">תפקיד</th>
                     <th className="text-right py-3">יצירות</th>
                     <th className="text-right py-3">קרדיטים</th>
@@ -776,6 +803,18 @@ function AdminUsersContent() {
                         >
                           {user.isBlocked ? 'חסום' : 'פעיל'}
                         </span>
+                      </td>
+                      <td className="py-3">
+                        {user.installedAt ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700"
+                            title={formatDate(user.installedAt)}
+                          >
+                            📲 הותקן
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="py-3 text-gray-600">
                         {user.role === 'admin' ? 'מנהל' : 'משתמש'}

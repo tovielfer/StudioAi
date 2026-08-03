@@ -42,6 +42,8 @@ function formatDate(value: string) {
 function formatReason(reason: string) {
   if (reason === 'admin_add') return 'הוספה ידנית';
   if (reason === 'admin_deduct') return 'הורדה ידנית';
+  if (reason === 'signup_bonus') return 'בונוס הרשמה';
+  if (reason === 'install_reward') return 'בונוס התקנה';
   if (reason.startsWith('purchase:order:')) return 'רכישת קרדיטים';
   if (reason.startsWith('generation:')) return 'חיוב על יצירה';
   if (reason.startsWith('refund:failed:')) return 'החזר על יצירה שנכשלה';
