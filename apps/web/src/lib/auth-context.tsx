@@ -17,6 +17,8 @@ interface AuthContextType {
   register: (email: string, password: string) => Promise<void>;
   logout: () => void;
   refreshCredits: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  setToken: (token: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -26,11 +28,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
     const stored = localStorage.getItem('user');
-    if (stored) {
-      setUser(JSON.parse(stored));
+
+    // No token → make sure we don't render as logged-in from a stale cached user.
+    if (!token) {
+      if (stored) localStorage.removeItem('user');
+      setUser(null);
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    // Optimistically show the cached user so the UI isn't blank while we verify.
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored));
+      } catch {
+        localStorage.removeItem('user');
+      }
+    }
+
+    // Validate the token against the server. If it's expired/invalid, api.getMe
+    // triggers the global 401 handler (clears storage + redirects to login), so
+    // here we just clear local state.
+    let cancelled = false;
+    api
+      .getMe(token)
+      .then((fresh) => {
+        if (cancelled) return;
+        localStorage.setItem('user', JSON.stringify(fresh));
+        setUser(fresh);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const persist = (token: string, userData: User) => {
@@ -39,14 +80,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
   };
 
+  const setToken = useCallback(async (token: string) => {
+    localStorage.setItem('token', token);
+    try {
+      const userData = await api.getMe(token);
+      persist(token, userData);
+    } catch (err) {
+      console.error('Failed to fetch user with token', err);
+      localStorage.removeItem('token');
+    }
+  }, []);
+
   const login = useCallback(async (email: string, password: string) => {
     const res = await api.login(email, password);
     persist(res.token, res.user);
   }, []);
 
   const register = useCallback(async (email: string, password: string) => {
-    const res = await api.register(email, password);
-    persist(res.token, res.user);
+    await api.register(email, password);
+    // Registration no longer returns a token — user must verify email first
   }, []);
 
   const logout = useCallback(() => {
@@ -56,16 +108,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshCredits = useCallback(async () => {
-    if (!user) return;
     const { credits } = await api.getCredits();
-    const updated = { ...user, credits };
-    setUser(updated);
-    localStorage.setItem('user', JSON.stringify(updated));
-  }, [user]);
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, credits };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  // Re-fetches the full profile (credits + saved-card state) from the server.
+  const refreshUser = useCallback(async () => {
+    const fresh = await api.getMe();
+    setUser((prev) => {
+      const updated = { ...(prev ?? {}), ...fresh };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, register, logout, refreshCredits }}
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        refreshCredits,
+        refreshUser,
+        setToken,
+      }}
     >
       {children}
     </AuthContext.Provider>

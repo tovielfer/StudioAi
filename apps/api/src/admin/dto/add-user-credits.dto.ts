@@ -1,8 +1,8 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, NotEquals } from 'class-validator';
 
 export class AddUserCreditsDto {
   @IsInt()
-  @Min(1)
+  @NotEquals(0)
   amount: number;
 
   @IsOptional()

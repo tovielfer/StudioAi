@@ -1,7 +1,11 @@
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import sharp from 'sharp';
 import { GenerateImageParams, GenerateImageResult } from '../ai.types';
 
 export abstract class BaseImageProvider {
+  private readonly baseLogger = new Logger('ReferenceImageFetch');
+
   constructor(protected readonly config: ConfigService) {}
 
   abstract generate(params: GenerateImageParams): Promise<GenerateImageResult>;
@@ -9,7 +13,7 @@ export abstract class BaseImageProvider {
   // Pixel dimensions for a given aspect ratio at 1K, scaled by the resolution tier.
   protected dimensions(
     ratio: string,
-    resolution?: string,
+    resolution?: string | null,
   ): { width: number; height: number } {
     const base: Record<string, { width: number; height: number }> = {
       '1:1': { width: 1024, height: 1024 },
@@ -27,8 +31,14 @@ export abstract class BaseImageProvider {
     return params.referenceImages?.length ? params.referenceImages : [];
   }
 
-  private static readonly REFERENCE_IMAGE_TIMEOUT_MS = 10_000;
-  private static readonly REFERENCE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+  // Per-attempt download timeout. Under a filtering proxy (NetFree) or slow
+  // storage the fetch can stall; 30s leaves room before we abort and retry.
+  private static readonly REFERENCE_IMAGE_TIMEOUT_MS = 30_000;
+  // Extra download attempts after the first, for transient timeouts/network
+  // blips — so a slow proxy round-trip doesn't fail the whole generation.
+  private static readonly REFERENCE_IMAGE_MAX_RETRIES = 2;
+  // Google caps inline image data at 7MB; keep providers aligned with that.
+  private static readonly REFERENCE_IMAGE_MAX_BYTES = 7 * 1024 * 1024;
 
   protected async fetchReferenceImage(url: string): Promise<{ blob: Blob; filename: string }> {
     let parsed: URL;
@@ -41,58 +51,193 @@ export abstract class BaseImageProvider {
       throw new Error(`Unsupported reference image protocol: ${parsed.protocol}`);
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      BaseImageProvider.REFERENCE_IMAGE_TIMEOUT_MS,
+    const { buffer, rawHeader } = await this.downloadReferenceImage(url);
+    if (buffer.byteLength > BaseImageProvider.REFERENCE_IMAGE_MAX_BYTES) {
+      throw new Error('Reference image exceeds maximum allowed size');
+    }
+    const firstBytes = Array.from(new Uint8Array(buffer).slice(0, 4))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join(' ');
+    // Trust the actual bytes over the header/extension: files are often stored
+    // with a mismatched extension/content-type (e.g. a JPEG saved as .png),
+    // which makes providers reject them with "invalid image file".
+    const sniffed = this.detectImageContentType(buffer);
+    const { data: normalized, contentType: normalizedContentType } =
+      await this.normalizeReferenceImage(buffer);
+    const normalizedBytes = new Uint8Array(normalized);
+    const blob = new Blob([normalizedBytes], { type: normalizedContentType });
+    const filename = this.filenameFromContentType(normalizedContentType);
+    this.baseLogger.log(
+      `fetched ref: bytes=${buffer.byteLength}, normalized-bytes=${normalized.byteLength}, header-content-type="${rawHeader}", magic=[${firstBytes}], sniffed=${sniffed ?? 'null'}, final-content-type="${normalizedContentType}", filename="${filename}" (url=${url})`,
     );
-    try {
-      const response = await fetch(url, { signal: controller.signal });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch reference image: ${response.statusText}`);
-      }
-      const buffer = await response.arrayBuffer();
-      if (buffer.byteLength > BaseImageProvider.REFERENCE_IMAGE_MAX_BYTES) {
-        throw new Error('Reference image exceeds maximum allowed size');
-      }
-      const raw = response.headers.get('content-type') ?? '';
-      // R2 (and some CDNs) may return application/octet-stream — fall back to URL extension
-      const contentType = raw.startsWith('image/')
-        ? raw.split(';')[0].trim()
-        : this.contentTypeFromUrl(url);
-      const blob = new Blob([buffer], { type: contentType });
-      const filename = this.filenameFromUrl(url, contentType);
-      return { blob, filename };
-    } finally {
-      clearTimeout(timeout);
-    }
+    return { blob, filename };
   }
 
-  private contentTypeFromUrl(url: string): string {
-    const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
-    const map: Record<string, string> = {
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      png: 'image/png',
-      webp: 'image/webp',
-      gif: 'image/gif',
-    };
-    return map[ext ?? ''] ?? 'image/png';
+  // Downloads the reference image with a per-attempt timeout and retries the
+  // transient failures (abort/timeout/network) that otherwise surface as
+  // "This operation was aborted" and fail an entire generation. Definitive HTTP
+  // errors (e.g. 404) are not retried.
+  private async downloadReferenceImage(
+    url: string,
+  ): Promise<{ buffer: ArrayBuffer; rawHeader: string }> {
+    const maxRetries = BaseImageProvider.REFERENCE_IMAGE_MAX_RETRIES;
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(
+        () => controller.abort(),
+        BaseImageProvider.REFERENCE_IMAGE_TIMEOUT_MS,
+      );
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`Failed to fetch reference image: ${response.statusText}`);
+        }
+        const buffer = await response.arrayBuffer();
+        const rawHeader = response.headers.get('content-type') ?? '';
+        return { buffer, rawHeader };
+      } catch (error) {
+        lastError = error;
+        if (!this.isRetryableFetchError(error) || attempt === maxRetries) break;
+        this.baseLogger.warn(
+          `reference image download attempt ${attempt + 1} failed, retrying: ${error instanceof Error ? error.message : String(error)} (url=${url})`,
+        );
+        await this.delay(500 * (attempt + 1));
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
   }
 
-  private filenameFromUrl(url: string, contentType: string): string {
-    try {
-      const filename = new URL(url).pathname.split('/').pop();
-      if (filename?.includes('.')) return filename.toLowerCase();
-    } catch {
-      // fall through
+  private isRetryableFetchError(error: unknown): boolean {
+    if (!(error instanceof Error)) return false;
+    return (
+      error.name === 'AbortError' ||
+      /aborted/i.test(error.message) ||
+      /fetch failed/i.test(error.message) ||
+      /network/i.test(error.message) ||
+      /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN/i.test(error.message)
+    );
+  }
+
+  protected delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // Normalize a reference image to a format/size every provider accepts while
+  // guaranteeing the result stays under the inline size cap. Re-encoding a photo
+  // to lossless PNG often balloons well past the limit, so we fall back to JPEG
+  // and progressively downscale + lower quality until it fits, instead of
+  // failing the whole generation.
+  private async normalizeReferenceImage(
+    buffer: ArrayBuffer,
+  ): Promise<{ data: Buffer; contentType: string }> {
+    const max = BaseImageProvider.REFERENCE_IMAGE_MAX_BYTES;
+    const input = Buffer.from(buffer);
+
+    // Preferred: lossless PNG (keeps transparency and exact pixels).
+    const png = await sharp(input, { failOn: 'none' })
+      .rotate()
+      .toColorspace('srgb')
+      .png()
+      .toBuffer();
+    if (png.byteLength <= max) {
+      return { data: png, contentType: 'image/png' };
     }
+
+    // PNG too large (typical for high-res photos): re-encode as JPEG, shrinking
+    // dimensions and quality step by step until the payload fits under the cap.
+    const dimensionSteps = [4096, 3072, 2048, 1536, 1024];
+    const qualitySteps = [85, 75, 65, 55];
+    let smallest: Buffer | null = null;
+    for (const dimension of dimensionSteps) {
+      for (const quality of qualitySteps) {
+        const jpeg = await sharp(input, { failOn: 'none' })
+          .rotate()
+          .toColorspace('srgb')
+          .resize({
+            width: dimension,
+            height: dimension,
+            fit: 'inside',
+            withoutEnlargement: true,
+          })
+          .flatten({ background: '#ffffff' })
+          .jpeg({ quality, mozjpeg: true })
+          .toBuffer();
+        if (!smallest || jpeg.byteLength < smallest.byteLength) {
+          smallest = jpeg;
+        }
+        if (jpeg.byteLength <= max) {
+          return { data: jpeg, contentType: 'image/jpeg' };
+        }
+      }
+    }
+
+    if (smallest && smallest.byteLength <= max) {
+      return { data: smallest, contentType: 'image/jpeg' };
+    }
+    throw new Error('Reference image exceeds maximum allowed size after normalization');
+  }
+
+  // Identify the real image format from the file's magic bytes. Returns null
+  // when the content isn't a recognized image so callers can fall back.
+  private detectImageContentType(buffer: ArrayBuffer): string | null {
+    const bytes = new Uint8Array(buffer);
+    if (bytes.length < 12) return null;
+
+    // JPEG: FF D8 FF
+    if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+      return 'image/jpeg';
+    }
+    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    if (
+      bytes[0] === 0x89 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x4e &&
+      bytes[3] === 0x47 &&
+      bytes[4] === 0x0d &&
+      bytes[5] === 0x0a &&
+      bytes[6] === 0x1a &&
+      bytes[7] === 0x0a
+    ) {
+      return 'image/png';
+    }
+    // GIF: "GIF87a" / "GIF89a"
+    if (
+      bytes[0] === 0x47 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46 &&
+      bytes[3] === 0x38
+    ) {
+      return 'image/gif';
+    }
+    // WEBP: "RIFF"...."WEBP"
+    if (
+      bytes[0] === 0x52 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46 &&
+      bytes[3] === 0x46 &&
+      bytes[8] === 0x57 &&
+      bytes[9] === 0x45 &&
+      bytes[10] === 0x42 &&
+      bytes[11] === 0x50
+    ) {
+      return 'image/webp';
+    }
+    return null;
+  }
+
+  private filenameFromContentType(contentType: string): string {
     return `reference.${this.extensionFromContentType(contentType)}`;
   }
 
   private extensionFromContentType(contentType: string): string {
     if (contentType.includes('jpeg')) return 'jpg';
     if (contentType.includes('webp')) return 'webp';
+    if (contentType.includes('gif')) return 'gif';
     if (contentType.includes('png')) return 'png';
     return 'png';
   }

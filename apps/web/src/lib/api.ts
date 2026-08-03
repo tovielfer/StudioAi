@@ -1,11 +1,60 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+/** Error carrying the HTTP status so callers can react to specific codes
+ *  (e.g. 418 "Blocked by NetFree" when an upstream content filter blocks a
+ *  response body). */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/** True when the failure is (likely) an upstream content-filter block. NetFree
+ *  returns status 418 for blocked response bodies, but because that response is
+ *  injected by the network proxy it often lacks CORS headers, so `fetch` rejects
+ *  with a `TypeError` ("Failed to fetch") and JS never sees the 418. We treat
+ *  both cases as a block; the salvage flow re-fetches in "safe" mode and only
+ *  rethrows if that safe request also fails (i.e. a genuine outage). */
+export function isBlockedError(err: unknown): boolean {
+  if (err instanceof ApiError && err.status === 418) return true;
+  if (err instanceof TypeError) return true;
+  const message = err instanceof Error ? err.message : '';
+  return /netfree|blocked by netfree|failed to fetch|networkerror/i.test(message);
+}
+
 export interface User {
   id: string;
   email: string;
+  nickname?: string | null;
   credits: number;
   role: 'user' | 'admin';
+  isBlocked?: boolean;
+  emailVerified?: boolean;
   createdAt?: string;
+  /** When the user first opened the installed PWA and claimed the install
+   *  bonus. Null/absent means they haven't installed (or never opened it). */
+  installedAt?: string | null;
+  generationsCount?: number;
+  /** True when a card token is saved and can be charged without re-entry. */
+  hasSavedCard?: boolean;
+  savedCardLast4?: string | null;
+  savedCardBrand?: string | null;
+}
+
+export type AdminUsersSort =
+  | 'newest'
+  | 'oldest'
+  | 'generations'
+  | 'credits'
+  | 'email';
+
+export interface BroadcastFilters {
+  onlyVerified: boolean;
+  excludeBlocked: boolean;
+  excludeAdmins: boolean;
 }
 
 export interface AuthResponse {
@@ -33,13 +82,15 @@ export interface Generation {
   type: string;
   prompt: string;
   model: string;
-  status: 'pending' | 'processing' | 'done' | 'failed';
+  status: 'pending' | 'processing' | 'done' | 'failed' | 'cancelled';
   resultUrl: string | null;
   referenceImageUrls: string[] | null;
-  quality: string;
+  quality: string | null;
   size: string;
-  resolution: string;
+  resolution: string | null;
   provider: string;
+  durationSeconds: number | null;
+  generateAudio: boolean | null;
   creditCost: number;
   pricingRuleId: string | null;
   actualCostUsd: number | null;
@@ -47,6 +98,7 @@ export interface Generation {
   errorMessage: string | null;
   providerErrorRaw: string | null;
   createdAt: string;
+  deletedAt?: string | null;
 }
 
 export interface AdminStats {
@@ -59,6 +111,26 @@ export interface AdminStats {
 
 export interface AdminGeneration extends Generation {
   userEmail: string | null;
+  /** True when the row was returned in "safe" mode because its full payload was
+   *  blocked by the upstream content filter; prompt & image URLs are redacted. */
+  blocked?: boolean;
+}
+
+export type CreditTransactionDirection = 'credit' | 'debit';
+
+export interface AdminCreditTransaction {
+  id: string;
+  userId: string;
+  userEmail: string | null;
+  amount: number;
+  reason: string;
+  createdAt: string;
+}
+
+export interface AdminCreditTransactionSummary {
+  issued: number;
+  spent: number;
+  net: number;
 }
 
 export interface AdminCostStat {
@@ -119,9 +191,51 @@ export interface AdminPricingRule {
   updatedAt: string;
   calculatedUsd: number;
   calculatedCredits: number;
+  calculatedIls: number;
   referenceCalculatedUsd: number;
   referenceCalculatedCredits: number;
+  referenceCalculatedIls: number;
+  underpriced: boolean;
   metrics: PricingRuleMetrics;
+}
+
+export interface CreditPackage {
+  id: string;
+  name: string;
+  priceIls: number;
+  credits: number;
+  badge: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type OrderStatus = 'pending' | 'approved' | 'rejected' | 'failed';
+
+export interface Order {
+  id: string;
+  userId: string;
+  userEmail?: string | null;
+  packageId: string | null;
+  packageName: string;
+  priceIls: number;
+  credits: number;
+  status: OrderStatus;
+  note: string | null;
+  failureReason?: string | null;
+  failedAt?: string | null;
+  decidedByUserId?: string | null;
+  decidedAt?: string | null;
+  createdAt: string;
+}
+
+export interface OrdersSummary {
+  totalRevenue: number;
+  totalOrders: number;
+  avgOrder: number;
+  days: number;
+  series: Array<{ date: string; revenue: number; count: number }>;
 }
 
 export interface PricingRuleAuditLog {
@@ -139,14 +253,16 @@ export type FeedbackType =
   | 'note'
   | 'improvement'
   | 'shortcut'
-  | 'other';
+  | 'other'
+  | 'email';
 
 export type FeedbackStatus = 'open' | 'in_progress' | 'answered' | 'closed';
 
 export interface FeedbackSubmission {
   id: string;
-  userId: string;
+  userId: string | null;
   userEmail?: string | null;
+  contactEmail?: string | null;
   type: FeedbackType;
   title: string;
   message: string;
@@ -156,6 +272,32 @@ export interface FeedbackSubmission {
   userReplyRead?: boolean;
   adminRead?: boolean;
   createdAt: string;
+  lastMessageAt?: string | null;
+}
+
+export type FeedbackMessageDirection = 'inbound' | 'outbound';
+
+export interface FeedbackMessage {
+  id: string;
+  feedbackId: string;
+  direction: FeedbackMessageDirection;
+  authorType: 'user' | 'admin' | 'system';
+  body: string;
+  createdAt: string;
+}
+
+/** Wipes the stored session and sends the user to /login. Called when an
+ *  authenticated request comes back 401 (expired/invalid/revoked token), so a
+ *  user can't get stuck "half logged in" — pages rendering from a stale cached
+ *  `user` while every API call fails. Guards against redirect loops when we're
+ *  already on the login page. */
+function handleUnauthorized() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  if (window.location.pathname !== '/login') {
+    window.location.assign('/login?expired=1');
+  }
 }
 
 class ApiClient {
@@ -184,18 +326,31 @@ class ApiClient {
     const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 
     if (!res.ok) {
+      // A 401 on a request that carried a token means the session is no longer
+      // valid. Clear it and bounce to login instead of leaving the app in a
+      // broken "authenticated but every call fails" state.
+      if (res.status === 401 && token) {
+        handleUnauthorized();
+      }
       const err = await res.json().catch(() => ({ message: res.statusText }));
-      throw new Error(err.message || `Request failed: ${res.status}`);
+      throw new ApiError(
+        err.message || `Request failed: ${res.status}`,
+        res.status,
+      );
     }
 
     return res.json();
   }
 
   register(email: string, password: string) {
-    return this.request<AuthResponse>('/auth/register', {
+    return this.request<{ message: string }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
+  }
+
+  verifyEmail(token: string) {
+    return this.request<AuthResponse>(`/auth/verify-email?token=${token}`);
   }
 
   login(email: string, password: string) {
@@ -205,8 +360,40 @@ class ApiClient {
     });
   }
 
+  forgotPassword(email: string) {
+    return this.request<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  resetPassword(token: string, newPassword: string) {
+    return this.request<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
+  }
+
+  getMe(token?: string) {
+    const options: RequestInit = {};
+    if (token) {
+      options.headers = { Authorization: `Bearer ${token}` };
+    }
+    return this.request<User>('/auth/me', options);
+  }
+
   getCredits() {
     return this.request<{ credits: number }>('/credits');
+  }
+
+  /** Claims the one-time "installed the app" bonus. Idempotent server-side:
+   *  `granted` is true only the first time; later calls just return the
+   *  current balance. Called when the app detects it runs as an installed PWA. */
+  claimInstallReward() {
+    return this.request<{ granted: boolean; amount: number; credits: number }>(
+      '/credits/install-reward',
+      { method: 'POST' },
+    );
   }
 
   createGeneration(data: {
@@ -218,6 +405,8 @@ class ApiClient {
     resolution?: string;
     provider?: string;
     referenceImageUrls?: string[];
+    durationSeconds?: number;
+    generateAudio?: boolean;
   }) {
     return this.request<Generation>('/generations/create', {
       method: 'POST',
@@ -225,16 +414,54 @@ class ApiClient {
     });
   }
 
+  // Starts a brand-new generation that reuses every parameter of an existing one
+  // (prompt, model, type, size, quality, resolution, provider, references, and
+  // the video-only controls). Used by the immediate "create again" action on
+  // failed/cancelled items.
+  recreateGeneration(gen: Generation) {
+    return this.createGeneration({
+      prompt: gen.prompt,
+      model: gen.model,
+      type: gen.type,
+      quality: gen.quality ?? undefined,
+      size: gen.size,
+      resolution: gen.resolution ?? undefined,
+      provider: gen.provider,
+      referenceImageUrls: gen.referenceImageUrls ?? undefined,
+      durationSeconds: gen.durationSeconds ?? undefined,
+      generateAudio: gen.generateAudio ?? undefined,
+    });
+  }
+
   getGeneration(id: string) {
     return this.request<Generation>(`/generations/${id}`);
   }
 
+  sendGenerationByEmail(id: string) {
+    return this.request<{ success: boolean }>(
+      `/generations/${id}/deliver`,
+      { method: 'POST' },
+    );
+  }
+
+  deleteGeneration(id: string) {
+    return this.request<{ success: boolean }>(`/generations/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   getUserGenerations(
     userId: string,
-    params?: { type?: string; limit?: number; offset?: number },
+    params?: {
+      type?: string;
+      excludeStatus?: string;
+      limit?: number;
+      offset?: number;
+    },
   ) {
     const query = new URLSearchParams();
     if (params?.type) query.set('type', params.type);
+    if (params?.excludeStatus) query.set('excludeStatus', params.excludeStatus);
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.offset) query.set('offset', String(params.offset));
     const qs = query.toString();
@@ -260,6 +487,8 @@ class ApiClient {
     resolution?: string;
     hasReference?: boolean;
     type?: string;
+    durationSeconds?: number;
+    generateAudio?: boolean;
   }) {
     const query = new URLSearchParams({
       provider: params.provider,
@@ -270,18 +499,75 @@ class ApiClient {
     });
     if (params.resolution) query.set('resolution', params.resolution);
     if (params.type) query.set('type', params.type);
-    return this.request<{ credits: number; usd: number }>(
+    if (params.durationSeconds != null) {
+      query.set('durationSeconds', String(params.durationSeconds));
+    }
+    if (params.generateAudio != null) {
+      query.set('generateAudio', String(params.generateAudio));
+    }
+    return this.request<{ credits: number; usd: number; priceIls: number }>(
       `/generations/cost?${query.toString()}`,
     );
+  }
+
+  // --- Packages & orders (public/user) ---
+
+  getPackages() {
+    return this.request<CreditPackage[]>('/packages');
+  }
+
+  createOrder(packageId: string, note?: string) {
+    return this.request<Order>('/orders', {
+      method: 'POST',
+      body: JSON.stringify({ packageId, note }),
+    });
+  }
+
+  getMyOrders() {
+    return this.request<Order[]>('/orders');
+  }
+
+  payOrder(orderId: string, singleUseToken: string, saveCard = true) {
+    return this.request<{ order: Order; credits: number }>(
+      `/orders/${orderId}/pay`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ singleUseToken, saveCard }),
+      },
+    );
+  }
+
+  payOrderSaved(orderId: string) {
+    return this.request<{ order: Order; credits: number }>(
+      `/orders/${orderId}/pay-saved`,
+      { method: 'POST' },
+    );
+  }
+
+  removeSavedCard() {
+    return this.request<{ ok: boolean }>('/saved-card', { method: 'DELETE' });
+  }
+
+  getModels(type?: 'image' | 'video') {
+    const qs = type ? `?type=${type}` : '';
+    return this.request<ModelOption[]>(`/generations/models${qs}`);
   }
 
   getAdminStats() {
     return this.request<AdminStats>('/admin/stats');
   }
 
-  getAdminUsers(params?: { search?: string; limit?: number; offset?: number }) {
+  getAdminUsers(params?: {
+    search?: string;
+    sort?: AdminUsersSort;
+    installed?: boolean;
+    limit?: number;
+    offset?: number;
+  }) {
     const query = new URLSearchParams();
     if (params?.search) query.set('search', params.search);
+    if (params?.sort) query.set('sort', params.sort);
+    if (params?.installed) query.set('installed', 'true');
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.offset) query.set('offset', String(params.offset));
     const qs = query.toString();
@@ -301,6 +587,8 @@ class ApiClient {
     size?: string;
     resolution?: string;
     hasReference?: boolean;
+    onlyDeleted?: boolean;
+    safe?: boolean;
     limit?: number;
     offset?: number;
   }) {
@@ -317,6 +605,8 @@ class ApiClient {
     if (typeof params?.hasReference === 'boolean') {
       query.set('hasReference', String(params.hasReference));
     }
+    if (params?.onlyDeleted) query.set('onlyDeleted', 'true');
+    if (params?.safe) query.set('safe', 'true');
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.offset) query.set('offset', String(params.offset));
     const qs = query.toString();
@@ -325,11 +615,113 @@ class ApiClient {
     );
   }
 
+  sendAdminGenerationByEmail(id: string) {
+    return this.request<{ success: boolean }>(
+      `/admin/generations/${id}/deliver`,
+      { method: 'POST' },
+    );
+  }
+
+  cancelAdminGeneration(id: string) {
+    return this.request<AdminGeneration>(`/admin/generations/${id}/cancel`, {
+      method: 'POST',
+    });
+  }
+
+  hardDeleteAdminGenerations(ids: string[]) {
+    return this.request<{ success: boolean; deleted: number; ids: string[] }>(
+      `/admin/generations/hard-delete`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ids }),
+      },
+    );
+  }
+
   addAdminCredits(userId: string, amount: number, reason?: string) {
     return this.request<{ credits: number }>(`/admin/users/${userId}/credits`, {
       method: 'POST',
       body: JSON.stringify({ amount, reason }),
     });
+  }
+
+  sendAdminUserEmail(userId: string, subject: string, message: string) {
+    return this.request<{ success: boolean }>(
+      `/admin/users/${userId}/deliver`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ subject, message }),
+      },
+    );
+  }
+
+  countAdminBroadcastRecipients(filters: BroadcastFilters) {
+    const params = new URLSearchParams({
+      onlyVerified: String(filters.onlyVerified),
+      excludeBlocked: String(filters.excludeBlocked),
+      excludeAdmins: String(filters.excludeAdmins),
+    });
+    return this.request<{ total: number }>(
+      `/admin/broadcast/recipients?${params.toString()}`,
+    );
+  }
+
+  sendAdminBroadcast(
+    subject: string,
+    message: string,
+    filters: BroadcastFilters,
+  ) {
+    return this.request<{
+      success: boolean;
+      total: number;
+      sent: number;
+      failed: number;
+    }>(`/admin/broadcast`, {
+      method: 'POST',
+      body: JSON.stringify({ subject, message, ...filters }),
+    });
+  }
+
+  sendAdminBroadcastTest(subject: string, message: string, to: string) {
+    return this.request<{ success: boolean }>(`/admin/broadcast/test`, {
+      method: 'POST',
+      body: JSON.stringify({ subject, message, to }),
+    });
+  }
+
+  updateAdminUser(
+    userId: string,
+    data: { nickname?: string | null; isBlocked?: boolean },
+  ) {
+    return this.request<User>(`/admin/users/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  getAdminCreditTransactions(params?: {
+    search?: string;
+    userId?: string;
+    direction?: CreditTransactionDirection;
+    from?: string;
+    to?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.userId) query.set('userId', params.userId);
+    if (params?.direction) query.set('direction', params.direction);
+    if (params?.from) query.set('from', params.from);
+    if (params?.to) query.set('to', params.to);
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+    const qs = query.toString();
+    return this.request<{
+      items: AdminCreditTransaction[];
+      total: number;
+      summary: AdminCreditTransactionSummary;
+    }>(`/admin/credit-transactions${qs ? `?${qs}` : ''}`);
   }
 
   getAdminCostStats() {
@@ -375,12 +767,104 @@ class ApiClient {
     );
   }
 
+  // --- Admin packages & orders ---
+
+  getAdminBillingConfig() {
+    return this.request<{
+      usdIls: number;
+      targetMargin: number;
+      creditValueIls: number;
+    }>('/admin/billing-config');
+  }
+
+  getAdminPackages() {
+    return this.request<CreditPackage[]>('/admin/packages');
+  }
+
+  createAdminPackage(data: {
+    name: string;
+    priceIls: number;
+    credits: number;
+    badge?: string | null;
+    isActive?: boolean;
+    sortOrder?: number;
+  }) {
+    return this.request<CreditPackage>('/admin/packages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  updateAdminPackage(
+    id: string,
+    data: {
+      name?: string;
+      priceIls?: number;
+      credits?: number;
+      badge?: string | null;
+      isActive?: boolean;
+      sortOrder?: number;
+    },
+  ) {
+    return this.request<CreditPackage>(`/admin/packages/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  getAdminOrders(status?: OrderStatus) {
+    const qs = status ? `?status=${status}` : '';
+    return this.request<Order[]>(`/admin/orders${qs}`);
+  }
+
+  getAdminOrdersPendingCount() {
+    return this.request<{ pending: number }>('/admin/orders/pending-count');
+  }
+
+  getAdminOrdersNewCount() {
+    return this.request<{ count: number }>('/admin/orders/new-count');
+  }
+
+  getAdminOrdersSummary(days = 30) {
+    return this.request<OrdersSummary>(`/admin/orders/summary?days=${days}`);
+  }
+
+  markAdminOrdersSeen() {
+    return this.request<{ ok: boolean }>('/admin/orders/mark-seen', {
+      method: 'POST',
+    });
+  }
+
+  approveAdminOrder(id: string) {
+    return this.request<Order>(`/admin/orders/${id}/approve`, {
+      method: 'POST',
+    });
+  }
+
+  rejectAdminOrder(id: string) {
+    return this.request<Order>(`/admin/orders/${id}/reject`, {
+      method: 'POST',
+    });
+  }
+
   createFeedback(data: {
     type: FeedbackType;
-    title: string;
+    title?: string;
     message: string;
   }) {
     return this.request<FeedbackSubmission>('/feedback', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  createPublicFeedback(data: {
+    type: FeedbackType;
+    title?: string;
+    message: string;
+    contactEmail: string;
+  }) {
+    return this.request<FeedbackSubmission>('/feedback/public', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -394,6 +878,19 @@ class ApiClient {
     return this.request<{ items: FeedbackSubmission[]; total: number }>(
       `/feedback${qs ? `?${qs}` : ''}`,
     );
+  }
+
+  getMyFeedbackMessages(id: string) {
+    return this.request<{ items: FeedbackMessage[] }>(
+      `/feedback/${id}/messages`,
+    );
+  }
+
+  replyMyFeedback(id: string, message: string) {
+    return this.request<FeedbackSubmission>(`/feedback/${id}/reply`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
   }
 
   getMyFeedbackUnreadCount() {
@@ -435,6 +932,19 @@ class ApiClient {
       body: JSON.stringify(data),
     });
   }
+
+  getAdminFeedbackMessages(id: string) {
+    return this.request<{ items: FeedbackMessage[] }>(
+      `/feedback/admin/${id}/messages`,
+    );
+  }
+
+  replyAdminFeedback(id: string, message: string) {
+    return this.request<FeedbackSubmission>(`/feedback/admin/${id}/reply`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+  }
 }
 
 export const api = new ApiClient();
@@ -442,6 +952,7 @@ export const api = new ApiClient();
 export interface SizeOption   { id: string; label: string }
 export interface QualityOption { id: string; label: string }
 export interface ResolutionOption { id: string; label: string }
+export interface DurationOption { id: string; label: string }
 export interface ModelOption {
   id: string;
   name: string;
@@ -452,140 +963,21 @@ export interface ModelOption {
   // Resolution tiers (1K/2K/4K). Empty when the model has a single fixed
   // resolution; the UI only renders the selector when there is a choice.
   resolutions: ResolutionOption[];
+  // Video only: selectable clip durations (seconds). Empty/undefined for a
+  // single fixed duration.
+  durations?: DurationOption[];
+  // Video only: whether the model can generate native audio.
+  supportsAudio?: boolean;
+  // Video only: whether image-to-video accepts an end/tail frame in addition
+  // to the start frame (Kling v3 + v2.1 pro). Hides the end-frame slot when off.
+  supportsEndFrame?: boolean;
 }
-
-const DEFAULT_SIZES: SizeOption[] = [
-  { id: '1:1',  label: '1:1 ריבוע' },
-  { id: '16:9', label: '16:9 לרוחב' },
-  { id: '9:16', label: '9:16 לאורך' },
-  { id: '4:3',  label: '4:3 סטנדרטי' },
-];
-
-const DEFAULT_QUALITIES: QualityOption[] = [
-  { id: 'fast',     label: 'מהיר' },
-  { id: 'standard', label: 'רגיל' },
-  { id: 'hd',       label: 'HD'   },
-];
-
-const FIXED_STANDARD_QUALITY: QualityOption[] = [
-  { id: 'standard', label: 'רגיל' },
-];
-
-const RESOLUTION_TIERS: ResolutionOption[] = [
-  { id: '1K', label: '1K – רגיל' },
-  { id: '2K', label: '2K – גבוה' },
-  { id: '4K', label: '4K – מקסימלי' },
-];
-
-export const IMAGE_MODELS: ModelOption[] = [
-  // {
-  //   id: 'flux-schnell',
-  //   name: 'Flux Schnell',
-  //   provider: 'mock',
-  //   sizes: DEFAULT_SIZES,
-  //   qualities: DEFAULT_QUALITIES,
-  // },
-  // {
-  //   id: 'flux-dev',
-  //   name: 'Flux Dev',
-  //   provider: 'replicate',
-  //   sizes: DEFAULT_SIZES,
-  //   qualities: DEFAULT_QUALITIES,
-  // },
-  // {
-  //   id: 'sd3',
-  //   name: 'Stable Diffusion 3',
-  //   provider: 'stability',
-  //   sizes: DEFAULT_SIZES,
-  //   qualities: DEFAULT_QUALITIES,
-  // },
-  {
-    id: 'gpt-image-1',
-    name: 'OpenAI Image 1',
-    provider: 'openai',
-    sizes: [
-      { id: '1:1',  label: '1024×1024 (ריבוע)' },
-      { id: '16:9', label: '1536×1024 (לרוחב)' },
-      { id: '9:16', label: '1024×1536 (לאורך)' },
-    ],
-    qualities: [
-      { id: 'fast',     label: 'Low – מהיר'         },
-      { id: 'standard', label: 'Medium – רגיל'       },
-      { id: 'hd',       label: 'High – איכות גבוהה' },
-    ],
-    resolutions: [],
-  },
-  {
-    id: 'gpt-image-2',
-    name: 'OpenAI Image 2',
-    provider: 'openai',
-    sizes: [
-      { id: '1:1',  label: '1:1 ריבוע'  },
-      { id: '16:9', label: '16:9 לרוחב' },
-      { id: '9:16', label: '9:16 לאורך' },
-    ],
-    qualities: [
-      { id: 'fast',     label: 'Low – מהיר'         },
-      { id: 'standard', label: 'Medium – רגיל'       },
-      { id: 'hd',       label: 'High – איכות גבוהה' },
-    ],
-    resolutions: RESOLUTION_TIERS,
-  },
-  // {
-  //   id: 'fal-flux',
-  //   name: 'Fal Flux',
-  //   provider: 'fal',
-  //   sizes: DEFAULT_SIZES,
-  //   qualities: DEFAULT_QUALITIES,
-  // },
-  {
-    id: 'gemini-3-pro-image-preview',
-    name: 'Nano Banana Pro',
-    provider: 'google',
-    sizes: DEFAULT_SIZES,
-    qualities: FIXED_STANDARD_QUALITY,
-    resolutions: RESOLUTION_TIERS,
-  },
-  // {
-  //   id: 'gemini-3.1-flash-image',
-  //   name: 'Nano Banana 2',
-  //   provider: 'google',
-  //   sizes: DEFAULT_SIZES,
-  //   qualities: DEFAULT_QUALITIES,
-  // },
-  {
-    id: 'gemini-2.5-flash-image',
-    name: 'Nano Banana',
-    provider: 'google',
-    sizes: DEFAULT_SIZES,
-    qualities: FIXED_STANDARD_QUALITY,
-    resolutions: [],
-  },
-];
-
-export const VIDEO_MODELS: ModelOption[] = [
-  {
-    id: 'kling-v3-standard',
-    name: 'Kling Video v3 Standard',
-    provider: 'fal',
-    type: 'video',
-    sizes: [
-      { id: '16:9', label: '16:9 לרוחב' },
-      { id: '9:16', label: '9:16 לאורך' },
-      { id: '1:1',  label: '1:1 ריבוע' },
-    ],
-    qualities: FIXED_STANDARD_QUALITY,
-    resolutions: [],
-  },
-];
-
-export const MODELS = IMAGE_MODELS;
 
 /** @deprecated Use api.getGenerationCostPreview() for accurate backend pricing. */
 export function estimateCost(
   quality: string,
   hasReference: boolean,
 ): number {
-  const base = quality === 'hd' ? 10 : 5;
+  const base = quality === 'high' ? 10 : 5;
   return hasReference ? base + 5 : base;
 }

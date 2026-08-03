@@ -17,7 +17,14 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GenerationStatus } from '../common/constants';
 import { AdminService } from './admin.service';
 import { AddUserCreditsDto } from './dto/add-user-credits.dto';
+import { HardDeleteGenerationsDto } from './dto/hard-delete-generations.dto';
+import {
+  SendBroadcastDto,
+  SendBroadcastTestDto,
+} from './dto/send-broadcast.dto';
+import { SendUserEmailDto } from './dto/send-user-email.dto';
 import { UpdatePricingRuleDto } from './dto/update-pricing-rule.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -32,11 +39,51 @@ export class AdminController {
   @Get('users')
   listUsers(
     @Query('search') search?: string,
+    @Query('sort') sort?: string,
+    @Query('installed') installed?: string,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
     @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset = 0,
   ) {
+    const allowedSorts = [
+      'newest',
+      'oldest',
+      'generations',
+      'credits',
+      'email',
+    ] as const;
+    type SortOption = (typeof allowedSorts)[number];
+    const sortOption = allowedSorts.includes(sort as SortOption)
+      ? (sort as SortOption)
+      : 'newest';
+
     return this.adminService.listUsers({
       search: search?.trim() || undefined,
+      sort: sortOption,
+      installed: installed === 'true' ? true : undefined,
+      limit: Math.min(Math.max(limit, 1), 100),
+      offset: Math.max(offset, 0),
+    });
+  }
+
+  @Get('credit-transactions')
+  listCreditTransactions(
+    @Query('search') search?: string,
+    @Query('userId') userId?: string,
+    @Query('direction') direction?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset = 0,
+  ) {
+    return this.adminService.listCreditTransactions({
+      search: search?.trim() || undefined,
+      userId: userId?.trim() || undefined,
+      direction:
+        direction === 'credit' || direction === 'debit'
+          ? direction
+          : undefined,
+      from: from?.trim() || undefined,
+      to: to?.trim() || undefined,
       limit: Math.min(Math.max(limit, 1), 100),
       offset: Math.max(offset, 0),
     });
@@ -54,6 +101,8 @@ export class AdminController {
     @Query('size') size?: string,
     @Query('resolution') resolution?: string,
     @Query('hasReference') hasReference?: string,
+    @Query('onlyDeleted') onlyDeleted?: string,
+    @Query('safe') safe?: string,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit = 50,
     @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset = 0,
   ) {
@@ -73,9 +122,29 @@ export class AdminController {
           : hasReference === 'false'
             ? false
             : undefined,
+      onlyDeleted: onlyDeleted === 'true' ? true : undefined,
+      safe: safe === 'true' ? true : undefined,
       limit: Math.min(Math.max(limit, 1), 100),
       offset: Math.max(offset, 0),
     });
+  }
+
+  @Post('generations/hard-delete')
+  hardDeleteGenerations(@Body() dto: HardDeleteGenerationsDto) {
+    return this.adminService.hardDeleteGenerations(dto.ids);
+  }
+
+  @Post('generations/:id/deliver')
+  sendGenerationEmail(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: { user: { email: string } },
+  ) {
+    return this.adminService.sendGenerationEmail(id, req.user.email);
+  }
+
+  @Post('generations/:id/cancel')
+  cancelGeneration(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.cancelGeneration(id);
   }
 
   @Get('cost-stats')
@@ -115,11 +184,55 @@ export class AdminController {
     return this.adminService.getPricingRuleAuditLog(id);
   }
 
+  @Patch('users/:id')
+  updateUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateUserDto,
+    @Req() req: { user: { id: string } },
+  ) {
+    return this.adminService.updateUser(id, dto, req.user.id);
+  }
+
   @Post('users/:id/credits')
   addCredits(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AddUserCreditsDto,
   ) {
     return this.adminService.addCredits(id, dto.amount, dto.reason);
+  }
+
+  @Post('users/:id/deliver')
+  sendUserEmail(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SendUserEmailDto,
+  ) {
+    return this.adminService.sendUserEmail(id, dto.subject, dto.message);
+  }
+
+  @Get('broadcast/recipients')
+  countBroadcastRecipients(
+    @Query('onlyVerified') onlyVerified?: string,
+    @Query('excludeBlocked') excludeBlocked?: string,
+    @Query('excludeAdmins') excludeAdmins?: string,
+  ) {
+    return this.adminService.countBroadcastRecipients({
+      onlyVerified: onlyVerified !== 'false',
+      excludeBlocked: excludeBlocked !== 'false',
+      excludeAdmins: excludeAdmins === 'true',
+    });
+  }
+
+  @Post('broadcast/test')
+  sendBroadcastTest(@Body() dto: SendBroadcastTestDto) {
+    return this.adminService.sendBroadcastTest(dto.to, dto.subject, dto.message);
+  }
+
+  @Post('broadcast')
+  broadcast(@Body() dto: SendBroadcastDto) {
+    return this.adminService.broadcastEmail(dto.subject, dto.message, {
+      onlyVerified: dto.onlyVerified ?? true,
+      excludeBlocked: dto.excludeBlocked ?? true,
+      excludeAdmins: dto.excludeAdmins ?? false,
+    });
   }
 }

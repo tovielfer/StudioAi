@@ -6,7 +6,11 @@ import { AppModule } from './app.module';
 import { isSyncQueue } from './config/env.loader';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule.register());
+  const app = await NestFactory.create(AppModule.register(), {
+    // Preserve the raw request body so the inbound-email webhook can verify
+    // its Svix signature against the exact bytes Resend signed.
+    rawBody: true,
+  });
 
   const logger = new Logger('Bootstrap');
 
@@ -17,8 +21,15 @@ async function bootstrap() {
     throw new Error('FRONTEND_URL env variable is required in production');
   }
 
+  const allowedOrigins = [
+    frontendUrl || 'http://localhost:3000',
+    'https://vookapix.com',
+    'https://www.vookapix.com',
+    'https://studio-ai-web-phi.vercel.app',
+  ].filter(Boolean);
+
   app.enableCors({
-    origin: frontendUrl || 'http://localhost:3000',
+    origin: allowedOrigins,
     credentials: true,
   });
 

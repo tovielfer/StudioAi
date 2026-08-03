@@ -13,13 +13,43 @@ body {
   min-height: 100vh;
 }
 
+/* Custom scrollbar styling (applies across the whole app) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a3a transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #2a2a3a;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #3b3b50;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 @layer components {
   .btn-primary {
-    @apply bg-brand-600 hover:bg-brand-500 text-white font-medium px-5 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply relative bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 text-white font-medium px-5 py-2.5 rounded-lg transition-all duration-200 shadow-glow-sm hover:shadow-glow disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none;
   }
 
   .btn-secondary {
-    @apply bg-surface-card hover:bg-surface-border border border-surface-border text-white font-medium px-5 py-2.5 rounded-lg transition-colors;
+    @apply bg-surface-card hover:bg-surface-border border border-surface-border hover:border-brand-500/50 text-white font-medium px-5 py-2.5 rounded-lg transition-all duration-200;
   }
 
   .icon-button {
@@ -34,11 +64,200 @@ body {
     @apply bg-surface-card border border-surface-border rounded-xl p-6;
   }
 
+  .card-interactive {
+    @apply bg-surface-card border border-surface-border rounded-xl p-6 transition-all duration-200 hover:border-brand-500/50 hover:shadow-glow-sm hover:-translate-y-0.5;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-brand-300 via-brand-400 to-accent-400 bg-clip-text text-transparent;
+  }
+
   .admin-card {
     @apply bg-white border border-gray-200 rounded-xl p-6 text-gray-950 shadow-sm;
   }
 
   .admin-field {
     @apply w-full bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent;
+  }
+}
+
+.bg-grid {
+  background-image: linear-gradient(
+      to right,
+      rgba(124, 58, 237, 0.06) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgba(124, 58, 237, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 70% 60% at 50% 0%,
+    #000 40%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 70% 60% at 50% 0%,
+    #000 40%,
+    transparent 100%
+  );
+}
+
+.glow-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+@keyframes auth-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-card-in {
+  animation: auth-card-in 0.25s ease-out;
+}
+
+@layer components {
+  .auth-tab {
+    @apply flex-1 text-center text-sm font-medium py-2 rounded-md transition-colors;
+  }
+
+  .auth-tab-active {
+    @apply bg-brand-600 text-white;
+  }
+
+  .auth-tab-inactive {
+    @apply text-gray-400 hover:text-white;
+  }
+}
+
+@keyframes fancy-select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.fancy-select-menu {
+  transform-origin: top center;
+  animation: fancy-select-in 0.14s ease-out;
+}
+
+@keyframes pay-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pay-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pay-overlay-in {
+  animation: pay-overlay-in 0.2s ease-out;
+}
+
+.pay-modal-in {
+  animation: pay-modal-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-in {
+  animation: toast-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Install banner: slide up from the bottom edge. */
+@keyframes install-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.install-in {
+  animation: install-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Install-reward modal: a springy pop-in. */
+@keyframes reward-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(10px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.reward-pop {
+  animation: reward-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Celebratory confetti falling behind the reward modal. */
+@keyframes reward-confetti {
+  0% {
+    opacity: 0;
+    transform: translateY(0) rotate(0deg);
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(110vh) rotate(720deg);
+  }
+}
+
+.reward-confetti {
+  animation-name: reward-confetti;
+  animation-timing-function: ease-in;
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .install-in,
+  .reward-pop,
+  .reward-confetti {
+    animation: none;
   }
 }

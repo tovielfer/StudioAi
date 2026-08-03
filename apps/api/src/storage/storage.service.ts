@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
   PutObjectCommand,
+  DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -119,6 +120,65 @@ export class StorageService {
         throw new Error(`${msg}. URL: ${sourceUrl}`);
       }
       throw error;
+    }
+  }
+
+  // Permanently removes a previously uploaded asset given its public URL.
+  // Best-effort: a missing object (already gone) is treated as success, and any
+  // other failure is logged and swallowed so callers can proceed with deleting
+  // the owning DB row. Returns true when the object was deleted (or absent).
+  async deleteByUrl(url: string | null | undefined): Promise<boolean> {
+    if (!url) return false;
+
+    const key = this.keyFromUrl(url);
+    if (!key) {
+      this.logger.warn(`Could not derive storage key from url: ${url}`);
+      return false;
+    }
+
+    if (this.storageType === 'r2' && this.s3) {
+      try {
+        await this.s3.send(
+          new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+        );
+        return true;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.error(`R2 delete failed (key=${key}): ${msg}`);
+        return false;
+      }
+    }
+
+    const fullPath = path.join(this.localPath, key);
+    try {
+      await fs.unlink(fullPath);
+      return true;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return true;
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Local delete failed (path=${fullPath}): ${msg}`);
+      return false;
+    }
+  }
+
+  // Extracts the storage key (e.g. `generations/<uuid>.png`) from a public URL,
+  // handling both the R2 public-URL form and the local `/uploads/<key>` form.
+  private keyFromUrl(url: string): string | null {
+    if (this.publicUrl && url.startsWith(`${this.publicUrl}/`)) {
+      return url.slice(this.publicUrl.length + 1);
+    }
+
+    const marker = '/uploads/';
+    const idx = url.indexOf(marker);
+    if (idx !== -1) {
+      return url.slice(idx + marker.length);
+    }
+
+    try {
+      const pathname = new URL(url).pathname.replace(/^\/+/, '');
+      return pathname || null;
+    } catch {
+      return null;
     }
   }
 

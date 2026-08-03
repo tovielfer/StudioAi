@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
@@ -46,17 +47,25 @@ export class Generation {
   @Column({ type: 'jsonb', nullable: true })
   referenceImageUrls: string[] | null;
 
-  @Column({ type: 'varchar', default: ImageQuality.STANDARD })
-  quality: ImageQuality;
+  @Column({ type: 'varchar', nullable: true })
+  quality: ImageQuality | null;
 
   @Column({ type: 'varchar', default: ImageSize.SQUARE })
   size: ImageSize;
 
-  @Column({ type: 'varchar', default: ImageResolution.ONE_K })
-  resolution: ImageResolution;
+  @Column({ type: 'varchar', nullable: true })
+  resolution: ImageResolution | null;
 
   @Column({ type: 'varchar', default: AiProvider.MOCK })
   provider: AiProvider;
+
+  // Video only: clip length in seconds. Null for images.
+  @Column({ type: 'int', nullable: true })
+  durationSeconds: number | null;
+
+  // Video only: whether native audio was requested (v3 models).
+  @Column({ type: 'boolean', nullable: true })
+  generateAudio: boolean | null;
 
   @Column({ type: 'int', default: 0 })
   creditCost: number;
@@ -85,4 +94,10 @@ export class Generation {
 
   @CreateDateColumn()
   createdAt: Date;
+
+  // Soft delete: set when a user removes the creation from their list. Queries on
+  // this entity exclude soft-deleted rows automatically; admin views opt back in
+  // with `withDeleted()` to keep audit/cost history intact.
+  @DeleteDateColumn({ type: 'timestamptz', nullable: true })
+  deletedAt: Date | null;
 }

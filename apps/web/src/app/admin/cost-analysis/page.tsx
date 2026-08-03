@@ -14,6 +14,10 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const QUALITY_LABELS: Record<string, string> = {
+  low: 'נמוכה',
+  medium: 'בינונית',
+  high: 'גבוהה',
+  auto: 'אוטומטי',
   fast: 'מהיר',
   standard: 'רגיל',
   hd: 'HD',
@@ -77,7 +81,8 @@ function providerLabel(value: string) {
   return PROVIDER_LABELS[value] ?? value;
 }
 
-function qualityLabel(value: string) {
+function qualityLabel(value: string | null) {
+  if (!value) return '—';
   return QUALITY_LABELS[value] ?? value;
 }
 
@@ -303,7 +308,7 @@ function CostAnalysisContent() {
               }))}
             />
             <FilterSelect
-              label="איכות"
+              label="רמת החשיבה"
               value={filters.quality}
               onChange={(value) => updateFilter('quality', value)}
               options={filterOptions.qualities.map((value) => ({
@@ -312,7 +317,7 @@ function CostAnalysisContent() {
               }))}
             />
             <FilterSelect
-              label="גודל"
+              label="יחס תמונה"
               value={filters.size}
               onChange={(value) => updateFilter('size', value)}
               options={filterOptions.sizes.map((value) => ({
@@ -369,8 +374,8 @@ function CostAnalysisContent() {
                     <th className="py-3 pe-3 text-right">סוג</th>
                     <th className="py-3 pe-3 text-right">ספק</th>
                     <th className="py-3 pe-3 text-right">מודל</th>
-                    <th className="py-3 pe-3 text-right">איכות</th>
-                    <th className="py-3 pe-3 text-right">גודל</th>
+                    <th className="py-3 pe-3 text-right">רמת החשיבה</th>
+                    <th className="py-3 pe-3 text-right">יחס תמונה</th>
                     <th className="py-3 pe-3 text-right">רזולוציה</th>
                     <th className="py-3 pe-3 text-right">מקור</th>
                     <th className="py-3 pe-3 text-right">תמונות מקור</th>
@@ -464,7 +469,7 @@ function CostAnalysisContent() {
         </section>
 
         <p className="text-sm text-gray-500">
-          לחצי על שורת סיכום כדי לראות את היצירות ששייכות אליה.
+          לחץ על שורת סיכום כדי לראות את היצירות ששייכות אליה.
         </p>
       </div>
 

@@ -12,14 +12,18 @@ import { AiModule } from './ai/ai.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { AdminModule } from './admin/admin.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { BillingModule } from './billing/billing.module';
 import { HealthController } from './health.controller';
 import { LoggerMiddleware } from './common/logger.middleware';
 import { User } from './users/user.entity';
 import { Generation } from './generations/generation.entity';
 import { CreditTransaction } from './credits/credit-transaction.entity';
 import { FeedbackSubmission } from './feedback/feedback-submission.entity';
+import { FeedbackMessage } from './feedback/feedback-message.entity';
 import { AiPricingRule } from './ai/ai-pricing-rule.entity';
 import { AiPricingRuleAuditLog } from './ai/ai-pricing-rule-audit-log.entity';
+import { CreditPackage } from './billing/credit-package.entity';
+import { Order } from './billing/order.entity';
 import { isSyncQueue } from './config/env.loader';
 
 @Module({})
@@ -49,8 +53,11 @@ export class AppModule implements NestModule {
             Generation,
             CreditTransaction,
             FeedbackSubmission,
+            FeedbackMessage,
             AiPricingRule,
             AiPricingRuleAuditLog,
+            CreditPackage,
+            Order,
           ],
           migrations: [join(__dirname, 'database/migrations/*.{ts,js}')],
           migrationsRun: true,
@@ -83,6 +90,7 @@ export class AppModule implements NestModule {
       UploadsModule,
       AdminModule,
       FeedbackModule,
+      BillingModule,
     ];
 
     return {

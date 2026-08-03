@@ -2,23 +2,45 @@
 
 import { useState } from 'react';
 import { Generation } from '@/lib/api';
-import { GenerationCard } from './GenerationCard';
-import { GenerationDetailsModal } from './GenerationDetailsModal';
+import { useSendGenerationEmail, EmailToast } from '@/components/SendEmail';
+import {
+  useDeleteGeneration,
+  DeleteConfirmDialog,
+  DeleteToast,
+} from '@/components/DeleteGeneration';
+import { GenerationCard } from '@/components/generation/GenerationCard';
+import { GenerationDetailsModal } from '@/components/generation/GenerationDetailsModal';
 
 export function RecentCreations({
   generations,
   loading,
   activeGenId,
   onUseReference,
+  onReuse,
+  onDeleted,
   type = 'image',
 }: {
   generations: Generation[];
   loading: boolean;
   activeGenId: string | null;
   onUseReference: (url: string) => void;
+  onReuse: (gen: Generation) => void;
+  onDeleted?: (id: string) => void;
   type?: 'image' | 'video';
 }) {
   const [selected, setSelected] = useState<Generation | null>(null);
+  const { sendingId, toast, sendEmail } = useSendGenerationEmail();
+  const {
+    pendingDelete,
+    deletingId,
+    toast: deleteToast,
+    requestDelete,
+    cancelDelete,
+    confirmDelete,
+  } = useDeleteGeneration((id) => {
+    onDeleted?.(id);
+    setSelected((current) => (current?.id === id ? null : current));
+  });
   const isVideo = type === 'video';
 
   return (
@@ -43,17 +65,22 @@ export function RecentCreations({
         </div>
       ) : generations.length === 0 ? (
         <div className="text-center py-16 text-gray-500 text-sm">
-          עדיין אין יצירות — לחצי על &quot;יצירה&quot; כדי להתחיל
+          עדיין אין יצירות — לחץ על &quot;יצירה&quot; כדי להתחיל
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
           {generations.map((gen) => (
             <GenerationCard
               key={gen.id}
               gen={gen}
               isActive={gen.id === activeGenId}
               onUseReference={onUseReference}
+              onReuse={onReuse}
               onSelect={setSelected}
+              onSendEmail={sendEmail}
+              sendingEmail={sendingId === gen.id}
+              onDelete={requestDelete}
+              deleting={deletingId === gen.id}
             />
           ))}
         </div>
@@ -63,9 +90,25 @@ export function RecentCreations({
         <GenerationDetailsModal
           generation={selected}
           onUseReference={onUseReference}
+          onReuse={onReuse}
           onClose={() => setSelected(null)}
+          onSendEmail={sendEmail}
+          sendingEmail={sendingId === selected.id}
+          onDelete={requestDelete}
+          deleting={deletingId === selected.id}
+          showCopyPrompt
         />
       )}
+
+      <DeleteConfirmDialog
+        generation={pendingDelete}
+        deleting={Boolean(deletingId)}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
+
+      <DeleteToast toast={deleteToast} />
+      <EmailToast toast={toast} />
     </div>
   );
 }

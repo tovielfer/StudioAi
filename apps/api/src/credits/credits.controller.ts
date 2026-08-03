@@ -26,6 +26,18 @@ export class CreditsController {
     return this.creditsService.getBalance(req.user.id);
   }
 
+  /**
+   * Grants the one-time "installed the app" bonus. The web app calls this the
+   * first time it detects it's running as an installed PWA (standalone mode).
+   * Idempotent: safe to call on every app open — credits are added at most once
+   * per user (enforced atomically in the service).
+   */
+  @Post('install-reward')
+  @UseGuards(JwtAuthGuard)
+  claimInstallReward(@Req() req: { user: { id: string } }) {
+    return this.creditsService.grantInstallReward(req.user.id);
+  }
+
   @Post('add')
   addCredits(
     @Headers('x-admin-secret') adminSecret: string,

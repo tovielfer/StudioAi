@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { AdminGuard } from '@/components/AdminGuard';
-import { AdminGeneration, api } from '@/lib/api';
+import { AdminGeneration, api, isBlockedError } from '@/lib/api';
+import { useInfiniteList } from '@/lib/use-infinite-list';
 import { STATUS_LABELS } from '@/lib/he';
 import { AdminShell } from '../admin-shell';
 import { AdminGenerationCard } from './_components/AdminGenerationCard';
@@ -36,31 +37,137 @@ export default function AdminGenerationsPage() {
 }
 
 function AdminGenerationsContent() {
-  const [generations, setGenerations] = useState<AdminGeneration[]>([]);
-  const [generationsTotal, setGenerationsTotal] = useState(0);
   const [generationSearch, setGenerationSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState('');
+  const [onlyDeleted, setOnlyDeleted] = useState(false);
   const [view, setView] = useState<ViewMode>('cards');
   const [selected, setSelected] = useState<AdminGeneration | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadGenerations = useCallback(async () => {
-    const res = await api.getAdminGenerations({
-      search: generationSearch || undefined,
-      status: statusFilter || undefined,
-      limit: PAGE_SIZE,
+  const fetchPage = useCallback(
+    async ({ limit, offset }: { limit: number; offset: number }) => {
+      const baseParams = {
+        search: generationSearch || undefined,
+        status: statusFilter || undefined,
+        type: typeFilter || undefined,
+        onlyDeleted: onlyDeleted || undefined,
+      };
+
+      // Some rows contain content that an upstream filter (NetFree) blocks,
+      // returning HTTP 418 for the whole batch and freezing infinite scroll.
+      // We recover by splitting a blocked window in half until we isolate the
+      // offending rows, then re-fetch just those in "safe" mode (prompt & image
+      // redacted) so the rest of the batch still shows and paging continues.
+      const fetchChunk = async (
+        chunkOffset: number,
+        chunkLimit: number,
+      ): Promise<{ items: AdminGeneration[]; total: number }> => {
+        try {
+          return await api.getAdminGenerations({
+            ...baseParams,
+            limit: chunkLimit,
+            offset: chunkOffset,
+          });
+        } catch (err) {
+          if (!isBlockedError(err)) throw err;
+          if (chunkLimit <= 1) {
+            return api.getAdminGenerations({
+              ...baseParams,
+              safe: true,
+              limit: chunkLimit,
+              offset: chunkOffset,
+            });
+          }
+          const half = Math.ceil(chunkLimit / 2);
+          const first = await fetchChunk(chunkOffset, half);
+          const second = await fetchChunk(chunkOffset + half, chunkLimit - half);
+          return {
+            items: [...first.items, ...second.items],
+            total: second.total || first.total,
+          };
+        }
+      };
+
+      return fetchChunk(offset, limit);
+    },
+    [generationSearch, statusFilter, typeFilter, onlyDeleted],
+  );
+
+  const {
+    items: generations,
+    setItems: setGenerations,
+    total: generationsTotal,
+    setTotal: setGenerationsTotal,
+    loading,
+    loadingMore,
+    hasMore,
+    error: message,
+    sentinelRef,
+  } = useInfiniteList<AdminGeneration>(fetchPage, { pageSize: PAGE_SIZE });
+
+  const blockedCount = generations.filter((g) => g.blocked).length;
+
+  const handleGenerationUpdated = useCallback(
+    (updated: AdminGeneration) => {
+      setGenerations((prev) =>
+        prev.map((g) => (g.id === updated.id ? { ...g, ...updated } : g)),
+      );
+      setSelected((curr) =>
+        curr && curr.id === updated.id ? { ...curr, ...updated } : curr,
+      );
+    },
+    [setGenerations],
+  );
+
+  const removeGenerations = useCallback(
+    (ids: string[]) => {
+      const idSet = new Set(ids);
+      setGenerations((prev) => prev.filter((g) => !idSet.has(g.id)));
+      setGenerationsTotal((prev) => Math.max(0, prev - ids.length));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+    },
+    [setGenerations, setGenerationsTotal],
+  );
+
+  const toggleSelect = useCallback((gen: AdminGeneration) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(gen.id)) next.delete(gen.id);
+      else next.add(gen.id);
+      return next;
     });
-    setGenerations(res.items);
-    setGenerationsTotal(res.total);
-  }, [generationSearch, statusFilter]);
+  }, []);
 
-  useEffect(() => {
-    setLoading(true);
-    loadGenerations()
-      .catch((err) => setMessage(err.message))
-      .finally(() => setLoading(false));
-  }, [loadGenerations]);
+  const handleBulkDelete = useCallback(async () => {
+    if (bulkDeleting || selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    if (
+      !window.confirm(
+        `למחוק לצמיתות ${ids.length} יצירות? הפעולה תסיר את הרשומות ואת הקבצים המאוחסנים ואינה הפיכה.`,
+      )
+    ) {
+      return;
+    }
+    setBulkDeleting(true);
+    setActionError(null);
+    try {
+      const res = await api.hardDeleteAdminGenerations(ids);
+      removeGenerations(res.ids ?? ids);
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'מחיקת היצירות נכשלה',
+      );
+    } finally {
+      setBulkDeleting(false);
+    }
+  }, [bulkDeleting, selectedIds, removeGenerations]);
 
   return (
     <AdminShell
@@ -72,6 +179,14 @@ function AdminGenerationsContent() {
         {message && (
           <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
             {message}
+          </div>
+        )}
+
+        {blockedCount > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            {blockedCount.toLocaleString('he-IL')} יצירות הוסתרו חלקית על ידי
+            הסינון (נטפרי). מוצגים רק פרטי המשתמש והנתונים — הפרומפט והתמונה אינם
+            זמינים בחיבור מסונן.
           </div>
         )}
 
@@ -124,9 +239,67 @@ function AdminGenerationsContent() {
                 <option value="processing">בעיבוד</option>
                 <option value="done">הושלם</option>
                 <option value="failed">נכשל</option>
+                <option value="cancelled">בוטל</option>
               </select>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="admin-field md:w-40"
+              >
+                <option value="">כל הסוגים</option>
+                <option value="image">תמונה</option>
+                <option value="video">וידאו</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  setOnlyDeleted((v) => !v);
+                  setSelectedIds(new Set());
+                }}
+                className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                  onlyDeleted
+                    ? 'border-red-300 bg-red-50 text-red-700'
+                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                מחוקות בלבד
+              </button>
             </div>
           </div>
+
+          {(selectedIds.size > 0 || actionError) && (
+            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-red-800">
+                {selectedIds.size > 0
+                  ? `נבחרו ${selectedIds.size} יצירות למחיקה לצמיתות`
+                  : null}
+                {actionError && (
+                  <span className="block font-medium">{actionError}</span>
+                )}
+              </div>
+              {selectedIds.size > 0 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds(new Set())}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+                  >
+                    נקה בחירה
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleting}
+                    className="rounded-lg border border-red-600 bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+                  >
+                    {bulkDeleting
+                      ? 'מוחק...'
+                      : `מחק לצמיתות (${selectedIds.size})`}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {loading ? (
             <div className="flex justify-center py-16">
@@ -144,6 +317,9 @@ function AdminGenerationsContent() {
                     key={generation.id}
                     gen={generation}
                     onSelect={setSelected}
+                    selectable
+                    selected={selectedIds.has(generation.id)}
+                    onToggleSelect={toggleSelect}
                   />
                 ))}
               </div>
@@ -153,6 +329,7 @@ function AdminGenerationsContent() {
               <table className="w-full min-w-[1240px] text-sm">
                 <thead className="text-gray-500 border-b border-gray-200">
                   <tr>
+                    <th className="w-10 py-3 pe-2" aria-label="בחירה" />
                     <th className="text-right py-3 pe-4">משתמש</th>
                     <th className="text-right py-3 pe-4">פרומפט</th>
                     <th className="text-right py-3 pe-4">סטטוס</th>
@@ -160,9 +337,9 @@ function AdminGenerationsContent() {
                     <th className="text-right py-3 pe-4">עלות טוקנים</th>
                     <th className="text-right py-3 pe-4">עלות בפועל ($)</th>
                     <th className="text-right py-3 pe-4">tokensUsed</th>
-                    <th className="text-right py-3 pe-4">גודל</th>
+                    <th className="text-right py-3 pe-4">יחס תמונה</th>
                     <th className="text-right py-3 pe-4">רזולוציה</th>
-                    <th className="text-right py-3 pe-4">איכות</th>
+                    <th className="text-right py-3 pe-4">רמת החשיבה</th>
                     <th className="text-right py-3 pe-4">תמונת מקור</th>
                     <th className="text-right py-3 pe-4">תוצאה</th>
                     <th className="text-right py-3">נוצר</th>
@@ -174,11 +351,36 @@ function AdminGenerationsContent() {
                       key={generation.id}
                       className="border-b border-gray-100 align-top hover:bg-gray-50"
                     >
+                      <td className="py-3 pe-2 text-center">
+                        {generation.status !== 'pending' &&
+                          generation.status !== 'processing' && (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(generation.id)}
+                              onChange={() => toggleSelect(generation)}
+                              className="h-4 w-4 cursor-pointer accent-red-600"
+                              aria-label="בחר יצירה למחיקה לצמיתות"
+                            />
+                          )}
+                      </td>
                       <td className="py-3 pe-4 font-medium text-gray-950">
-                        {generation.userEmail ?? generation.userId}
+                        <div className="flex items-center gap-2">
+                          <span>{generation.userEmail ?? generation.userId}</span>
+                          {generation.deletedAt && (
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                              נמחקה
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 pe-4 max-w-xs text-gray-700">
-                        <span className="line-clamp-2">{generation.prompt}</span>
+                        {generation.blocked ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                            נחסם ע"י הסינון
+                          </span>
+                        ) : (
+                          <span className="line-clamp-2">{generation.prompt}</span>
+                        )}
                       </td>
                       <td className="py-3 pe-4">
                         <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
@@ -272,11 +474,24 @@ function AdminGenerationsContent() {
               )}
             </div>
           )}
+
+          {!loading && hasMore && <div ref={sentinelRef} className="h-px" />}
+
+          {loadingMore && (
+            <div className="flex justify-center py-8">
+              <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
         </section>
       </div>
 
       {selected && (
-        <AdminGenerationModal generation={selected} onClose={() => setSelected(null)} />
+        <AdminGenerationModal
+          generation={selected}
+          onClose={() => setSelected(null)}
+          onUpdated={handleGenerationUpdated}
+          onDeleted={(id) => removeGenerations([id])}
+        />
       )}
     </AdminShell>
   );

@@ -40,6 +40,14 @@ function fmtUsd(n: number | null | undefined) {
   return `$${n.toFixed(4)}`;
 }
 
+function fmtIls(n: number | null | undefined) {
+  if (typeof n !== 'number') return '—';
+  return `₪${n.toFixed(2)}`;
+}
+
+const DEFAULT_BILLING = { usdIls: 3.7, targetMargin: 2.0, creditValueIls: 0.01 };
+type BillingConfig = typeof DEFAULT_BILLING;
+
 function fmtDate(value: string) {
   return new Date(value).toLocaleString('he-IL', {
     dateStyle: 'short',
@@ -122,6 +130,7 @@ function AdminPricingContent() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<AdminPricingRule | null>(null);
   const [detailsRule, setDetailsRule] = useState<AdminPricingRule | null>(null);
+  const [billing, setBilling] = useState<BillingConfig>(DEFAULT_BILLING);
 
   const load = async () => {
     setLoading(true);
@@ -137,7 +146,16 @@ function AdminPricingContent() {
 
   useEffect(() => {
     load();
+    api
+      .getAdminBillingConfig()
+      .then(setBilling)
+      .catch(() => {});
   }, []);
+
+  const underpricedCount = useMemo(
+    () => rules.filter((rule) => rule.underpriced).length,
+    [rules],
+  );
 
   const filtered = useMemo(
     () =>
@@ -183,6 +201,14 @@ function AdminPricingContent() {
         {message && (
           <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
             {message}
+          </div>
+        )}
+
+        {underpricedCount > 0 && (
+          <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+            שים לב: {underpricedCount.toLocaleString('he-IL')} שורות מחירון נמכרות
+            כרגע <strong>מתחת לעלות בפועל</strong> (מסומנות "בהפסד" בטבלה). כדאי
+            להעלות מחיר.
           </div>
         )}
 
@@ -294,6 +320,11 @@ function AdminPricingContent() {
                         <tr className="border-b border-gray-100">
                           <td className="py-3 pe-3 font-semibold text-gray-950">
                             {group.key}
+                            {group.items.some((item) => item.underpriced) && (
+                              <span className="ms-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                                בהפסד
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 pe-3 text-gray-600">
                             {group.items.length.toLocaleString('he-IL')}
@@ -364,6 +395,7 @@ function AdminPricingContent() {
       {editing && (
         <EditRuleModal
           rule={editing}
+          billing={billing}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -487,6 +519,11 @@ function PricingCalculator({ rules }: { rules: AdminPricingRule[] }) {
       ? selectedRule.referenceCalculatedUsd
       : selectedRule.calculatedUsd
     : null;
+  const ils = selectedRule
+    ? hasReference
+      ? selectedRule.referenceCalculatedIls
+      : selectedRule.calculatedIls
+    : null;
 
   return (
     <section className="admin-card border-brand-100 bg-brand-50/40">
@@ -523,7 +560,7 @@ function PricingCalculator({ rules }: { rules: AdminPricingRule[] }) {
           onChange={setModel}
           options={modelOptions}
         />
-        <SelectField label="יחס" value={size} onChange={setSize} options={sizeOptions} />
+        <SelectField label="יחס תמונה" value={size} onChange={setSize} options={sizeOptions} />
         <SelectField
           label="רזולוציה"
           value={resolution}
@@ -531,7 +568,7 @@ function PricingCalculator({ rules }: { rules: AdminPricingRule[] }) {
           options={resolutionOptions}
         />
         <SelectField
-          label="איכות"
+          label="רמת החשיבה"
           value={quality}
           onChange={setQuality}
           options={qualityOptions}
@@ -545,6 +582,9 @@ function PricingCalculator({ rules }: { rules: AdminPricingRule[] }) {
           </p>
           <p className="mt-2 text-3xl font-bold text-brand-800">
             {credits === null ? '—' : credits.toLocaleString('he-IL')}
+          </p>
+          <p className="mt-1 text-sm text-brand-700">
+            {ils === null ? '' : `≈ ${fmtIls(ils)} ללקוח`}
           </p>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -622,12 +662,20 @@ function RuleRow({
       <td className="py-3 pe-3 text-xs text-gray-500">
         {rule.isModelDefault ? 'ברירת מחדל' : 'קומבינציה'}
         {!rule.isActive && <span className="ms-2 text-red-600">לא פעיל</span>}
+        {rule.underpriced && (
+          <span className="ms-2 rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-700">
+            בהפסד
+          </span>
+        )}
       </td>
       <td className="py-3 pe-3 text-gray-700">{fmt(rule.metrics.generationCount)}</td>
       <td className="py-3 pe-3 text-gray-700">{fmtUsd(rule.metrics.totalActualCostUsd)}</td>
       <td className="py-3 pe-3">
         <div className="font-semibold text-brand-700">
           {rule.creditCostOverride ?? rule.calculatedCredits}
+          <span className="ms-1 text-xs font-normal text-gray-500">
+            ({fmtIls(rule.calculatedIls)})
+          </span>
         </div>
         <div className="text-xs text-gray-500">
           ייגבה מעכשיו · עם מקור {rule.referenceCalculatedCredits}
@@ -662,10 +710,12 @@ function RuleRow({
 
 function EditRuleModal({
   rule,
+  billing,
   onClose,
   onSaved,
 }: {
   rule: AdminPricingRule;
+  billing: BillingConfig;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -684,11 +734,15 @@ function EditRuleModal({
   const calculatedUsd =
     (Number(baseUsd || 0) + Number(referenceImageUsd || 0)) *
     Number(margin || 0);
-  const calculatedCredits = Math.ceil(calculatedUsd * 100);
+  const calculatedCredits = Math.ceil(
+    (calculatedUsd * billing.usdIls) / billing.creditValueIls,
+  );
   const finalCredits =
     creditCostOverride.trim() === ''
       ? calculatedCredits
       : Number(creditCostOverride);
+  const finalIls =
+    Math.round(finalCredits * billing.creditValueIls * 100) / 100;
 
   const save = async () => {
     setSaving(true);
@@ -773,10 +827,15 @@ function EditRuleModal({
         </label>
 
         <div className="mt-5 rounded-xl border border-brand-100 bg-brand-50 p-4 text-sm text-brand-900">
-          <div>העלות שלנו לפי המחירון: {fmtUsd(calculatedUsd)}</div>
+          <div>מחיר המכירה שלנו (עלות × מרווח): {fmtUsd(calculatedUsd)}</div>
           <div className="mt-1 font-semibold">
             קרדיטים שייגבו מעכשיו:{' '}
             {Number.isFinite(finalCredits) ? finalCredits : '—'}
+            {Number.isFinite(finalCredits) && (
+              <span className="ms-1 font-normal text-brand-700">
+                (≈ {fmtIls(finalIls)} ללקוח)
+              </span>
+            )}
           </div>
         </div>
 

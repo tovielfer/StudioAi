@@ -3,7 +3,15 @@ export const STATUS_LABELS: Record<string, string> = {
   processing: 'מעבד',
   done: 'הושלם',
   failed: 'נכשל',
+  cancelled: 'בוטל',
 };
+
+const OPENAI_SAFETY_MESSAGE =
+  'OpenAI דחתה את הבקשה בגלל מערכת הבטיחות. נסה לשנות את התיאור או להסיר פרטים שעלולים להיחסם.';
+
+interface TranslateErrorOptions {
+  includeRequestId?: boolean;
+}
 
 function referenceImageLabel(imageNumber?: string): string {
   const labels: Record<string, string> = {
@@ -16,10 +24,18 @@ function referenceImageLabel(imageNumber?: string): string {
   return labels[imageNumber ?? ''] ?? 'שהועלתה';
 }
 
-export function translateError(message: string): string {
-  if (message.includes('OPENAI_SAFETY_REJECTED')) {
-    const requestId = message.match(/\breq_[a-zA-Z0-9]+\b/)?.[0];
-    return `OpenAI דחתה את הבקשה בגלל מערכת הבטיחות. נסה לשנות את התיאור או להסיר פרטים שעלולים להיחסם.${requestId ? ` מזהה בקשה: ${requestId}` : ''}`;
+function requestIdSuffix(message: string, includeRequestId?: boolean): string {
+  if (!includeRequestId) return '';
+  const requestId = message.match(/\breq_[a-zA-Z0-9]+\b/)?.[0];
+  return requestId ? ` מזהה בקשה: ${requestId}` : '';
+}
+
+export function translateError(
+  message: string,
+  options: TranslateErrorOptions = {},
+): string {
+  if (isOpenAISafetyError(message)) {
+    return `${OPENAI_SAFETY_MESSAGE}${requestIdSuffix(message, options.includeRequestId)}`;
   }
 
   if (message.includes('OPENAI_INVALID_REFERENCE_IMAGE')) {
@@ -27,12 +43,41 @@ export function translateError(message: string): string {
     return `אי אפשר להשתמש בתמונת ההשראה ${referenceImageLabel(imageNumber)}: הקובץ לא תקין או בפורמט תמונה ש-OpenAI לא תומך בו. כדאי להעלות אותה מחדש כ-JPG או PNG רגיל (RGB).`;
   }
 
+  if (message.includes('OPENAI_TEMPORARY_OVERLOAD')) {
+    return 'יש עומס רגעי ביצירת התמונה. נסה שוב בעוד כמה שניות.';
+  }
+
+  if (message.includes('FAL_INVALID_IMAGE_ASPECT_RATIO')) {
+    return 'יחס הממדים של תמונת ההשראה חורג מהטווח הנתמך (בין 0.4 ל-2.5). כדאי לחתוך או להעלות תמונה פחות מוארכת/רחבה ולנסות שוב.';
+  }
+
   if (
-    message.includes('rejected by the safety system') ||
-    message.includes('content_policy_violation')
+    message.includes('FAL_CONTENT_BLOCKED') ||
+    message.includes('REPLICATE_CONTENT_BLOCKED') ||
+    message.includes('flagged as sensitive') ||
+    message.includes('(E005)')
   ) {
-    const requestId = message.match(/\breq_[a-zA-Z0-9]+\b/)?.[0];
-    return `OpenAI דחתה את הבקשה בגלל מערכת הבטיחות. נסה לשנות את התיאור או להסיר פרטים שעלולים להיחסם.${requestId ? ` מזהה בקשה: ${requestId}` : ''}`;
+    return 'התוכן נחסם על ידי מערכת הבטיחות של הספק (סומן כתוכן רגיש). נסה לנסח מחדש את התיאור, להסיר פרטים שעלולים להיחסם, או להחליף את תמונת ההשראה, ונסה שוב.';
+  }
+
+  if (
+    message.includes('This operation was aborted') ||
+    message.includes('The operation was aborted') ||
+    message.includes('AbortError')
+  ) {
+    return 'תם הזמן הקצוב להורדת תמונת ההשראה. ייתכן שהחיבור איטי או שהתמונה גדולה — נסה שוב, ואם התקלה חוזרת כדאי להעלות תמונה קטנה יותר.';
+  }
+
+  if (
+    message.includes('Google Gemini returned text instead of image') ||
+    message.includes('Google Gemini returned no image') ||
+    message.includes('Google Gemini finished without image')
+  ) {
+    return 'המודל החזיר תשובה טקסטואלית במקום תמונה. נסח את הבקשה כבקשה ליצירת תמונה — למשל התחל ב"צור תמונה של..." ותאר מה שברצונך לראות — ונסה שוב.';
+  }
+
+  if (message.includes('Google Gemini blocked the request')) {
+    return 'הבקשה נחסמה על ידי מערכת הבטיחות של Google. נסה לשנות את התיאור או להסיר פרטים שעלולים להיחסם.';
   }
 
   if (
@@ -46,6 +91,7 @@ export function translateError(message: string): string {
   const map: Record<string, string> = {
     'Email already registered': 'כתובת האימייל כבר רשומה',
     'Invalid credentials': 'פרטי התחברות שגויים',
+    'Email not verified': 'המייל עדיין לא אומת. בדוק את תיבת הדואר שלך.',
     'Insufficient credits': 'אין מספיק קרדיטים',
     'Login failed': 'ההתחברות נכשלה',
     'Registration failed': 'ההרשמה נכשלה',
@@ -60,4 +106,13 @@ export function translateError(message: string): string {
       'חרגת ממגבלת הבקשות. נסה שוב בעוד דקה',
   };
   return map[message] ?? message;
+}
+
+function isOpenAISafetyError(message: string): boolean {
+  return (
+    message.includes('OPENAI_SAFETY_REJECTED') ||
+    message.includes('rejected by the safety system') ||
+    message.includes('content_policy_violation') ||
+    message.includes('OpenAI דחתה את הבקשה בגלל מערכת הבטיחות')
+  );
 }

@@ -1,14 +1,27 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository, SelectQueryBuilder } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { AiPricingRuleAuditLog } from '../ai/ai-pricing-rule-audit-log.entity';
 import { AiPricingRule } from '../ai/ai-pricing-rule.entity';
 import { CreditTransaction } from '../credits/credit-transaction.entity';
 import { CreditsService } from '../credits/credits.service';
 import { Generation } from '../generations/generation.entity';
 import { GenerationStatus } from '../common/constants';
-import { User } from '../users/user.entity';
+import { MailService } from '../mail/mail.service';
+import { StorageService } from '../storage/storage.service';
+import { creditsToIls, getBillingConfig, usdToCredits } from '../config/billing';
+import { User, UserRole } from '../users/user.entity';
 import { UpdatePricingRuleDto } from './dto/update-pricing-rule.dto';
+
+type BroadcastFilters = {
+  onlyVerified?: boolean;
+  excludeBlocked?: boolean;
+  excludeAdmins?: boolean;
+};
 
 type PricingMetric = {
   generationCount: number;
@@ -56,16 +69,111 @@ export class AdminService {
     @InjectRepository(AiPricingRuleAuditLog)
     private readonly pricingAuditRepo: Repository<AiPricingRuleAuditLog>,
     private readonly creditsService: CreditsService,
+    private readonly mailService: MailService,
+    private readonly storageService: StorageService,
   ) {}
+
+  // Emails a finished generation's asset to the given recipient (the admin's
+  // own address). Unlike the user-facing flow this isn't restricted to the
+  // generation owner, so an admin can pull any user's result into their inbox.
+  async sendGenerationEmail(id: string, to: string) {
+    const generation = await this.generationsRepo.findOne({ where: { id } });
+    if (!generation) {
+      throw new NotFoundException('Generation not found');
+    }
+
+    if (generation.status !== GenerationStatus.DONE || !generation.resultUrl) {
+      throw new BadRequestException('Generation is not ready to be sent');
+    }
+
+    await this.mailService.sendGenerationImage({ to, generation });
+
+    return { success: true };
+  }
+
+  // Lets an admin stop a generation that is still pending or processing. The
+  // status is moved to CANCELLED and any credits charged for it are refunded.
+  async cancelGeneration(id: string) {
+    const generation = await this.generationsRepo.findOne({ where: { id } });
+    if (!generation) {
+      throw new NotFoundException('Generation not found');
+    }
+
+    if (
+      generation.status !== GenerationStatus.PENDING &&
+      generation.status !== GenerationStatus.PROCESSING
+    ) {
+      throw new BadRequestException(
+        'Only pending or processing generations can be stopped',
+      );
+    }
+
+    await this.generationsRepo.update(id, {
+      status: GenerationStatus.CANCELLED,
+      errorMessage: 'בוטל על ידי מנהל',
+    });
+
+    if (generation.creditCost > 0) {
+      await this.creditsService.addCredits(
+        generation.userId,
+        generation.creditCost,
+        `refund:cancelled:${id}`,
+      );
+    }
+
+    const updated = await this.generationsRepo.findOne({ where: { id } });
+    return updated ?? { ...generation, status: GenerationStatus.CANCELLED };
+  }
+
+  // Permanently removes generations: deletes the stored result asset from
+  // storage and then hard-deletes the DB row. An admin can remove any creation,
+  // including ones the user never deleted — the only exception is generations
+  // that are still running (pending/processing), which must be cancelled first
+  // so we don't nuke a live job mid-run. Returns how many rows were removed.
+  async hardDeleteGenerations(ids: string[]) {
+    const uniqueIds = Array.from(new Set(ids));
+    if (uniqueIds.length === 0) {
+      throw new BadRequestException('No generations specified');
+    }
+
+    const generations = await this.generationsRepo.find({
+      where: { id: In(uniqueIds) },
+      withDeleted: true,
+    });
+
+    const deletable = generations.filter(
+      (g) =>
+        g.status !== GenerationStatus.PENDING &&
+        g.status !== GenerationStatus.PROCESSING,
+    );
+    if (deletable.length === 0) {
+      throw new BadRequestException(
+        'Cannot permanently remove generations that are still pending or processing — cancel them first',
+      );
+    }
+
+    // Best-effort asset cleanup first; storage failures are logged inside the
+    // service and never block removal of the DB row.
+    await Promise.all(
+      deletable.map((g) => this.storageService.deleteByUrl(g.resultUrl)),
+    );
+
+    const deletableIds = deletable.map((g) => g.id);
+    await this.generationsRepo.delete(deletableIds);
+
+    return { success: true, deleted: deletableIds.length, ids: deletableIds };
+  }
 
   async getStats() {
     const [usersTotal, generationsTotal, creditTotals, statusRows] =
       await Promise.all([
         this.usersRepo.count(),
-        this.generationsRepo.count(),
+        // Include soft-deleted rows: they still represent real activity and spend.
+        this.generationsRepo.count({ withDeleted: true }),
         this.getCreditTotals(),
         this.generationsRepo
           .createQueryBuilder('g')
+          .withDeleted()
           .select('g.status', 'status')
           .addSelect('COUNT(*)', 'count')
           .groupBy('g.status')
@@ -87,22 +195,301 @@ export class AdminService {
     };
   }
 
-  async listUsers(params: { search?: string; limit: number; offset: number }) {
-    const [items, total] = await this.usersRepo.findAndCount({
-      select: {
-        id: true,
-        email: true,
-        credits: true,
-        role: true,
-        createdAt: true,
-      },
-      where: params.search ? { email: ILike(`%${params.search}%`) } : {},
-      order: { createdAt: 'DESC' },
-      take: params.limit,
-      skip: params.offset,
-    });
+  async listUsers(params: {
+    search?: string;
+    limit: number;
+    offset: number;
+    sort?: 'newest' | 'oldest' | 'generations' | 'credits' | 'email';
+    /** When true, only return users who claimed the install bonus (i.e. opened
+     *  the installed app at least once). */
+    installed?: boolean;
+  }) {
+    // Count respecting the same filters as the list, so pagination totals match
+    // the "installed only" toggle and search.
+    const countQb = this.usersRepo.createQueryBuilder('u');
+    if (params.search) {
+      countQb.andWhere('(u.email ILIKE :s OR u.nickname ILIKE :s)', {
+        s: `%${params.search}%`,
+      });
+    }
+    if (params.installed) {
+      countQb.andWhere('u."installRewardGrantedAt" IS NOT NULL');
+    }
+    const total = await countQb.getCount();
+
+    const qb = this.usersRepo
+      .createQueryBuilder('u')
+      // Include soft-deleted generations so the per-user count matches the rest
+      // of the admin views (getStats/listGenerations), which count all activity.
+      .withDeleted()
+      .leftJoin('generations', 'g', 'g."userId" = u.id')
+      .select('u.id', 'id')
+      .addSelect('u.email', 'email')
+      .addSelect('u.nickname', 'nickname')
+      .addSelect('u.credits', 'credits')
+      .addSelect('u.role', 'role')
+      .addSelect('u."isBlocked"', 'isBlocked')
+      .addSelect('u."emailVerified"', 'emailVerified')
+      .addSelect('u."createdAt"', 'createdAt')
+      .addSelect('u."installRewardGrantedAt"', 'installRewardGrantedAt')
+      .addSelect('COUNT(g.id)::int', 'generationsCount')
+      .groupBy('u.id');
+
+    if (params.search) {
+      qb.andWhere('(u.email ILIKE :s OR u.nickname ILIKE :s)', {
+        s: `%${params.search}%`,
+      });
+    }
+
+    if (params.installed) {
+      qb.andWhere('u."installRewardGrantedAt" IS NOT NULL');
+    }
+
+    switch (params.sort) {
+      case 'generations':
+        qb.orderBy('COUNT(g.id)', 'DESC').addOrderBy('u."createdAt"', 'DESC');
+        break;
+      case 'credits':
+        qb.orderBy('u.credits', 'DESC').addOrderBy('u."createdAt"', 'DESC');
+        break;
+      case 'oldest':
+        qb.orderBy('u."createdAt"', 'ASC');
+        break;
+      case 'email':
+        qb.orderBy('LOWER(u.email)', 'ASC');
+        break;
+      case 'newest':
+      default:
+        qb.orderBy('u."createdAt"', 'DESC');
+        break;
+    }
+
+    const rows = await qb.limit(params.limit).offset(params.offset).getRawMany();
+
+    const items = rows.map((r) => ({
+      id: r.id as string,
+      email: r.email as string,
+      nickname: (r.nickname as string | null) ?? null,
+      credits: Number(r.credits),
+      role: r.role as string,
+      isBlocked: Boolean(r.isBlocked),
+      emailVerified: Boolean(r.emailVerified),
+      createdAt: r.createdAt as Date,
+      installedAt: (r.installRewardGrantedAt as Date | null) ?? null,
+      generationsCount: Number(r.generationsCount),
+    }));
 
     return { items, total };
+  }
+
+  async updateUser(
+    userId: string,
+    dto: { nickname?: string | null; isBlocked?: boolean },
+    adminUserId?: string,
+  ) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (dto.nickname !== undefined) {
+      const trimmed = dto.nickname?.trim();
+      user.nickname = trimmed ? trimmed : null;
+    }
+    if (dto.isBlocked !== undefined) {
+      if (dto.isBlocked && user.id === adminUserId) {
+        throw new BadRequestException('You cannot block your own admin user');
+      }
+      if (dto.isBlocked && user.role === UserRole.ADMIN) {
+        throw new BadRequestException('Admin users cannot be blocked');
+      }
+      user.isBlocked = dto.isBlocked;
+    }
+    await this.usersRepo.save(user);
+
+    return {
+      id: user.id,
+      email: user.email,
+      nickname: user.nickname,
+      credits: user.credits,
+      role: user.role,
+      isBlocked: user.isBlocked,
+      emailVerified: user.emailVerified,
+      createdAt: user.createdAt,
+    };
+  }
+
+  // Sends a one-off branded email to a specific user from the admin area.
+  async sendUserEmail(userId: string, subject: string, message: string) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    await this.mailService.sendCustomEmail({
+      to: user.email,
+      subject: subject.trim(),
+      message: message.trim(),
+    });
+
+    return { success: true };
+  }
+
+  // Builds the recipient list for a broadcast based on the admin's audience
+  // filters. `emailVerified`/`isBlocked`/admin filtering happens in SQL so we
+  // only pull the addresses we actually intend to email.
+  private buildBroadcastRecipientQuery(filters: BroadcastFilters) {
+    const {
+      onlyVerified = true,
+      excludeBlocked = true,
+      excludeAdmins = false,
+    } = filters;
+
+    const qb = this.usersRepo.createQueryBuilder('u');
+    if (onlyVerified) {
+      qb.andWhere('u."emailVerified" = true');
+    }
+    if (excludeBlocked) {
+      qb.andWhere('u."isBlocked" = false');
+    }
+    if (excludeAdmins) {
+      qb.andWhere('u.role != :adminRole', { adminRole: UserRole.ADMIN });
+    }
+    return qb;
+  }
+
+  // How many users would receive a broadcast with the given filters. Used to
+  // show a recipient-count preview before the admin commits to a bulk send.
+  async countBroadcastRecipients(filters: BroadcastFilters) {
+    const total = await this.buildBroadcastRecipientQuery(filters).getCount();
+    return { total };
+  }
+
+  // Sends a branded broadcast to every user matching the audience filters.
+  async broadcastEmail(
+    subject: string,
+    message: string,
+    filters: BroadcastFilters,
+  ) {
+    const rows = await this.buildBroadcastRecipientQuery(filters)
+      .select('u.email', 'email')
+      .getRawMany<{ email: string }>();
+
+    const recipients = Array.from(
+      new Set(
+        rows
+          .map((r) => r.email?.trim())
+          .filter((email): email is string => Boolean(email)),
+      ),
+    );
+
+    if (recipients.length === 0) {
+      throw new BadRequestException(
+        'No users match the selected audience for this broadcast',
+      );
+    }
+
+    const { sent, failed } = await this.mailService.sendBroadcast({
+      recipients,
+      subject: subject.trim(),
+      message: message.trim(),
+    });
+
+    return { success: failed === 0, total: recipients.length, sent, failed };
+  }
+
+  // Sends a single test copy of the broadcast to one address so the admin can
+  // preview exactly what recipients will get before sending to everyone.
+  async sendBroadcastTest(to: string, subject: string, message: string) {
+    await this.mailService.sendCustomEmail({
+      to: to.trim(),
+      subject: subject.trim(),
+      message: message.trim(),
+    });
+
+    return { success: true };
+  }
+
+  async listCreditTransactions(params: {
+    search?: string;
+    userId?: string;
+    direction?: 'credit' | 'debit';
+    from?: string;
+    to?: string;
+    limit: number;
+    offset: number;
+  }) {
+    const qb = this.creditTransactionsRepo
+      .createQueryBuilder('tx')
+      .leftJoin('tx.user', 'user');
+
+    if (params.search) {
+      qb.andWhere('(tx.reason ILIKE :search OR user.email ILIKE :search)', {
+        search: `%${params.search}%`,
+      });
+    }
+
+    if (params.userId) {
+      qb.andWhere('tx.userId = :userId', { userId: params.userId });
+    }
+
+    if (params.direction === 'credit') {
+      qb.andWhere('tx.amount > 0');
+    }
+
+    if (params.direction === 'debit') {
+      qb.andWhere('tx.amount < 0');
+    }
+
+    const fromDate = this.parseDateFilter(params.from, 'start');
+    if (fromDate) {
+      qb.andWhere('tx.createdAt >= :fromDate', { fromDate });
+    }
+
+    const toDate = this.parseDateFilter(params.to, 'end');
+    if (toDate) {
+      qb.andWhere('tx.createdAt <= :toDate', { toDate });
+    }
+
+    const [total, summaryRow, items] = await Promise.all([
+      qb.clone().getCount(),
+      qb
+        .clone()
+        .select(
+          'COALESCE(SUM(CASE WHEN tx.amount > 0 THEN tx.amount ELSE 0 END), 0)',
+          'issued',
+        )
+        .addSelect(
+          'COALESCE(SUM(CASE WHEN tx.amount < 0 THEN -tx.amount ELSE 0 END), 0)',
+          'spent',
+        )
+        .addSelect('COALESCE(SUM(tx.amount), 0)', 'net')
+        .getRawOne<{ issued: string; spent: string; net: string }>(),
+      qb
+        .select('tx.id', 'id')
+        .addSelect('tx.userId', 'userId')
+        .addSelect('user.email', 'userEmail')
+        .addSelect('tx.amount', 'amount')
+        .addSelect('tx.reason', 'reason')
+        .addSelect('tx.createdAt', 'createdAt')
+        .orderBy('tx.createdAt', 'DESC')
+        .limit(params.limit)
+        .offset(params.offset)
+        .getRawMany(),
+    ]);
+
+    return {
+      items: items.map((item) => ({
+        ...item,
+        amount: Number(item.amount),
+      })),
+      total,
+      summary: {
+        issued: Number(summaryRow?.issued ?? 0),
+        spent: Number(summaryRow?.spent ?? 0),
+        net: Number(summaryRow?.net ?? 0),
+      },
+    };
   }
 
   async listGenerations(params: {
@@ -116,12 +503,23 @@ export class AdminService {
     size?: string;
     resolution?: string;
     hasReference?: boolean;
+    onlyDeleted?: boolean;
+    // When true, redacts free-text/image fields (prompt, result & reference
+    // image URLs) from the response. Used as a fallback for admin rows whose
+    // normal payload gets blocked by an upstream content filter (NetFree 418),
+    // so the row can still be listed with its metadata.
+    safe?: boolean;
     limit: number;
     offset: number;
   }) {
     const qb = this.generationsRepo
       .createQueryBuilder('g')
+      .withDeleted()
       .leftJoin('g.user', 'user');
+
+    if (params.onlyDeleted) {
+      qb.andWhere('g.deletedAt IS NOT NULL');
+    }
 
     if (params.status) {
       qb.andWhere('g.status = :status', { status: params.status });
@@ -197,10 +595,24 @@ export class AdminService {
       .addSelect('g.errorMessage', 'errorMessage')
       .addSelect('g.providerErrorRaw', 'providerErrorRaw')
       .addSelect('g.createdAt', 'createdAt')
+      .addSelect('g.deletedAt', 'deletedAt')
       .orderBy('g.createdAt', 'DESC')
-      .take(params.limit)
-      .skip(params.offset)
+      .addOrderBy('g.id', 'DESC')
+      .limit(params.limit)
+      .offset(params.offset)
       .getRawMany();
+
+    if (params.safe) {
+      const redacted = items.map((item) => ({
+        ...item,
+        prompt: null,
+        resultUrl: null,
+        referenceImageUrls: null,
+        providerErrorRaw: null,
+        blocked: true,
+      }));
+      return { items: redacted, total };
+    }
 
     return { items, total };
   }
@@ -209,6 +621,15 @@ export class AdminService {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    if (amount < 0) {
+      await this.creditsService.deductCredits(
+        userId,
+        Math.abs(amount),
+        reason && reason !== 'admin_add' ? reason : 'admin_deduct',
+      );
+      return this.creditsService.getBalance(userId);
     }
 
     return this.creditsService.addCredits(
@@ -221,6 +642,7 @@ export class AdminService {
   async getCostStats() {
     const rows = await this.generationsRepo
       .createQueryBuilder('g')
+      .withDeleted()
       .select('g.type', 'type')
       .addSelect('g.provider', 'provider')
       .addSelect('g.model', 'model')
@@ -322,12 +744,23 @@ export class AdminService {
         byRuleId.get(rule.id),
         rule.isModelDefault ? undefined : byCombo.get(this.comboKey(rule)),
       );
+      const calculatedUsd = this.calculateRuleUsd(rule, false);
+      // Under-pricing alert: the measured provider cost exceeds what we sell
+      // for (sell price in USD). Surfaced prominently in the admin UI so the
+      // operator can raise the price before losing money at scale.
+      const underpriced =
+        metrics.avgActualCostUsd > 0 && metrics.avgActualCostUsd > calculatedUsd;
       return {
         ...rule,
-        calculatedUsd: this.calculateRuleUsd(rule, false),
+        calculatedUsd,
         calculatedCredits: this.calculateRuleCredits(rule, false),
+        calculatedIls: creditsToIls(this.calculateRuleCredits(rule, false)),
         referenceCalculatedUsd: this.calculateRuleUsd(rule, true),
         referenceCalculatedCredits: this.calculateRuleCredits(rule, true),
+        referenceCalculatedIls: creditsToIls(
+          this.calculateRuleCredits(rule, true),
+        ),
+        underpriced,
         metrics,
       };
     });
@@ -398,6 +831,7 @@ export class AdminService {
 
     const qb = this.generationsRepo
       .createQueryBuilder('g')
+      .withDeleted()
       .leftJoin('g.user', 'user')
       .where('g.pricingRuleId = :id', { id });
 
@@ -426,6 +860,7 @@ export class AdminService {
     const total = await qb.clone().getCount();
     const items = await this.selectGenerationRows(qb)
       .orderBy('g.createdAt', 'DESC')
+      .addOrderBy('g.id', 'DESC')
       .take(limit)
       .skip(offset)
       .getRawMany();
@@ -452,6 +887,14 @@ export class AdminService {
     };
   }
 
+  private parseDateFilter(value: string | undefined, boundary: 'start' | 'end') {
+    if (!value) return null;
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T${boundary === 'start' ? '00:00:00.000' : '23:59:59.999'}`)
+      : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
   private selectGenerationRows(qb: SelectQueryBuilder<Generation>) {
     return qb
       .select('g.id', 'id')
@@ -473,12 +916,14 @@ export class AdminService {
       .addSelect('g.tokensUsed', 'tokensUsed')
       .addSelect('g.errorMessage', 'errorMessage')
       .addSelect('g.providerErrorRaw', 'providerErrorRaw')
-      .addSelect('g.createdAt', 'createdAt');
+      .addSelect('g.createdAt', 'createdAt')
+      .addSelect('g.deletedAt', 'deletedAt');
   }
 
   private async getPricingMetricsByRuleId() {
     const rows = await this.generationsRepo
       .createQueryBuilder('g')
+      .withDeleted()
       .select('g.pricingRuleId', 'pricingRuleId')
       .addSelect('COUNT(*)::int', 'generationCount')
       .addSelect(
@@ -573,6 +1018,10 @@ export class AdminService {
       if (!key) continue;
       const totalCredits = Number(row['totalCredits']);
       const totalActualCostUsd = Number(row['totalActualCostUsd']);
+      // Credits are an ILS-denominated unit now (credit = creditValueIls), so
+      // gross revenue in USD = credits * creditValueIls / usdIls.
+      const { usdIls, creditValueIls } = getBillingConfig();
+      const grossUsd = (totalCredits * creditValueIls) / usdIls;
       map.set(key, {
         generationCount: Number(row['generationCount']),
         doneCount: Number(row['doneCount']),
@@ -581,9 +1030,9 @@ export class AdminService {
         avgCredits: Number(row['avgCredits']),
         totalActualCostUsd,
         avgActualCostUsd: Number(row['avgActualCostUsd']),
-        estimatedGrossUsd: Math.round((totalCredits / 100) * 10000) / 10000,
+        estimatedGrossUsd: Math.round(grossUsd * 10000) / 10000,
         estimatedMarginUsd:
-          Math.round((totalCredits / 100 - totalActualCostUsd) * 10000) / 10000,
+          Math.round((grossUsd - totalActualCostUsd) * 10000) / 10000,
         totalInputTokens: Number(row['totalInputTokens']),
         totalOutputTokens: Number(row['totalOutputTokens']),
         totalInputImageTokens: Number(row['totalInputImageTokens']),
@@ -653,6 +1102,6 @@ export class AdminService {
 
   private calculateRuleCredits(rule: AiPricingRule, hasReference: boolean) {
     if (rule.creditCostOverride !== null) return rule.creditCostOverride;
-    return Math.ceil(this.calculateRuleUsd(rule, hasReference) * 100);
+    return usdToCredits(this.calculateRuleUsd(rule, hasReference));
   }
 }

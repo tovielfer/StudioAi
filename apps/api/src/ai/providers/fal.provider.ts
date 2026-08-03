@@ -1,4 +1,8 @@
 import { AiProvider } from '../../common/constants';
+import {
+  modelSupportsEndFrame,
+  normalizeVideoDuration,
+} from '../../common/model-capabilities';
 import { GenerateImageParams, GenerateImageResult } from '../ai.types';
 import { BaseImageProvider } from './base.provider';
 
@@ -16,6 +20,25 @@ type FalQueueStatusResponse = {
 type FalResultFile = {
   url?: string;
 };
+
+type FalErrorPayload = {
+  detail?:
+    | string
+    | Array<{
+        msg?: string;
+        type?: string;
+      }>;
+};
+
+class FalProviderError extends Error {
+  constructor(
+    message: string,
+    readonly providerErrorRaw: string,
+  ) {
+    super(message);
+    this.name = 'FalProviderError';
+  }
+}
 
 type FalGenerationResponse = {
   images?: FalResultFile[];
@@ -49,8 +72,7 @@ export class FalProvider extends BaseImageProvider {
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Fal.ai error: ${err}`);
+      throw this.toProviderError(await response.text());
     }
 
     const data = (await response.json()) as { images?: { url: string }[] };
@@ -64,19 +86,42 @@ export class FalProvider extends BaseImageProvider {
     params: GenerateImageParams,
     key: string,
   ): Promise<GenerateImageResult> {
-    const firstRef = this.resolveReferenceImages(params)[0];
-    const endpointId = this.resolveVideoEndpoint(params.model, Boolean(firstRef));
-    const result = await this.runQueued(endpointId, key, {
+    const refs = this.resolveReferenceImages(params);
+    const startImage = refs[0];
+    // Only forward an end/tail frame to models whose fal endpoint accepts one
+    // (Kling v3 + v2.1 pro). v2.1 standard/master reject/ignore the field.
+    const endImage = modelSupportsEndFrame(params.model) ? refs[1] : undefined;
+    const endpointId = this.resolveVideoEndpoint(
+      params.model,
+      Boolean(startImage),
+    );
+
+    const isV3 = endpointId.includes('/v3/');
+    const isImageToVideo = endpointId.endsWith('/image-to-video');
+    const duration = normalizeVideoDuration(params.model, params.durationSeconds);
+
+    const input: Record<string, unknown> = {
       prompt: params.prompt,
-      duration: '5',
-      generate_audio: false,
-      aspect_ratio: this.klingAspectRatio(params.size),
+      duration: String(duration),
       negative_prompt: 'blur, distort, and low quality',
       cfg_scale: 0.5,
-      ...(firstRef
-        ? this.klingImageField(endpointId, firstRef)
-        : {}),
-    });
+    };
+
+    // v3 generates audio by default — always send the flag so "off" stays
+    // silent (and cheaper). v2.1 has no audio support, so the flag is omitted.
+    if (isV3) {
+      input.generate_audio = Boolean(params.generateAudio);
+    }
+
+    // aspect_ratio is only honoured by text-to-video; for image-to-video the
+    // ratio is derived from the start image and the field is rejected/ignored.
+    if (!isImageToVideo) {
+      input.aspect_ratio = this.klingAspectRatio(params.size);
+    } else {
+      Object.assign(input, this.klingImageFields(isV3, startImage, endImage));
+    }
+
+    const result = await this.runQueued(endpointId, key, input);
 
     const videoUrl =
       result.video?.url ??
@@ -114,7 +159,9 @@ export class FalProvider extends BaseImageProvider {
         return this.fetchJson<FalGenerationResponse>(responseUrl, key);
       }
       if (status.status === 'FAILED' || status.status === 'CANCELLED') {
-        throw new Error(status.error ?? `Fal.ai queue ${status.status.toLowerCase()}`);
+        throw this.toProviderError(
+          status.error ?? `Fal.ai queue ${status.status.toLowerCase()}`,
+        );
       }
       await this.delay(5000);
     }
@@ -137,38 +184,65 @@ export class FalProvider extends BaseImageProvider {
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Fal.ai error: ${err}`);
+      throw this.toProviderError(await response.text());
     }
 
     return response.json() as Promise<T>;
   }
 
+  // Maps a registry model id to its fal endpoint base. The mode (text/image
+  // -to-video) is appended based on whether a start image was supplied.
+  private static readonly KLING_ENDPOINT_BASE: Record<string, string> = {
+    'kling-v3-standard': 'fal-ai/kling-video/v3/standard',
+    'kling-v3-pro': 'fal-ai/kling-video/v3/pro',
+    'kling-v2.1-master': 'fal-ai/kling-video/v2.1/master',
+    'kling-v2.1-pro': 'fal-ai/kling-video/v2.1/pro',
+    'kling-v2.1-standard': 'fal-ai/kling-video/v2.1/standard',
+  };
+
+  // v2.1 standard/pro only expose image-to-video on fal — they require a start
+  // image and have no text-to-video endpoint.
+  private static readonly IMAGE_ONLY_MODELS = new Set([
+    'kling-v2.1-standard',
+    'kling-v2.1-pro',
+  ]);
+
   private resolveVideoEndpoint(model: string, hasReference: boolean): string {
+    // Allow passing a fully-qualified endpoint straight through.
     if (model.includes('/text-to-video') || model.includes('/image-to-video')) {
       if (model.startsWith('fal-ai/')) return model;
       return model.replace(/^https:\/\/fal\.run\//, '');
     }
 
-    const suffix = hasReference ? 'image-to-video' : 'text-to-video';
-    const defaults: Record<string, string> = {
-      'kling-v3-standard': `fal-ai/kling-video/v3/standard/${suffix}`,
-      'kling-v3-pro': `fal-ai/kling-video/v3/pro/${suffix}`,
-      'kling-v2.1-standard': 'fal-ai/kling-video/v2.1/standard/image-to-video',
-      'kling-v2.1-pro': 'fal-ai/kling-video/v2.1/pro/image-to-video',
-      'kling-v2.1-master': `fal-ai/kling-video/v2.1/master/${suffix}`,
-    };
+    const base =
+      FalProvider.KLING_ENDPOINT_BASE[model] ??
+      'fal-ai/kling-video/v3/standard';
 
-    return defaults[model] ?? `fal-ai/kling-video/v3/standard/${suffix}`;
+    if (FalProvider.IMAGE_ONLY_MODELS.has(model)) {
+      if (!hasReference) {
+        throw new Error('מודל זה דורש תמונת התחלה ליצירת הסרטון');
+      }
+      return `${base}/image-to-video`;
+    }
+
+    return `${base}/${hasReference ? 'image-to-video' : 'text-to-video'}`;
   }
 
-  private klingImageField(
-    endpointId: string,
-    imageUrl: string,
+  // Image-to-video frame fields differ by Kling version: v3 uses
+  // start_image_url/end_image_url, v2.1 uses image_url/tail_image_url.
+  private klingImageFields(
+    isV3: boolean,
+    startImage?: string,
+    endImage?: string,
   ): Record<string, string> {
-    return endpointId.includes('/v3/')
-      ? { start_image_url: imageUrl }
-      : { image_url: imageUrl };
+    const fields: Record<string, string> = {};
+    if (startImage) {
+      fields[isV3 ? 'start_image_url' : 'image_url'] = startImage;
+    }
+    if (endImage) {
+      fields[isV3 ? 'end_image_url' : 'tail_image_url'] = endImage;
+    }
+    return fields;
   }
 
   private klingAspectRatio(size: string): string {
@@ -177,8 +251,41 @@ export class FalProvider extends BaseImageProvider {
     return '16:9';
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+  // Translates a Fal error body into a coded error the frontend can localise.
+  // The raw body is preserved on `providerErrorRaw` for admin debugging.
+  private toProviderError(raw: string): FalProviderError {
+    let payload: FalErrorPayload | null = null;
+    try {
+      payload = JSON.parse(raw) as FalErrorPayload;
+    } catch {
+      // Some failures are plain text; fall back to the raw body below.
+    }
+
+    const details = Array.isArray(payload?.detail) ? payload.detail : [];
+    if (details.some((d) => d?.type === 'image_aspect_ratio_error')) {
+      return new FalProviderError('FAL_INVALID_IMAGE_ASPECT_RATIO', raw);
+    }
+
+    // fal's server-side NSFW/safety filter — e.g. "Async prediction failed:
+    // ModelError: The input or output was flagged as sensitive ... (E005)".
+    // It can't be disabled for these models, so surface a stable code the web
+    // can translate into an actionable message.
+    if (this.isContentBlockedError(raw)) {
+      return new FalProviderError('FAL_CONTENT_BLOCKED', raw);
+    }
+
+    return new FalProviderError(`Fal.ai error: ${raw}`, raw);
+  }
+
+  private isContentBlockedError(raw: string): boolean {
+    return (
+      /flagged as sensitive/i.test(raw) ||
+      /\(E005\)/i.test(raw) ||
+      /\bNSFW\b/i.test(raw) ||
+      // Fal sometimes surfaces content filtering as a ReadError mid-stream
+      // (the generation is aborted before the output is fully written).
+      /Async prediction failed.*ReadError/i.test(raw)
+    );
   }
 
   private resolveEndpoint(model?: string): string {

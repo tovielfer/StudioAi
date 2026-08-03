@@ -1,7 +1,9 @@
 'use client';
 
-import { AdminGeneration } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { AdminGeneration, api } from '@/lib/api';
 import { downloadImage } from '@/lib/download';
+import { EnvelopeIcon, SpinnerIcon } from '@/components/SendEmail';
 import { STATUS_LABELS, translateError } from '@/lib/he';
 
 function formatDateTime(value: string) {
@@ -18,22 +20,112 @@ function formatTokens(value: number | undefined) {
 export function AdminGenerationModal({
   generation,
   onClose,
+  onUpdated,
+  onDeleted,
 }: {
   generation: AdminGeneration;
   onClose: () => void;
+  onUpdated?: (generation: AdminGeneration) => void;
+  onDeleted?: (id: string) => void;
 }) {
   const hasImage = Boolean(generation.resultUrl && generation.status === 'done');
   const tokens = generation.tokensUsed;
+  const canStop =
+    generation.status === 'pending' || generation.status === 'processing';
+  // An admin can permanently remove any finished creation, whether or not the
+  // user deleted it. Only active jobs must be cancelled first.
+  const canDelete = !canStop;
+  const [sending, setSending] = useState(false);
+  const [canceling, setCanceling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [emailToast, setEmailToast] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!emailToast) return;
+    const timer = setTimeout(() => setEmailToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [emailToast]);
+
+  const handleSendEmail = async () => {
+    if (sending) return;
+    setSending(true);
+    setEmailToast(null);
+    try {
+      await api.sendAdminGenerationByEmail(generation.id);
+      setEmailToast({ type: 'success', message: 'נשלח למייל שלך' });
+    } catch (err) {
+      setEmailToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'שליחת המייל נכשלה',
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+  const handleCancel = async () => {
+    if (canceling) return;
+    if (
+      !window.confirm('לעצור את היצירה? הסטטוס ישתנה ל"בוטל" והקרדיטים יוחזרו למשתמש.')
+    ) {
+      return;
+    }
+    setCanceling(true);
+    setEmailToast(null);
+    try {
+      const updated = await api.cancelAdminGeneration(generation.id);
+      onUpdated?.(updated);
+      setEmailToast({ type: 'success', message: 'היצירה נעצרה' });
+    } catch (err) {
+      setEmailToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'עצירת היצירה נכשלה',
+      });
+    } finally {
+      setCanceling(false);
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (deleting) return;
+    if (
+      !window.confirm(
+        'למחוק את היצירה לצמיתות? הפעולה תסיר את הרשומה ואת הקובץ המאוחסן ואינה הפיכה.',
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setEmailToast(null);
+    try {
+      await api.hardDeleteAdminGenerations([generation.id]);
+      onDeleted?.(generation.id);
+      onClose();
+    } catch (err) {
+      setEmailToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'מחיקת היצירה נכשלה',
+      });
+      setDeleting(false);
+    }
+  };
+
+  const displayStatus =
+    generation.status === 'failed' && generation.errorMessage
+      ? translateError(generation.errorMessage, { includeRequestId: true })
+      : STATUS_LABELS[generation.status] ?? generation.status;
 
   const details: [string, string | undefined][] = [
     ['משתמש', generation.userEmail ?? generation.userId],
     ['סוג', generation.type],
-    ['סטטוס', STATUS_LABELS[generation.status] ?? generation.status],
+    ['סטטוס', displayStatus],
     ['ספק', generation.provider],
     ['מודל', generation.model],
-    ['גודל', generation.size],
-    ['רזולוציה', generation.resolution],
-    ['איכות', generation.quality],
+    ['יחס תמונה', generation.size],
+    ['רזולוציה', generation.resolution ?? '—'],
+    ['רמת החשיבה', generation.quality ?? '—'],
     ['עלות טוקנים', generation.creditCost.toLocaleString('he-IL')],
     [
       'עלות בפועל ($)',
@@ -42,6 +134,12 @@ export function AdminGenerationModal({
         : '—',
     ],
     ['תאריך', formatDateTime(generation.createdAt)],
+    ...(generation.deletedAt
+      ? ([['נמחקה בתאריך', formatDateTime(generation.deletedAt)]] as [
+          string,
+          string,
+        ][])
+      : []),
   ];
 
   return (
@@ -57,20 +155,51 @@ export function AdminGenerationModal({
       >
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-950">פרטי יצירה</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-bold text-gray-950">פרטי יצירה</h2>
+              {generation.deletedAt && (
+                <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+                  נמחקה
+                </span>
+              )}
+            </div>
             <p className="mt-1 text-sm text-gray-500">{formatDateTime(generation.createdAt)}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-50"
-            aria-label="סגור"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6 6 18" />
-              <path d="m6 6 12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            {canStop && (
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={canceling}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-60"
+              >
+                {canceling ? <SpinnerIcon /> : null}
+                {canceling ? 'עוצר...' : 'עצירת היצירה'}
+              </button>
+            )}
+            {canDelete && (
+              <button
+                type="button"
+                onClick={handleHardDelete}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-600 bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+              >
+                {deleting ? <SpinnerIcon /> : null}
+                {deleting ? 'מוחק...' : 'מחק לצמיתות'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-50"
+              aria-label="סגור"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
@@ -95,7 +224,7 @@ export function AdminGenerationModal({
                 )
               ) : (
                 <span className="text-gray-500">
-                  {STATUS_LABELS[generation.status] ?? generation.status}
+                  {displayStatus}
                 </span>
               )}
             </div>
@@ -118,7 +247,28 @@ export function AdminGenerationModal({
                 >
                   פתיחה
                 </a>
+                {/* <button
+                  type="button"
+                  onClick={handleSendEmail}
+                  disabled={sending}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
+                >
+                  {sending ? <SpinnerIcon /> : <EnvelopeIcon />}
+                  {sending ? 'שולח...' : 'שלח לי במייל'}
+                </button> */}
               </div>
+            )}
+            {emailToast && (
+              <p
+                className={`text-sm font-medium ${
+                  emailToast.type === 'success'
+                    ? 'text-green-600'
+                    : 'text-red-600'
+                }`}
+                role="status"
+              >
+                {emailToast.message}
+              </p>
             )}
           </div>
 
@@ -134,7 +284,7 @@ export function AdminGenerationModal({
               <section>
                 <h3 className="mb-2 font-semibold text-gray-950">שגיאה למשתמש</h3>
                 <p className="whitespace-pre-wrap rounded-lg border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-800">
-                  {translateError(generation.errorMessage)}
+                  {translateError(generation.errorMessage, { includeRequestId: true })}
                 </p>
               </section>
             )}

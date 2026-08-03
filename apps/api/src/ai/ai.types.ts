@@ -3,10 +3,14 @@ export interface GenerateImageParams {
   model: string;
   type?: string;
   size: string;
-  quality: string;
-  resolution?: string;
+  quality?: string | null;
+  resolution?: string | null;
   referenceImages?: string[] | null;
   provider: string;
+  /** Video only: clip length in seconds. */
+  durationSeconds?: number | null;
+  /** Video only: whether to generate native audio (v3 models). */
+  generateAudio?: boolean | null;
 }
 
 export interface GenerateTextParams {
