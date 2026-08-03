@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { PricingTiers } from '@/components/PricingTiers';
+import { RedirectIfAuthenticated } from '@/app/_components/RedirectIfAuthenticated';
 
 const features = [
   {
@@ -31,6 +32,7 @@ const steps = [
 export default function LandingPage() {
   return (
     <div className="relative overflow-hidden">
+      <RedirectIfAuthenticated to="/dashboard" />
       <div className="glow-orb -top-32 right-[-10%] h-[28rem] w-[28rem] bg-brand-700/40 animate-float-slow" />
       <div className="glow-orb top-40 left-[-10%] h-[24rem] w-[24rem] bg-accent-600/25 animate-float-slow" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[600px] bg-grid" />
