@@ -2,11 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import {
-  BeforeInstallPromptEvent,
-  isIos,
-  isStandalone,
-} from '@/lib/pwa';
+import { useInstall } from '@/lib/use-install';
 
 // Remember a dismissal for a while so we don't nag on every visit, but still
 // re-offer later for users who put it off.
@@ -14,6 +10,7 @@ const DISMISS_KEY = 'vp_install_prompt_dismissed';
 const HIDE_DAYS = 7;
 
 function isDismissed(): boolean {
+  if (typeof window === 'undefined') return false;
   const raw = localStorage.getItem(DISMISS_KEY);
   if (!raw) return false;
   const ts = Number(raw);
@@ -23,66 +20,42 @@ function isDismissed(): boolean {
 
 /**
  * A polished, dismissible "install the app" banner shown to logged-in users who
- * are browsing in a normal tab (not the installed PWA). On Chrome/Edge/Android
- * it captures `beforeinstallprompt` and triggers the real install dialog from
- * our own button; on iOS Safari (which has no such event) it shows the manual
- * "Share → Add to Home Screen" steps. Advertises the 40-credit install bonus.
+ * are browsing in a normal tab (not the installed PWA). It reads the shared
+ * install state: on Chrome/Edge/Android it triggers the native install dialog;
+ * on iOS Safari (no such event) it shows the manual "Share → Add to Home
+ * Screen" steps. Advertises the 40-credit install bonus. This complements the
+ * always-available navbar button with a more prominent, one-time nudge.
  */
 export function InstallPrompt() {
   const { user } = useAuth();
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
-    null,
-  );
-  const [mode, setMode] = useState<'android' | 'ios' | null>(null);
+  const { installed, canPrompt, isIos, promptInstall } = useInstall();
+  // Start hidden to avoid an SSR/first-paint flash; resolve on mount.
+  const [hidden, setHidden] = useState(true);
+
+  useEffect(() => {
+    setHidden(isDismissed());
+  }, []);
 
   const dismiss = useCallback(() => {
     localStorage.setItem(DISMISS_KEY, String(Date.now()));
-    setMode(null);
-    setDeferred(null);
+    setHidden(true);
   }, []);
 
-  useEffect(() => {
-    if (!user) return;
-    if (isStandalone()) return;
-    if (isDismissed()) return;
-
-    // iOS has no install event — show the manual guide right away.
-    if (isIos()) {
-      setMode('ios');
-      return;
-    }
-
-    // Chromium fires this instead of showing its own mini-infobar. Capture it
-    // so we can trigger installation from our button on demand.
-    const onBeforeInstall = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
-      setMode('android');
-    };
-    // Once installed, take the banner away for good.
-    const onInstalled = () => dismiss();
-
-    window.addEventListener('beforeinstallprompt', onBeforeInstall);
-    window.addEventListener('appinstalled', onInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstall);
-      window.removeEventListener('appinstalled', onInstalled);
-    };
-  }, [user, dismiss]);
-
   const install = useCallback(async () => {
-    if (!deferred) return;
-    await deferred.prompt();
-    const choice = await deferred.userChoice;
-    // Either way, retire this prompt event (it can only be used once). The
-    // reward is granted separately when the installed app is first opened.
-    setDeferred(null);
-    if (choice.outcome === 'accepted') {
-      setMode(null);
-    } else {
-      dismiss();
-    }
-  }, [deferred, dismiss]);
+    const outcome = await promptInstall();
+    // If the user rejected the native dialog, snooze the banner. On accept the
+    // app becomes installed and the banner disappears on its own.
+    if (outcome === 'dismissed') dismiss();
+  }, [promptInstall, dismiss]);
+
+  const mode: 'android' | 'ios' | null =
+    !user || installed || hidden
+      ? null
+      : canPrompt
+        ? 'android'
+        : isIos
+          ? 'ios'
+          : null;
 
   if (!mode) return null;
 

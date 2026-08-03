@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { InstallButton } from '@/components/InstallButton';
 
 const POLL_INTERVAL_MS = 30000;
 
@@ -126,7 +127,8 @@ export function Navbar() {
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
+          <InstallButton />
           {user ? (
             <div className="flex items-center gap-4">
               <span className="inline-flex items-center gap-1.5 text-sm bg-brand-900/30 border border-brand-700/40 text-brand-200 px-3 py-1 rounded-full">
