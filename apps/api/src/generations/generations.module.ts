@@ -10,6 +10,7 @@ import { CreditsModule } from '../credits/credits.module';
 import { AiModule } from '../ai/ai.module';
 import { StorageModule } from '../storage/storage.module';
 import { MailModule } from '../mail/mail.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({})
 export class GenerationsModule {
@@ -25,6 +26,7 @@ export class GenerationsModule {
         AiModule,
         StorageModule,
         MailModule,
+        UsersModule,
       ],
       controllers: [GenerationsController],
       providers: [

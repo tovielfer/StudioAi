@@ -7,7 +7,8 @@ MVP platform for AI image generation with Next.js frontend, NestJS backend, Post
 ```
 apps/
 ├── web/     Next.js 15 frontend
-└── api/     NestJS backend + BullMQ worker
+├── api/     NestJS backend + BullMQ worker
+└── mcp/     Remote MCP server (lets Claude drive the studio via a token)
 ```
 
 - **Frontend**: Landing, auth, dashboard, create, history, gallery
@@ -60,6 +61,9 @@ Without AI API keys, the system runs in **mock mode** (placeholder images).
 ### Auth
 - `POST /auth/register` — Register (25 free credits)
 - `POST /auth/login` — Login, returns JWT
+- `GET /auth/api-token` — Personal API token status (JWT)
+- `POST /auth/api-token` — Create/rotate personal API token, returned once (JWT)
+- `DELETE /auth/api-token` — Revoke personal API token (JWT)
 
 ### Generations
 - `POST /generations/create` — Create generation job
@@ -88,6 +92,19 @@ Without AI API keys, the system runs in **mock mode** (placeholder images).
 4. Result saved to storage (local/R2)
 5. DB updated → UI polls and shows result
 6. On failure after retries → credits refunded
+
+## MCP (connect Claude)
+
+The `apps/mcp` server exposes the studio as MCP tools so Claude (and any MCP
+client) can create images/videos on a user's behalf. Users generate a personal
+API token in the dashboard (`/mcp`) and connect Claude to the MCP URL with an
+`Authorization: Bearer vpx_...` header. Every action runs through the normal API,
+so credits are deducted and prompt moderation applies. See
+[apps/mcp/README.md](apps/mcp/README.md) for details and the tool list.
+
+```bash
+npm run dev:mcp   # starts the MCP server on :3002 (endpoint /mcp)
+```
 
 ## Production Notes
 

@@ -15,7 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { GenerationsService } from './generations.service';
 import { CreateGenerationDto } from './dto/create-generation.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtOrApiKeyGuard } from '../auth/jwt-or-api-key.guard';
 import { RateLimitGuard } from '../common/rate-limit.guard';
 import { StorageService } from '../storage/storage.service';
 import { GenerationType } from '../common/constants';
@@ -52,7 +52,7 @@ export class GenerationsController {
   }
 
   @Get('cost')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtOrApiKeyGuard)
   getCost(
     @Query('provider') provider: string,
     @Query('model') model: string,
@@ -92,7 +92,7 @@ export class GenerationsController {
   }
 
   @Post('create')
-  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @UseGuards(JwtOrApiKeyGuard, RateLimitGuard)
   create(
     @Req() req: { user: { id: string } },
     @Body() dto: CreateGenerationDto,
@@ -101,7 +101,7 @@ export class GenerationsController {
   }
 
   @Post('upload-reference')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtOrApiKeyGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: MAX_FILE_SIZE },
@@ -125,7 +125,7 @@ export class GenerationsController {
   }
 
   @Get('user/:userId')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtOrApiKeyGuard)
   findByUser(
     @Req() req: { user: { id: string } },
     @Param('userId') userId: string,
@@ -156,7 +156,7 @@ export class GenerationsController {
   }
 
   @Post(':id/deliver')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtOrApiKeyGuard)
   async sendEmail(
     @Req() req: { user: { id: string; email: string } },
     @Param('id') id: string,
@@ -178,13 +178,13 @@ export class GenerationsController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtOrApiKeyGuard)
   findOne(@Req() req: { user: { id: string } }, @Param('id') id: string) {
     return this.generationsService.findById(id, req.user.id);
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtOrApiKeyGuard)
   remove(@Req() req: { user: { id: string } }, @Param('id') id: string) {
     return this.generationsService.remove(id, req.user.id);
   }

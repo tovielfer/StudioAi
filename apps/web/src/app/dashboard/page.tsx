@@ -83,6 +83,9 @@ function DashboardContent() {
             <PlusIcon />
             סרטון חדש
           </Link>
+          <Link href="/mcp" className="btn-secondary inline-flex items-center gap-2">
+            חיבור ל-Claude
+          </Link>
         </div>
       </div>
 

@@ -11,6 +11,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { CreditsService } from './credits.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtOrApiKeyGuard } from '../auth/jwt-or-api-key.guard';
 import { AddCreditsDto } from './dto/add-credits.dto';
 
 @Controller('credits')
@@ -21,7 +22,7 @@ export class CreditsController {
   ) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtOrApiKeyGuard)
   getBalance(@Req() req: { user: { id: string } }) {
     return this.creditsService.getBalance(req.user.id);
   }

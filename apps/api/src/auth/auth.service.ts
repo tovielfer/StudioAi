@@ -12,6 +12,7 @@ import { UserRole } from '../users/user.entity';
 import { MailService } from '../mail/mail.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { generateApiToken } from './api-token.util';
 
 @Injectable()
 export class AuthService {
@@ -176,6 +177,44 @@ export class AuthService {
       hasSavedCard: Boolean(user.sumitCustomerId && user.sumitPaymentMethodId),
       savedCardLast4: user.savedCardLast4,
       savedCardBrand: user.savedCardBrand,
+    };
+  }
+
+  /**
+   * Issues a new personal API token for the user, replacing any existing one.
+   * The raw token is returned here and never again — the caller must surface it
+   * to the user immediately.
+   */
+  async createApiToken(userId: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const { token, hash, displayPrefix } = generateApiToken();
+    await this.usersService.setApiToken(userId, hash, displayPrefix);
+    return {
+      token,
+      prefix: displayPrefix,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  async revokeApiToken(userId: string) {
+    await this.usersService.clearApiToken(userId);
+    return { success: true };
+  }
+
+  async getApiTokenInfo(userId: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return {
+      hasToken: Boolean(user.apiTokenHash),
+      prefix: user.apiTokenPrefix,
+      createdAt: user.apiTokenCreatedAt
+        ? user.apiTokenCreatedAt.toISOString()
+        : null,
     };
   }
 

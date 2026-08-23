@@ -62,6 +62,18 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface ApiTokenInfo {
+  hasToken: boolean;
+  prefix: string | null;
+  createdAt: string | null;
+}
+
+export interface ApiTokenCreated {
+  token: string;
+  prefix: string;
+  createdAt: string;
+}
+
 export interface TokensUsed {
   input_tokens: number;
   output_tokens: number;
@@ -384,6 +396,22 @@ class ApiClient {
 
   getCredits() {
     return this.request<{ credits: number }>('/credits');
+  }
+
+  // --- Personal API token (for MCP clients like Claude) ---
+
+  getApiTokenInfo() {
+    return this.request<ApiTokenInfo>('/auth/api-token');
+  }
+
+  createApiToken() {
+    return this.request<ApiTokenCreated>('/auth/api-token', { method: 'POST' });
+  }
+
+  revokeApiToken() {
+    return this.request<{ success: boolean }>('/auth/api-token', {
+      method: 'DELETE',
+    });
   }
 
   /** Claims the one-time "installed the app" bonus. Idempotent server-side:

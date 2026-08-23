@@ -58,6 +58,23 @@ export class User {
   resetPasswordExpiry: Date | null;
 
   /**
+   * SHA-256 hash of the user's personal API token (used by MCP clients such as
+   * Claude). The raw token is shown to the user exactly once at creation and is
+   * never stored. Null means the user has no active token. Unique so a token can
+   * be resolved back to a single user in O(1).
+   */
+  @Column({ type: 'varchar', nullable: true, default: null, unique: true })
+  apiTokenHash: string | null;
+
+  /** Non-secret prefix of the token (e.g. "vpx_ab12cd34…") for display only. */
+  @Column({ type: 'varchar', nullable: true, default: null })
+  apiTokenPrefix: string | null;
+
+  /** When the current API token was created (null if none). */
+  @Column({ type: 'timestamptz', nullable: true, default: null })
+  apiTokenCreatedAt: Date | null;
+
+  /**
    * When the one-time "installed the app" credit bonus was granted. Null means
    * the user hasn't claimed it yet; a timestamp both records the grant and acts
    * as the idempotency guard so the bonus can never be given twice.

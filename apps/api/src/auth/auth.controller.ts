@@ -1,4 +1,14 @@
-import { Controller, Post, Body, Get, Query, UseGuards, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Delete,
+  Body,
+  Get,
+  Query,
+  UseGuards,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
@@ -8,6 +18,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { JwtOrApiKeyGuard } from './jwt-or-api-key.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -56,8 +67,31 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtOrApiKeyGuard)
   getMe(@Req() req: any) {
     return this.authService.getMe(req.user.id);
+  }
+
+  /**
+   * Personal API token management for MCP clients (e.g. Claude). These are
+   * guarded by the normal JWT session — a user manages their own token from the
+   * dashboard. The token itself grants API access via ApiKeyStrategy.
+   */
+  @Get('api-token')
+  @UseGuards(JwtAuthGuard)
+  getApiToken(@Req() req: { user: { id: string } }) {
+    return this.authService.getApiTokenInfo(req.user.id);
+  }
+
+  @Post('api-token')
+  @UseGuards(JwtAuthGuard)
+  createApiToken(@Req() req: { user: { id: string } }) {
+    return this.authService.createApiToken(req.user.id);
+  }
+
+  @Delete('api-token')
+  @UseGuards(JwtAuthGuard)
+  revokeApiToken(@Req() req: { user: { id: string } }) {
+    return this.authService.revokeApiToken(req.user.id);
   }
 }

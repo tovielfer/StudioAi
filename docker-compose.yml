@@ -70,14 +70,37 @@ services:
       retries: 5
       start_period: 20s
 
+  # ── MCP server ─────────────────────────────────────────────
+  # Remote MCP endpoint so Claude & other MCP clients can drive the studio via a
+  # personal API token. Talks to the API server-to-server (no CORS involved).
+  mcp:
+    build:
+      context: ./apps/mcp
+    environment:
+      MCP_PORT: 3002
+      VOOKAPIX_API_URL: http://api:3001
+    ports:
+      - "3002:3002"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3002/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   # ── Web ────────────────────────────────────────────────────
   web:
     build:
       context: ./apps/web
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+        NEXT_PUBLIC_MCP_URL: ${NEXT_PUBLIC_MCP_URL:-http://localhost:3002/mcp}
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_MCP_URL: ${NEXT_PUBLIC_MCP_URL:-http://localhost:3002/mcp}
     ports:
       - "3000:3000"
     depends_on:

@@ -5,11 +5,12 @@
     "apps/*"
   ],
   "scripts": {
-    "predev": "npx kill-port 3000 3001 || exit 0",
-    "dev": "concurrently -k -n api,web -c cyan,magenta \"npm run dev:api\" \"npm run dev:web\"",
+    "predev": "npx kill-port 3000 3001 3002 || exit 0",
+    "dev": "concurrently -k -n api,web,mcp -c cyan,magenta,yellow \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:mcp\"",
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:web": "npm run dev --workspace=apps/web",
-    "build": "npm run build --workspace=apps/api && npm run build --workspace=apps/web",
+    "dev:mcp": "npm run dev --workspace=apps/mcp",
+    "build": "npm run build --workspace=apps/api && npm run build --workspace=apps/web && npm run build --workspace=apps/mcp",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
   },

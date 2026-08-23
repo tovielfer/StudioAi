@@ -45,6 +45,31 @@ export class UsersService {
     return this.usersRepo.findOne({ where: { resetPasswordToken: token } });
   }
 
+  findByApiTokenHash(hash: string) {
+    return this.usersRepo.findOne({ where: { apiTokenHash: hash } });
+  }
+
+  /**
+   * Stores a new personal API token for the user. Only the SHA-256 hash and a
+   * non-secret display prefix are persisted; replacing a token overwrites the
+   * previous one (a user has at most one active token).
+   */
+  async setApiToken(userId: string, hash: string, prefix: string) {
+    await this.usersRepo.update(userId, {
+      apiTokenHash: hash,
+      apiTokenPrefix: prefix,
+      apiTokenCreatedAt: new Date(),
+    });
+  }
+
+  async clearApiToken(userId: string) {
+    await this.usersRepo.update(userId, {
+      apiTokenHash: null,
+      apiTokenPrefix: null,
+      apiTokenCreatedAt: null,
+    });
+  }
+
   async create(
     email: string,
     passwordHash: string | null,
